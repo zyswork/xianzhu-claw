@@ -12,7 +12,42 @@
 //! 6. 通过 REST API 发送回复
 
 use std::sync::Arc;
+use prost::Message as ProstMessage;
 use crate::agent::Orchestrator;
+
+// ─── 飞书 WebSocket Protobuf 帧定义 ────────────────────
+#[derive(Clone, PartialEq, prost::Message)]
+struct PbHeader {
+    #[prost(string, tag = "1")]
+    pub key: String,
+    #[prost(string, tag = "2")]
+    pub value: String,
+}
+
+#[derive(Clone, PartialEq, prost::Message)]
+struct PbFrame {
+    #[prost(uint64, tag = "1")]
+    pub seq_id: u64,
+    #[prost(uint64, tag = "2")]
+    pub log_id: u64,
+    #[prost(int32, tag = "3")]
+    pub service: i32,
+    #[prost(int32, tag = "4")]
+    pub method: i32, // 0=CONTROL(ping/pong) 1=DATA(events)
+    #[prost(message, repeated, tag = "5")]
+    pub headers: Vec<PbHeader>,
+    #[prost(bytes = "vec", optional, tag = "8")]
+    pub payload: Option<Vec<u8>>,
+}
+
+impl PbFrame {
+    fn header_value(&self, key: &str) -> &str {
+        self.headers.iter()
+            .find(|h| h.key == key)
+            .map(|h| h.value.as_str())
+            .unwrap_or("")
+    }
+}
 
 /// 飞书 Bot 配置
 pub struct FeishuConfig {
@@ -98,7 +133,7 @@ async fn get_tenant_token(
         .ok_or("token 字段缺失".to_string())
 }
 
-/// WebSocket 模式
+/// WebSocket 模式（Protobuf 帧协议）
 async fn try_websocket_mode(
     client: &reqwest::Client,
     app_id: &str,
@@ -127,7 +162,13 @@ async fn try_websocket_mode(
     let ws_url = data["data"]["URL"].as_str()
         .ok_or("WS URL 缺失")?;
 
-    log::info!("飞书: WebSocket 连接 {}", &ws_url[..ws_url.len().min(50)]);
+    // 从 URL 提取 service_id（查询参数 fpid）
+    let service_id: i32 = url::Url::parse(ws_url).ok()
+        .and_then(|u| u.query_pairs().find(|(k, _)| k == "fpid").map(|(_, v)| v.to_string()))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+
+    log::info!("飞书: WebSocket 连接 {} (service_id={})", &ws_url[..ws_url.len().min(60)], service_id);
 
     // 连接 WebSocket
     let (ws_stream, _) = tokio_tungstenite::connect_async(ws_url).await
@@ -140,50 +181,103 @@ async fn try_websocket_mode(
 
     // 事件去重
     let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut seq: u64 = 0;
+    let mut ping_secs: u64 = 120;
+    let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(ping_secs));
 
-    // Ping 定时器
-    let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(120));
+    // 发送初始 ping（飞书 SDK 的做法）
+    seq += 1;
+    let initial_ping = PbFrame {
+        seq_id: seq, log_id: 0, service: service_id, method: 0,
+        headers: vec![PbHeader { key: "type".into(), value: "ping".into() }],
+        payload: None,
+    };
+    let _ = write.send(WsMsg::Binary(initial_ping.encode_to_vec())).await;
 
-    log::info!("飞书: WebSocket 已连接，等待事件...");
+    log::info!("飞书: WebSocket 已连接，已发送初始 ping，等待事件...");
 
     loop {
         tokio::select! {
             _ = ping_interval.tick() => {
-                let _ = write.send(WsMsg::Ping(vec![])).await;
+                seq += 1;
+                let ping = PbFrame {
+                    seq_id: seq, log_id: 0, service: service_id, method: 0,
+                    headers: vec![PbHeader { key: "type".into(), value: "ping".into() }],
+                    payload: None,
+                };
+                if write.send(WsMsg::Binary(ping.encode_to_vec())).await.is_err() {
+                    log::warn!("飞书: ping 发送失败，重连");
+                    break;
+                }
             }
             msg = read.next() => {
                 match msg {
-                    Some(Ok(WsMsg::Text(text))) => {
-                        // JSON 事件
-                        if let Ok(event) = serde_json::from_str::<serde_json::Value>(&text) {
-                            handle_feishu_event(
-                                &event, &mut seen_ids,
-                                app_id, app_secret,
-                                pool, orchestrator, app_handle,
-                            ).await;
-                        }
-                    }
                     Some(Ok(WsMsg::Binary(data))) => {
-                        // Protobuf 帧（飞书 WS 有时用二进制）
-                        // 尝试作为 JSON 解析
-                        if let Ok(text) = String::from_utf8(data) {
-                            if let Ok(event) = serde_json::from_str::<serde_json::Value>(&text) {
-                                handle_feishu_event(
-                                    &event, &mut seen_ids,
-                                    app_id, app_secret,
-                                    pool, orchestrator, app_handle,
-                                ).await;
+                        // 解析 Protobuf 帧
+                        let frame = match PbFrame::decode(&data[..]) {
+                            Ok(f) => f,
+                            Err(e) => {
+                                log::warn!("飞书: Protobuf 解码失败: {}", e);
+                                continue;
+                            }
+                        };
+
+                        // CONTROL 帧（ping/pong）
+                        if frame.method == 0 {
+                            if frame.header_value("type") == "pong" {
+                                // 从 pong payload 更新 ping 间隔
+                                if let Some(p) = &frame.payload {
+                                    #[derive(serde::Deserialize)]
+                                    struct WsCfg { #[serde(rename = "PingInterval")] ping_interval: Option<u64> }
+                                    if let Ok(cfg) = serde_json::from_slice::<WsCfg>(p) {
+                                        if let Some(secs) = cfg.ping_interval {
+                                            let secs = secs.max(10);
+                                            if secs != ping_secs {
+                                                ping_secs = secs;
+                                                ping_interval = tokio::time::interval(std::time::Duration::from_secs(ping_secs));
+                                                log::info!("飞书: ping 间隔更新为 {}s", ping_secs);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            continue;
+                        }
+
+                        // DATA 帧（事件）
+                        if let Some(payload) = &frame.payload {
+                            if let Ok(event) = serde_json::from_slice::<serde_json::Value>(payload) {
+                                log::info!("飞书: 收到事件: type={}", frame.header_value("type"));
+                                // 并发处理
+                                let aid = app_id.to_string();
+                                let asec = app_secret.to_string();
+                                let p = pool.clone();
+                                let o = orchestrator.clone();
+                                let h = app_handle.clone();
+                                let mut sids = seen_ids.clone();
+                                tokio::spawn(async move {
+                                    handle_feishu_event(&event, &mut sids, &aid, &asec, &p, &o, &h).await;
+                                });
                             }
                         }
                     }
-                    Some(Ok(WsMsg::Close(_))) => {
-                        log::info!("飞书: WebSocket 关闭");
-                        break;
+                    Some(Ok(WsMsg::Text(text))) => {
+                        // 有些飞书版本用 JSON 文本
+                        if let Ok(event) = serde_json::from_str::<serde_json::Value>(&text) {
+                            let aid = app_id.to_string();
+                            let asec = app_secret.to_string();
+                            let p = pool.clone();
+                            let o = orchestrator.clone();
+                            let h = app_handle.clone();
+                            let mut sids = seen_ids.clone();
+                            tokio::spawn(async move {
+                                handle_feishu_event(&event, &mut sids, &aid, &asec, &p, &o, &h).await;
+                            });
+                        }
                     }
-                    Some(Err(e)) => {
-                        log::warn!("飞书: WebSocket 错误: {}", e);
-                        break;
-                    }
+                    Some(Ok(WsMsg::Ping(d))) => { let _ = write.send(WsMsg::Pong(d)).await; }
+                    Some(Ok(WsMsg::Close(_))) => { log::info!("飞书: WebSocket 关闭"); break; }
+                    Some(Err(e)) => { log::warn!("飞书: WebSocket 错误: {}", e); break; }
                     None => break,
                     _ => {}
                 }
@@ -324,39 +418,142 @@ async fn handle_feishu_event(
         "role": "user", "content": clean_text, "source": "feishu",
     }));
 
-    // 调用 orchestrator
+    // 1. 先发一个"思考中"卡片
+    let card_msg_id = send_feishu_card(app_id, app_secret, chat_id, "思考中...", true).await;
+
+    // 2. 流式调用 orchestrator
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let base_url_opt = if base_url.is_empty() { None } else { Some(base_url.as_str()) };
+
+    // 后台任务：收集 token 并定时更新卡片
+    let card_id = card_msg_id.clone();
+    let aid = app_id.to_string();
+    let asec = app_secret.to_string();
+    let app_for_stream = app_handle.clone();
+    let sid_for_stream = session_id.clone();
+
+    let output_handle = tokio::spawn(async move {
+        let mut accumulated = String::new();
+        let mut last_update = std::time::Instant::now();
+        let update_interval = std::time::Duration::from_millis(1000); // 每秒更新一次卡片
+
+        while let Some(token) = rx.recv().await {
+            accumulated.push_str(&token);
+
+            // 推送流式 token 到前端
+            let _ = app_for_stream.emit_all("chat-event", serde_json::json!({
+                "type": "token", "sessionId": sid_for_stream,
+                "content": accumulated.clone(), "source": "feishu",
+            }));
+
+            // 节流更新卡片（最多每秒一次，避免飞书限流）
+            if last_update.elapsed() >= update_interval && !accumulated.is_empty() {
+                if let Some(ref msg_id) = card_id {
+                    patch_feishu_card(&aid, &asec, msg_id, &format!("{}▌", accumulated)).await;
+                }
+                last_update = std::time::Instant::now();
+            }
+        }
+        accumulated
+    });
 
     let result = orchestrator.send_message_stream(
         &agent.id, &session_id, &clean_text,
         &api_key, &api_type, base_url_opt, tx, None,
     ).await;
 
-    // 收集输出
-    let mut output = String::new();
-    while let Ok(token) = rx.try_recv() {
-        output.push_str(&token);
-    }
+    let streamed_output = output_handle.await.unwrap_or_default();
 
     let reply = match result {
-        Ok(resp) => if resp.is_empty() { output } else { resp },
+        Ok(resp) => if resp.is_empty() { streamed_output } else { resp },
         Err(e) => format!("处理出错: {}", &e[..e.len().min(100)]),
     };
 
-    if !reply.is_empty() {
+    // 3. 最终更新卡片为完整回复（去掉光标）
+    if let Some(ref msg_id) = card_msg_id {
+        if !reply.is_empty() {
+            patch_feishu_card(app_id, app_secret, msg_id, &reply).await;
+        }
+    } else if !reply.is_empty() {
+        // 卡片发送失败的降级：发纯文本
         send_feishu_message(app_id, app_secret, chat_id, &reply).await;
-        log::info!("飞书: 回复 [{}] {}字符", chat_id, reply.len());
     }
 
-    // 推送回复到前端
+    log::info!("飞书: 回复 [{}] {}字符", chat_id, reply.len());
+
+    // 推送完成到前端
     let _ = app_handle.emit_all("chat-event", serde_json::json!({
         "type": "done", "sessionId": session_id,
         "role": "assistant", "content": reply, "source": "feishu",
     }));
 }
 
-/// 发送飞书消息
+/// 发送飞书交互卡片（用于流式更新）
+/// 返回 message_id（用于后续 PATCH 更新）
+async fn send_feishu_card(app_id: &str, app_secret: &str, chat_id: &str, text: &str, thinking: bool) -> Option<String> {
+    let client = reqwest::Client::new();
+    let token = get_tenant_token(&client, app_id, app_secret).await.ok()?;
+
+    let header_text = if thinking { "思考中..." } else { "小爪" };
+    let card = serde_json::json!({
+        "config": {"update_multi": true},
+        "header": {
+            "template": "blue",
+            "title": {"content": header_text, "tag": "plain_text"}
+        },
+        "elements": [
+            {"tag": "markdown", "content": text}
+        ]
+    });
+
+    let body = serde_json::json!({
+        "receive_id": chat_id,
+        "msg_type": "interactive",
+        "content": card.to_string(),
+    });
+
+    let resp = client.post(format!("{}/im/v1/messages?receive_id_type=chat_id", FEISHU_BASE))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&body)
+        .send().await.ok()?;
+
+    let data: serde_json::Value = resp.json().await.ok()?;
+    if data["code"].as_i64() != Some(0) {
+        log::warn!("飞书: 卡片发送失败: {}", data["msg"].as_str().unwrap_or("?"));
+        return None;
+    }
+
+    let msg_id = data["data"]["message_id"].as_str().map(|s| s.to_string());
+    log::info!("飞书: 卡片已发送 msg_id={:?}", msg_id);
+    msg_id
+}
+
+/// 更新飞书卡片内容（PATCH，用于流式输出）
+async fn patch_feishu_card(app_id: &str, app_secret: &str, message_id: &str, text: &str) {
+    let client = reqwest::Client::new();
+    let token = match get_tenant_token(&client, app_id, app_secret).await {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+
+    let card = serde_json::json!({
+        "config": {"update_multi": true},
+        "header": {
+            "template": "blue",
+            "title": {"content": "小爪", "tag": "plain_text"}
+        },
+        "elements": [
+            {"tag": "markdown", "content": text}
+        ]
+    });
+
+    let _ = client.patch(format!("{}/im/v1/messages/{}", FEISHU_BASE, message_id))
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&serde_json::json!({"content": card.to_string()}))
+        .send().await;
+}
+
+/// 发送飞书纯文本消息（降级用）
 async fn send_feishu_message(app_id: &str, app_secret: &str, chat_id: &str, text: &str) {
     let client = reqwest::Client::new();
 

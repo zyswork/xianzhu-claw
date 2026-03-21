@@ -260,15 +260,22 @@ async fn send_typing(token: &str, chat_id: i64) {
         .send().await;
 }
 
-/// 发送消息到 Telegram
+/// 发送消息到 Telegram（Markdown → HTML 渲染）
 async fn send_message(token: &str, chat_id: i64, text: &str) {
     let client = reqwest::Client::new();
-    // 先尝试 Markdown 格式
+    let html = markdown_to_telegram_html(text);
+
+    // 先尝试 HTML 格式（比 Markdown 更宽容）
     let resp = client.post(format!("https://api.telegram.org/bot{}/sendMessage", token))
-        .json(&serde_json::json!({"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}))
+        .json(&serde_json::json!({
+            "chat_id": chat_id,
+            "text": html,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": true,
+        }))
         .send().await;
 
-    // Markdown 失败则降级纯文本
+    // HTML 失败则降级纯文本
     if let Ok(r) = resp {
         if let Ok(body) = r.json::<serde_json::Value>().await {
             if body["ok"].as_bool() != Some(true) {
@@ -278,4 +285,174 @@ async fn send_message(token: &str, chat_id: i64, text: &str) {
             }
         }
     }
+}
+
+/// 将标准 Markdown 转为 Telegram HTML
+///
+/// Telegram HTML 支持: <b> <i> <code> <pre> <a> <s> <u> <blockquote>
+fn markdown_to_telegram_html(md: &str) -> String {
+    let mut html = String::with_capacity(md.len() * 2);
+    let mut in_code_block = false;
+    let mut code_lang = String::new();
+
+    for line in md.lines() {
+        // 代码块
+        if line.trim_start().starts_with("```") {
+            if in_code_block {
+                html.push_str("</code></pre>\n");
+                in_code_block = false;
+            } else {
+                code_lang = line.trim_start().trim_start_matches('`').to_string();
+                if code_lang.is_empty() {
+                    html.push_str("<pre><code>");
+                } else {
+                    html.push_str(&format!("<pre><code class=\"language-{}\">", escape_html(&code_lang)));
+                }
+                in_code_block = true;
+            }
+            continue;
+        }
+
+        if in_code_block {
+            html.push_str(&escape_html(line));
+            html.push('\n');
+            continue;
+        }
+
+        // 标题 → 加粗
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("### ") {
+            html.push_str(&format!("<b>{}</b>\n", escape_html(&trimmed[4..])));
+            continue;
+        }
+        if trimmed.starts_with("## ") {
+            html.push_str(&format!("\n<b>{}</b>\n", escape_html(&trimmed[3..])));
+            continue;
+        }
+        if trimmed.starts_with("# ") {
+            html.push_str(&format!("\n<b>{}</b>\n", escape_html(&trimmed[2..])));
+            continue;
+        }
+
+        // 行内格式转换
+        let processed = process_inline_markdown(line);
+        html.push_str(&processed);
+        html.push('\n');
+    }
+
+    if in_code_block {
+        html.push_str("</code></pre>\n");
+    }
+
+    html.trim().to_string()
+}
+
+/// 处理行内 Markdown 格式
+fn process_inline_markdown(line: &str) -> String {
+    let mut result = String::new();
+    let chars: Vec<char> = line.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        // 行内代码 `code`
+        if chars[i] == '`' && !matches!(chars.get(i+1), Some(&'`')) {
+            if let Some(end) = chars[i+1..].iter().position(|&c| c == '`') {
+                let code: String = chars[i+1..i+1+end].iter().collect();
+                result.push_str(&format!("<code>{}</code>", escape_html(&code)));
+                i += end + 2;
+                continue;
+            }
+        }
+
+        // 加粗 **text**
+        if i + 1 < len && chars[i] == '*' && chars[i+1] == '*' {
+            if let Some(end) = find_closing(&chars, i+2, "**") {
+                let inner: String = chars[i+2..end].iter().collect();
+                result.push_str(&format!("<b>{}</b>", escape_html(&inner)));
+                i = end + 2;
+                continue;
+            }
+        }
+
+        // 斜体 *text* 或 _text_
+        if (chars[i] == '*' || chars[i] == '_') && i + 1 < len && chars[i+1] != ' ' {
+            let marker = chars[i];
+            if let Some(end) = chars[i+1..].iter().position(|&c| c == marker) {
+                let inner: String = chars[i+1..i+1+end].iter().collect();
+                if !inner.is_empty() && !inner.contains(' ') || marker == '*' {
+                    result.push_str(&format!("<i>{}</i>", escape_html(&inner)));
+                    i += end + 2;
+                    continue;
+                }
+            }
+        }
+
+        // 链接 [text](url)
+        if chars[i] == '[' {
+            if let Some(close_bracket) = chars[i+1..].iter().position(|&c| c == ']') {
+                let text_end = i + 1 + close_bracket;
+                if text_end + 1 < len && chars[text_end + 1] == '(' {
+                    if let Some(close_paren) = chars[text_end+2..].iter().position(|&c| c == ')') {
+                        let link_text: String = chars[i+1..text_end].iter().collect();
+                        let url: String = chars[text_end+2..text_end+2+close_paren].iter().collect();
+                        result.push_str(&format!("<a href=\"{}\">{}</a>", escape_html(&url), escape_html(&link_text)));
+                        i = text_end + 2 + close_paren + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // 删除线 ~~text~~
+        if i + 1 < len && chars[i] == '~' && chars[i+1] == '~' {
+            if let Some(end) = find_closing(&chars, i+2, "~~") {
+                let inner: String = chars[i+2..end].iter().collect();
+                result.push_str(&format!("<s>{}</s>", escape_html(&inner)));
+                i = end + 2;
+                continue;
+            }
+        }
+
+        // 普通字符（HTML 转义）
+        match chars[i] {
+            '&' => result.push_str("&amp;"),
+            '<' => result.push_str("&lt;"),
+            '>' if trimmed_starts_with_quote(line) && i == 0 => {
+                // blockquote
+                result.push_str("<blockquote>");
+                // 跳过 > 和空格
+                i += 1;
+                if i < len && chars[i] == ' ' { i += 1; }
+                let rest: String = chars[i..].iter().collect();
+                result.push_str(&escape_html(&rest));
+                result.push_str("</blockquote>");
+                return result;
+            }
+            '>' => result.push_str("&gt;"),
+            _ => result.push(chars[i]),
+        }
+        i += 1;
+    }
+
+    result
+}
+
+fn trimmed_starts_with_quote(line: &str) -> bool {
+    line.trim_start().starts_with('>')
+}
+
+fn find_closing(chars: &[char], start: usize, marker: &str) -> Option<usize> {
+    let marker_chars: Vec<char> = marker.chars().collect();
+    let mlen = marker_chars.len();
+    for i in start..chars.len().saturating_sub(mlen - 1) {
+        if chars[i..i+mlen] == marker_chars[..] {
+            return Some(i);
+        }
+    }
+    None
+}
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
