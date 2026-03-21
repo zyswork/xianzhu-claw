@@ -16,7 +16,7 @@ interface ChannelInfo {
 
 const CHANNELS: ChannelInfo[] = [
   { id: 'telegram', name: 'Telegram', icon: '\u{1F4E8}', desc: '通过 Telegram Bot 与 AI 对话。从 @BotFather 获取 Token，一分钟接入。', connected: false, configFields: [{ key: 'botToken', label: 'Bot Token', placeholder: '123456:ABC-DEF...', type: 'password' }] },
-  { id: 'feishu', name: '飞书 (Lark)', icon: '\u{1F426}', desc: '飞书群聊 AI 助手。', connected: false },
+  { id: 'feishu', name: '飞书 (Lark)', icon: '\u{1F426}', desc: '飞书群聊 AI 助手。在飞书开放平台创建应用，获取 App ID 和 Secret。', connected: false, configFields: [{ key: 'appId', label: 'App ID', placeholder: 'cli_xxx' }, { key: 'appSecret', label: 'App Secret', placeholder: '', type: 'password' }] },
   { id: 'dingtalk', name: '钉钉', icon: '\u{1F4AC}', desc: '钉钉群机器人接入。', connected: false },
   { id: 'wechat', name: '微信', icon: '\u{1F4F1}', desc: '微信公众号/企业微信接入。', connected: false },
   { id: 'discord', name: 'Discord', icon: '\u{1F3AE}', desc: '通过 Bot API 接入 Discord。', connected: false },
@@ -39,12 +39,17 @@ export default function ChannelsPage() {
       // 优先从本地 settings 检查
       const token = await invoke<string | null>('get_setting', { key: 'telegram_bot_token' })
       const infoStr = await invoke<string | null>('get_setting', { key: 'telegram_bot_info' })
+      const feishuId = await invoke<string | null>('get_setting', { key: 'feishu_app_id' })
+      const hasFeishu = !!feishuId
+
       const hasToken = !!token
       let botInfo = null
       try { if (infoStr) botInfo = JSON.parse(infoStr) } catch {}
 
       setChannels(prev => prev.map(c =>
-        c.id === 'telegram' ? { ...c, connected: hasToken, bot: botInfo } : c
+        c.id === 'telegram' ? { ...c, connected: hasToken, bot: botInfo }
+        : c.id === 'feishu' ? { ...c, connected: hasFeishu }
+        : c
       ))
     } catch (e: any) {
       setLoadError(String(e))
@@ -52,6 +57,21 @@ export default function ChannelsPage() {
   }
 
   const handleSetup = async (channelId: string) => {
+    if (channelId === 'feishu') {
+      const appId = formValues.appId?.trim()
+      const appSecret = formValues.appSecret?.trim()
+      if (!appId || !appSecret) { setError('请填写 App ID 和 App Secret'); return }
+      setSaving(true); setError('')
+      try {
+        await invoke('set_setting', { key: 'feishu_app_id', value: appId })
+        await invoke('set_setting', { key: 'feishu_app_secret', value: appSecret })
+        setConfiguring(null); setFormValues({}); setError('')
+        alert('飞书已配置！重启应用后生效。')
+        checkStatuses()
+      } catch (e: any) { setError('保存失败: ' + String(e)) }
+      setSaving(false)
+      return
+    }
     if (channelId !== 'telegram') { alert('该频道暂未支持'); return }
     const token = formValues.botToken?.trim()
     if (!token) { setError('请输入 Bot Token'); return }

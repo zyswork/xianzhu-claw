@@ -3124,6 +3124,35 @@ async fn main() {
                 });
             }
 
+            // 启动飞书连接（如果配置了 App ID）
+            {
+                let fs_pool = pool_for_setup.clone();
+                let fs_orch = app_state_for_setup.orchestrator.clone();
+                let fs_handle = app.handle().clone();
+                tokio::spawn(async move {
+                    let app_id: Option<String> = sqlx::query_scalar(
+                        "SELECT value FROM settings WHERE key = 'feishu_app_id'"
+                    ).fetch_optional(&fs_pool).await.ok().flatten();
+                    let app_secret: Option<String> = sqlx::query_scalar(
+                        "SELECT value FROM settings WHERE key = 'feishu_app_secret'"
+                    ).fetch_optional(&fs_pool).await.ok().flatten();
+
+                    if let (Some(id), Some(secret)) = (app_id, app_secret) {
+                        if !id.trim().is_empty() && !secret.trim().is_empty() {
+                            channels::feishu::start_feishu(
+                                channels::feishu::FeishuConfig {
+                                    app_id: id.trim().to_string(),
+                                    app_secret: secret.trim().to_string(),
+                                },
+                                fs_pool, fs_orch, fs_handle,
+                            ).await;
+                        }
+                    } else {
+                        log::info!("飞书: 未配置 App ID/Secret，跳过连接");
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

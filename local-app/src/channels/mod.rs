@@ -4,3 +4,4 @@
 //! 桌面端离线时，云端自动接管。
 
 pub mod telegram;
+pub mod feishu;
