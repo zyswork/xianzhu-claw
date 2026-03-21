@@ -676,6 +676,11 @@ impl Orchestrator {
             log::info!("Failover 模型链: {:?}", failover.all_models());
         }
 
+        // 温度策略（参考 OpenClaw/IronClaw/Hermes）：
+        // - 用户手动设了 → 用用户的
+        // - 没设 → 不传（用模型默认值，对话更自然）
+        // - 辅助任务（摘要/进化 review）在各自模块里固定 0.3
+
         let config = LlmConfig {
             provider: provider.to_string(), api_key: api_key.to_string(),
             model: selected_model, base_url: base_url.map(|s| s.to_string()),
