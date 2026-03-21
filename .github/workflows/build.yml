@@ -15,17 +15,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # macOS Universal (M + Intel)
           - platform: macos-latest
-            target: universal-apple-darwin
-            label: macOS-Universal
-          # Windows
+            args: '--target aarch64-apple-darwin'
+            label: macOS-ARM64
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+            label: macOS-x64
           - platform: windows-latest
-            target: x86_64-pc-windows-msvc
+            args: ''
             label: Windows-x64
-          # Linux
           - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
+            args: ''
             label: Linux-x64
 
     runs-on: ${{ matrix.platform }}
@@ -41,22 +41,19 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
 
-      # macOS Universal 需要两个 target
-      - name: Add aarch64 target (macOS)
-        if: matrix.target == 'universal-apple-darwin'
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+      - name: Add macOS targets
+        if: runner.os == 'macOS'
+        run: |
+          rustup target add aarch64-apple-darwin
+          rustup target add x86_64-apple-darwin
 
-      # Linux 依赖
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
-      # 构建前端
       - name: Install frontend deps
         working-directory: frontend
         run: npm install
@@ -65,29 +62,36 @@ jobs:
         working-directory: frontend
         run: npx vite build
 
-      # 构建 Tauri
-      - name: Build Tauri
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: local-app
-          tauriScript: cargo tauri
-          args: --target ${{ matrix.target }}
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^1.6" --locked
 
-      # 上传产物
-      - name: Upload artifacts
+      - name: Build Tauri
+        working-directory: local-app
+        run: cargo tauri build ${{ matrix.args }}
+
+      - name: Upload artifacts (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: YonClaw-${{ matrix.label }}
+          path: local-app/target/**/release/bundle/dmg/*.dmg
+
+      - name: Upload artifacts (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: YonClaw-${{ matrix.label }}
+          path: local-app/target/release/bundle/msi/*.msi
+
+      - name: Upload artifacts (Linux)
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: YonClaw-${{ matrix.label }}
           path: |
-            local-app/target/${{ matrix.target }}/release/bundle/**/*.dmg
-            local-app/target/${{ matrix.target }}/release/bundle/**/*.app
-            local-app/target/${{ matrix.target }}/release/bundle/**/*.msi
-            local-app/target/${{ matrix.target }}/release/bundle/**/*.AppImage
-            local-app/target/${{ matrix.target }}/release/bundle/**/*.deb
+            local-app/target/release/bundle/appimage/*.AppImage
+            local-app/target/release/bundle/deb/*.deb
 
-  # 创建 Release（仅 tag 触发时）
   release:
     needs: build
     runs-on: ubuntu-latest
