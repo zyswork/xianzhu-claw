@@ -1,0 +1,629 @@
+//! 工具调用系统
+//!
+//! 支持 Agent 调用外部工具，包含安全级别控制
+
+use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// 统一路径安全校验
+///
+/// 检查路径是否安全，拒绝系统路径、敏感路径和路径遍历攻击
+pub(crate) fn validate_path_safety(path: &str) -> Result<(), String> {
+    let p = std::path::Path::new(path);
+
+    // 尝试规范化路径
+    let canonical = if p.exists() {
+        p.canonicalize()
+            .map_err(|e| format!("路径规范化失败: {}", e))?
+    } else {
+        // 路径不存在：规范化父目录
+        let parent = p.parent().ok_or("无效路径：无父目录")?;
+        if parent.as_os_str().is_empty() {
+            // 相对路径，使用当前目录
+            std::env::current_dir()
+                .map_err(|e| format!("获取当前目录失败: {}", e))?
+                .join(p)
+        } else if parent.exists() {
+            parent.canonicalize()
+                .map_err(|e| format!("父目录规范化失败: {}", e))?
+                .join(p.file_name().unwrap_or_default())
+        } else {
+            return Err("路径不存在且父目录也不存在，拒绝访问".to_string());
+        }
+    };
+
+    let path_str = canonical.to_string_lossy();
+
+    // 规范化后仍含 .. 则拒绝
+    if path_str.contains("..") {
+        return Err("路径包含非法遍历序列".to_string());
+    }
+
+    // 系统路径黑名单
+    let blocked_prefixes = [
+        "/etc", "/usr", "/bin", "/sbin",
+        "/System", "/Library",
+        "/var/root", "/private/etc",
+    ];
+    for prefix in &blocked_prefixes {
+        if path_str.starts_with(prefix) {
+            return Err(format!("安全限制：不允许访问系统路径 {}", path_str));
+        }
+    }
+
+    // 敏感用户路径
+    if let Some(home) = std::env::var_os("HOME") {
+        let home_str = home.to_string_lossy();
+        let sensitive_dirs = [".ssh", ".gnupg", ".aws", ".config/gcloud"];
+        for dir in &sensitive_dirs {
+            if path_str.starts_with(&format!("{}/{}", home_str, dir)) {
+                return Err(format!("安全限制：不允许访问敏感目录 {}", dir));
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// 工具安全级别
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ToolSafetyLevel {
+    /// 安全工具，可直接执行（如计算器、时间查询）
+    Safe,
+    /// 受保护工具，需要参数校验（如文件读取）
+    Guarded,
+    /// 沙箱工具，需要在沙箱中执行（如命令执行）
+    Sandboxed,
+    /// 需要用户审批（如发送邮件、删除文件）
+    Approval,
+}
+
+/// 解析后的工具调用
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParsedToolCall {
+    /// 调用 ID（用于关联结果）
+    pub id: String,
+    /// 工具名称
+    pub name: String,
+    /// 调用参数
+    pub arguments: serde_json::Value,
+}
+
+/// 工具定义
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolDefinition {
+    pub name: String,
+    pub description: String,
+    pub parameters: serde_json::Value,
+}
+
+/// 工具调用请求
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallRequest {
+    pub tool_name: String,
+    pub arguments: serde_json::Value,
+}
+
+/// 工具调用结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallResult {
+    pub tool_name: String,
+    pub result: String,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+/// 工具处理器特征
+#[async_trait]
+pub trait Tool: Send + Sync {
+    /// 获取工具定义
+    fn definition(&self) -> ToolDefinition;
+
+    /// 获取安全级别（默认 Safe）
+    fn safety_level(&self) -> ToolSafetyLevel {
+        ToolSafetyLevel::Safe
+    }
+
+    /// 执行工具
+    async fn execute(&self, arguments: serde_json::Value) -> Result<String, String>;
+}
+
+
+pub mod builtin;
+pub use builtin::*;
+
+pub struct ToolManager {
+    tools: HashMap<String, Box<dyn Tool>>,
+}
+
+impl ToolManager {
+    /// 创建新的工具管理器
+    pub fn new() -> Self {
+        Self {
+            tools: HashMap::new(),
+        }
+    }
+
+    /// 注册工具
+    pub fn register_tool(&mut self, tool: Box<dyn Tool>) {
+        let name = tool.definition().name.clone();
+        self.tools.insert(name.clone(), tool);
+        log::info!("工具已注册: {}", name);
+    }
+
+    /// 获取工具定义列表
+    pub fn get_tool_definitions(&self) -> Vec<ToolDefinition> {
+        self.tools
+            .values()
+            .map(|tool| tool.definition())
+            .collect()
+    }
+
+    /// 获取工具安全级别
+    pub fn get_safety_level(&self, tool_name: &str) -> Option<ToolSafetyLevel> {
+        self.tools.get(tool_name).map(|t| t.safety_level())
+    }
+
+    /// 执行工具（带安全防护层）
+    pub async fn execute_tool(
+        &self,
+        tool_name: &str,
+        arguments: serde_json::Value,
+    ) -> ToolCallResult {
+        // 防护 1: 危险命令检测
+        if tool_name == "bash_exec" {
+            if let Some(cmd) = arguments.get("command").and_then(|c| c.as_str()) {
+                if let Some(warning) = detect_dangerous_command(cmd) {
+                    log::warn!("危险命令被拦截: {} — {}", cmd, warning);
+                    return ToolCallResult {
+                        tool_name: tool_name.to_string(),
+                        result: String::new(),
+                        success: false,
+                        error: Some(format!("安全拦截：{}", warning)),
+                    };
+                }
+            }
+        }
+
+        // 防护 2: 文件路径白名单（file_read/write/edit 限制为 Agent workspace + /tmp）
+        if matches!(tool_name, "file_write" | "file_edit" | "diff_edit") {
+            if let Some(path) = arguments.get("path").and_then(|p| p.as_str()) {
+                if let Err(e) = validate_write_path(path) {
+                    return ToolCallResult {
+                        tool_name: tool_name.to_string(),
+                        result: String::new(),
+                        success: false,
+                        error: Some(e),
+                    };
+                }
+            }
+        }
+
+        match self.tools.get(tool_name) {
+            Some(tool) => match tool.execute(arguments).await {
+                Ok(result) => {
+                    // 防护 3: 输出大小限制（最大 50KB，防止撑爆上下文）
+                    let truncated = truncate_output(&result, MAX_OUTPUT_SIZE);
+                    ToolCallResult {
+                        tool_name: tool_name.to_string(),
+                        result: truncated,
+                        success: true,
+                        error: None,
+                    }
+                }
+                Err(error) => ToolCallResult {
+                    tool_name: tool_name.to_string(),
+                    result: String::new(),
+                    success: false,
+                    error: Some(error),
+                },
+            },
+            None => ToolCallResult {
+                tool_name: tool_name.to_string(),
+                result: String::new(),
+                success: false,
+                error: Some(format!("工具不存在: {}", tool_name)),
+            },
+        }
+    }
+
+    /// 获取工具
+    pub fn get_tool(&self, tool_name: &str) -> Option<&Box<dyn Tool>> {
+        self.tools.get(tool_name)
+    }
+}
+
+impl Default for ToolManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// 工具输出最大字节数（50KB）
+const MAX_OUTPUT_SIZE: usize = 50 * 1024;
+
+/// 截断超大输出
+fn truncate_output(output: &str, max_bytes: usize) -> String {
+    if output.len() <= max_bytes {
+        return output.to_string();
+    }
+    // 找到安全的 UTF-8 截断点
+    let mut end = max_bytes;
+    while end > 0 && !output.is_char_boundary(end) {
+        end -= 1;
+    }
+    let truncated = &output[..end];
+    format!(
+        "{}\n\n[输出已截断：原始 {} 字节，显示前 {} 字节]",
+        truncated,
+        output.len(),
+        end
+    )
+}
+
+/// 检测危险 bash 命令，返回警告消息
+fn detect_dangerous_command(cmd: &str) -> Option<String> {
+    let cmd_lower = cmd.to_lowercase();
+
+    // 高危：不可逆的破坏性命令
+    let critical_patterns = [
+        ("rm -rf /", "危险：试图删除根目录"),
+        ("rm -rf ~", "危险：试图删除用户目录"),
+        ("rm -rf /*", "危险：试图删除根目录下所有文件"),
+        ("mkfs", "危险：试图格式化磁盘"),
+        ("dd if=", "危险：dd 命令可能覆盖磁盘数据"),
+        (":(){:|:&};:", "危险：fork bomb"),
+    ];
+    for (pattern, msg) in &critical_patterns {
+        if cmd_lower.contains(pattern) {
+            return Some(msg.to_string());
+        }
+    }
+
+    // 中危：需要注意的命令（记录日志但不拦截）
+    let warn_patterns = [
+        "sudo ", "chmod 777", "chown ", "curl | sh", "curl | bash",
+        "wget -O - | sh", "eval ", "> /dev/",
+    ];
+    for pattern in &warn_patterns {
+        if cmd_lower.contains(pattern) {
+            log::warn!("工具安全: bash_exec 执行了敏感命令: {}", cmd);
+            // 不拦截，只记录
+            break;
+        }
+    }
+
+    None
+}
+
+/// 验证写入路径（限制为 Agent workspace、/tmp、当前用户目录下的项目）
+fn validate_write_path(path: &str) -> Result<(), String> {
+    // 先做基本路径安全校验
+    validate_path_safety(path)?;
+
+    let p = std::path::Path::new(path);
+    let canonical = if p.exists() {
+        p.canonicalize().map_err(|e| format!("路径规范化失败: {}", e))?
+    } else if let Some(parent) = p.parent() {
+        if parent.exists() {
+            parent.canonicalize().map_err(|e| e.to_string())?
+                .join(p.file_name().unwrap_or_default())
+        } else {
+            return Err("写入路径的父目录不存在".to_string());
+        }
+    } else {
+        return Err("无效的写入路径".to_string());
+    };
+
+    let path_str = canonical.to_string_lossy();
+
+    // 允许的写入路径
+    let allowed = [
+        "/tmp",
+        "/var/tmp",
+    ];
+    for prefix in &allowed {
+        if path_str.starts_with(prefix) { return Ok(()); }
+    }
+
+    // 允许 ~/.yonclaw/ 下的所有路径（Agent workspace）
+    if let Some(home) = std::env::var_os("HOME") {
+        let home_str = home.to_string_lossy();
+        if path_str.starts_with(&format!("{}/.yonclaw/", home_str)) {
+            return Ok(());
+        }
+        // 允许用户 Desktop/Documents/Downloads 下的项目目录
+        for dir in &["Desktop", "Documents", "Downloads", "Projects", "workspace"] {
+            if path_str.starts_with(&format!("{}/{}/", home_str, dir)) {
+                return Ok(());
+            }
+        }
+    }
+
+    Err(format!("安全限制：不允许写入此路径 {}。只能写入 Agent 工作区、/tmp 或用户项目目录。", path_str))
+}
+
+// ─── 工具配置 (TOOLS.md) 解析与序列化 ────────────────────────
+
+/// Profile 预设定义：每个 profile 包含的工具列表
+pub fn profile_tools(profile: &str) -> Vec<&'static str> {
+    match profile {
+        "basic" => vec!["calculator", "datetime", "file_read", "file_list", "code_search"],
+        "coding" => vec!["calculator", "datetime", "file_read", "file_write", "file_edit", "file_list", "bash_exec", "code_search", "web_fetch", "memory_read", "memory_write"],
+        "full" => vec![], // 空表示全部启用
+        _ => vec!["calculator", "datetime", "file_read", "file_list", "code_search"], // 未知 profile 降级为 basic
+    }
+}
+
+/// 解析 TOOLS.md 内容，返回 (profile, overrides)
+///
+/// overrides: HashMap<tool_name, enabled>
+pub fn parse_tools_config(content: &str) -> (String, HashMap<String, bool>) {
+    let mut profile = "full".to_string();
+    let mut overrides = HashMap::new();
+    let mut in_profile = false;
+    let mut in_overrides = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+
+        if trimmed == "## Profile" {
+            in_profile = true;
+            in_overrides = false;
+            continue;
+        }
+        if trimmed == "## Overrides" {
+            in_overrides = true;
+            in_profile = false;
+            continue;
+        }
+        if trimmed.starts_with("## ") || trimmed.starts_with("# ") {
+            in_profile = false;
+            in_overrides = false;
+            continue;
+        }
+
+        if in_profile && !trimmed.is_empty() {
+            profile = trimmed.to_string();
+            in_profile = false;
+        }
+
+        if in_overrides && trimmed.starts_with("- ") {
+            // 格式: "- tool_name: enabled" 或 "- tool_name: disabled"
+            let entry = trimmed.trim_start_matches("- ");
+            if let Some((name, status)) = entry.split_once(':') {
+                let name = name.trim();
+                let status = status.trim();
+                let enabled = status == "enabled";
+                overrides.insert(name.to_string(), enabled);
+            }
+        }
+    }
+
+    (profile, overrides)
+}
+
+/// 判断工具是否启用（基于 profile 和 overrides）
+pub fn is_tool_enabled(tool_name: &str, profile: &str, overrides: &HashMap<String, bool>) -> bool {
+    // overrides 优先
+    if let Some(&enabled) = overrides.get(tool_name) {
+        return enabled;
+    }
+
+    // full profile: 全部启用
+    if profile == "full" {
+        return true;
+    }
+
+    // 检查 profile 包含列表
+    let allowed = profile_tools(profile);
+    allowed.contains(&tool_name)
+}
+
+/// 将 profile 和 overrides 序列��为 TOOLS.md 格式
+pub fn format_tools_config(profile: &str, overrides: &HashMap<String, bool>) -> String {
+    let mut output = String::from("# Tools Configuration\n\n## Profile\n");
+    output.push_str(profile);
+    output.push('\n');
+
+    if !overrides.is_empty() {
+        output.push_str("\n## Overrides\n");
+        let mut sorted_keys: Vec<&String> = overrides.keys().collect();
+        sorted_keys.sort();
+        for key in sorted_keys {
+            let status = if overrides[key] { "enabled" } else { "disabled" };
+            output.push_str(&format!("- {}: {}\n", key, status));
+        }
+    }
+
+    output
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tool_manager_creation() {
+        let manager = ToolManager::new();
+        assert_eq!(manager.get_tool_definitions().len(), 0);
+    }
+
+    #[test]
+    fn test_calculator_tool_definition() {
+        let tool = CalculatorTool;
+        let def = tool.definition();
+        assert_eq!(def.name, "calculator");
+    }
+
+    #[test]
+    fn test_safety_level_default() {
+        let tool = CalculatorTool;
+        assert_eq!(tool.safety_level(), ToolSafetyLevel::Safe);
+    }
+
+    #[test]
+    fn test_safety_level_guarded() {
+        let tool = FileReadTool;
+        assert_eq!(tool.safety_level(), ToolSafetyLevel::Guarded);
+    }
+
+    #[test]
+    fn test_parsed_tool_call() {
+        let call = ParsedToolCall {
+            id: "call_1".to_string(),
+            name: "calculator".to_string(),
+            arguments: serde_json::json!({"expression": "1+1"}),
+        };
+        assert_eq!(call.name, "calculator");
+        assert_eq!(call.id, "call_1");
+    }
+
+    #[test]
+    fn test_eval_math_basic() {
+        assert_eq!(super::builtin::eval_math("1+2").unwrap(), 3.0);
+        assert_eq!(super::builtin::eval_math("10-3").unwrap(), 7.0);
+        assert_eq!(super::builtin::eval_math("4*5").unwrap(), 20.0);
+        assert_eq!(super::builtin::eval_math("15/3").unwrap(), 5.0);
+    }
+
+    #[test]
+    fn test_eval_math_precedence() {
+        assert_eq!(super::builtin::eval_math("2+3*4").unwrap(), 14.0);
+        assert_eq!(super::builtin::eval_math("(2+3)*4").unwrap(), 20.0);
+    }
+
+    #[test]
+    fn test_eval_math_negative() {
+        assert_eq!(super::builtin::eval_math("-5+3").unwrap(), -2.0);
+    }
+
+    #[test]
+    fn test_eval_math_divide_by_zero() {
+        assert!(super::builtin::eval_math("1/0").is_err());
+    }
+
+    #[tokio::test]
+    async fn test_calculator_execute() {
+        let tool = CalculatorTool;
+        let result = tool.execute(serde_json::json!({"expression": "(1+2)*3"})).await.unwrap();
+        assert_eq!(result, "9");
+    }
+
+    #[tokio::test]
+    async fn test_datetime_execute() {
+        let tool = DateTimeTool;
+        let result = tool.execute(serde_json::json!({"timezone": "+8"})).await.unwrap();
+        assert!(result.contains("datetime"));
+        assert!(result.contains("UTC+8"));
+    }
+
+    #[test]
+    fn test_tool_manager_safety_level() {
+        let mut manager = ToolManager::new();
+        manager.register_tool(Box::new(CalculatorTool));
+        manager.register_tool(Box::new(FileReadTool));
+        assert_eq!(manager.get_safety_level("calculator"), Some(ToolSafetyLevel::Safe));
+        assert_eq!(manager.get_safety_level("file_read"), Some(ToolSafetyLevel::Guarded));
+        assert_eq!(manager.get_safety_level("nonexistent"), None);
+    }
+
+    #[test]
+    fn test_parse_tools_config_full() {
+        let content = "# Tools Configuration\n\n## Profile\nfull\n\n## Overrides\n- web_search: disabled\n";
+        let (profile, overrides) = parse_tools_config(content);
+        assert_eq!(profile, "full");
+        assert_eq!(overrides.len(), 1);
+        assert_eq!(overrides.get("web_search"), Some(&false));
+    }
+
+    #[test]
+    fn test_parse_tools_config_basic() {
+        let content = "# Tools Configuration\n\n## Profile\nbasic\n";
+        let (profile, overrides) = parse_tools_config(content);
+        assert_eq!(profile, "basic");
+        assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn test_parse_tools_config_empty() {
+        let (profile, overrides) = parse_tools_config("");
+        assert_eq!(profile, "full");
+        assert!(overrides.is_empty());
+    }
+
+    #[test]
+    fn test_parse_tools_config_multiple_overrides() {
+        let content = "# Tools Configuration\n\n## Profile\ncoding\n\n## Overrides\n- web_search: disabled\n- calculator: enabled\n- file_read: disabled\n";
+        let (profile, overrides) = parse_tools_config(content);
+        assert_eq!(profile, "coding");
+        assert_eq!(overrides.len(), 3);
+        assert_eq!(overrides.get("web_search"), Some(&false));
+        assert_eq!(overrides.get("calculator"), Some(&true));
+        assert_eq!(overrides.get("file_read"), Some(&false));
+    }
+
+    #[test]
+    fn test_is_tool_enabled_full_profile() {
+        let overrides = HashMap::new();
+        assert!(is_tool_enabled("calculator", "full", &overrides));
+        assert!(is_tool_enabled("web_search", "full", &overrides));
+        assert!(is_tool_enabled("anything", "full", &overrides));
+    }
+
+    #[test]
+    fn test_is_tool_enabled_basic_profile() {
+        let overrides = HashMap::new();
+        assert!(is_tool_enabled("calculator", "basic", &overrides));
+        assert!(is_tool_enabled("datetime", "basic", &overrides));
+        assert!(is_tool_enabled("file_read", "basic", &overrides));
+        assert!(is_tool_enabled("file_list", "basic", &overrides));
+        assert!(is_tool_enabled("code_search", "basic", &overrides));
+        assert!(!is_tool_enabled("bash_exec", "basic", &overrides));
+        assert!(!is_tool_enabled("web_search", "basic", &overrides));
+        assert!(!is_tool_enabled("file_edit", "basic", &overrides));
+    }
+
+    #[test]
+    fn test_is_tool_enabled_override_wins() {
+        let mut overrides = HashMap::new();
+        overrides.insert("calculator".to_string(), false);
+        // override 禁用 calculator，即使 full profile 允许
+        assert!(!is_tool_enabled("calculator", "full", &overrides));
+
+        overrides.insert("web_search".to_string(), true);
+        // override 启用 web_search，即使 basic profile 不包含
+        assert!(is_tool_enabled("web_search", "basic", &overrides));
+    }
+
+    #[test]
+    fn test_format_tools_config_roundtrip() {
+        let mut overrides = HashMap::new();
+        overrides.insert("web_search".to_string(), false);
+        overrides.insert("calculator".to_string(), true);
+        let output = format_tools_config("coding", &overrides);
+        let (profile, parsed_overrides) = parse_tools_config(&output);
+        assert_eq!(profile, "coding");
+        assert_eq!(parsed_overrides, overrides);
+    }
+
+    #[test]
+    fn test_format_tools_config_no_overrides() {
+        let overrides = HashMap::new();
+        let output = format_tools_config("full", &overrides);
+        assert!(output.contains("## Profile\nfull"));
+        assert!(!output.contains("## Overrides"));
+    }
+
+    #[test]
+    fn test_profile_tools() {
+        assert_eq!(profile_tools("basic"), vec!["calculator", "datetime", "file_read", "file_list", "code_search"]);
+        assert!(profile_tools("coding").contains(&"file_read"));
+        assert!(profile_tools("coding").contains(&"bash_exec"));
+        assert!(profile_tools("coding").contains(&"file_edit"));
+        assert!(profile_tools("coding").contains(&"code_search"));
+        assert!(profile_tools("coding").contains(&"web_fetch"));
+        assert!(profile_tools("full").is_empty()); // 空表示全部启用
+    }
+}

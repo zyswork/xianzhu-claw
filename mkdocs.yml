@@ -1,0 +1,94 @@
+site_name: OpenClaw 文档
+site_description: 企业级开源协作平台文档
+site_author: OpenClaw Team
+site_url: https://openclaw.example.com/docs
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - scheme: light
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    - scheme: dark
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换到浅色模式
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search:
+      lang: zh
+      separator: '[\s\-\.]+'
+  - minify:
+      minify_html: true
+      minify_css: true
+      minify_js: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      use_pygments: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:pymdownx.emoji.twemoji
+      emoji_generator: !!python/name:pymdownx.emoji.to_svg
+  - admonition
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+      toc_depth: 3
+
+nav:
+  - 首页: index.md
+  - 快速开始:
+      - 安装指南: guides/installation.md
+      - 基础操作: guides/basic-operations.md
+      - 入门教程: guides/getting-started.md
+  - 用户指南:
+      - 概述: USER_GUIDE.md
+      - 故障排除: TROUBLESHOOTING.md
+  - 性能优化:
+      - 启动基准: performance/startup-baseline.md
+      - 内存优化: performance/memory-optimization.md
+      - 包体积优化: performance/bundle-optimization.md
+      - 运行时优化: performance/runtime-optimization.md
+  - 审查报告:
+      - 执行摘要: docs/REVIEW_EXECUTIVE_SUMMARY.md
+      - 最终审查: docs/FINAL_REVIEW_REPORT.md
+      - Tauri 集成审查: docs/TAURI_FRONTEND_INTEGRATION_REVIEW.md
+  - 关于:
+      - 项目信息: README.md
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/openclaw/openclaw
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/openclaw
+
+copyright: Copyright &copy; 2024 OpenClaw Team. All rights reserved.

@@ -1,0 +1,56 @@
+{
+  "name": "openclaw-admin-backend",
+  "version": "0.1.0",
+  "description": "OpenClaw 企业后台 API",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "openclaw",
+    "admin",
+    "api"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@types/compression": "^1.8.1",
+    "axios": "^1.6.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-jwt": "^8.5.1",
+    "joi": "^18.0.2",
+    "jsonwebtoken": "^9.0.3",
+    "lib0": "^0.2.117",
+    "pg": "^8.20.0",
+    "uuid": "^9.0.1",
+    "ws": "^8.19.0",
+    "yjs": "^13.6.30"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.10.6",
+    "@types/pg": "^8.18.0",
+    "@types/supertest": "^7.2.0",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.18.1",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "@vitest/ui": "^4.1.0",
+    "eslint": "^8.56.0",
+    "supertest": "^7.2.2",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^4.1.0"
+  }
+}
