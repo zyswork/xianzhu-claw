@@ -95,7 +95,8 @@ async fn run_gateway(
 
     let last_seq_hb = last_seq.clone();
     let ack_hb = ack_received.clone();
-    // 把 write 包装为 Arc<Mutex> 供心跳和消息回复共用
+    // write 仅由心跳任务使用（消息回复走 HTTP REST，不走 WebSocket）
+    // Mutex 用于心跳 task 和主循环之间的所有权共享
     let write = Arc::new(tokio::sync::Mutex::new(write));
     let write_hb = write.clone();
 

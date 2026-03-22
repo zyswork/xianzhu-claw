@@ -44,7 +44,6 @@ async fn run_socket_mode(
     let client = reqwest::Client::new();
     let resp = client.post("https://slack.com/api/apps.connections.open")
         .header("Authorization", format!("Bearer {}", config.app_token))
-        .header("Content-Type", "application/x-www-form-urlencoded")
         .send().await.map_err(|e| format!("获取 Socket Mode URL 失败: {}", e))?;
 
     let data: serde_json::Value = resp.json().await
@@ -64,7 +63,6 @@ async fn run_socket_mode(
     // 获取 bot user ID
     let auth_resp = client.post("https://slack.com/api/auth.test")
         .header("Authorization", format!("Bearer {}", config.bot_token))
-        .header("Content-Type", "application/x-www-form-urlencoded")
         .send().await;
     let bot_user_id = match auth_resp {
         Ok(r) => {
