@@ -26,6 +26,17 @@ interface InstalledSkill {
   source: string
 }
 
+interface OnlineSkill {
+  slug: string
+  name: string
+  description: string
+  category: string
+  version: string
+  icon: string
+  downloads: number
+  author?: string
+}
+
 // 技能元数据（icon + 分类 key）
 const SKILL_META: Record<string, { icon: string; category: string }> = {
   // productivity
@@ -98,7 +109,7 @@ export default function SkillsPage() {
   const [activeTab, setActiveTab] = useState('all')
   const [loading, setLoading] = useState(true)
   const [operating, setOperating] = useState('')
-  const [onlineSkills, setOnlineSkills] = useState<any[]>([])
+  const [onlineSkills, setOnlineSkills] = useState<OnlineSkill[]>([])
   const [onlineSearch, setOnlineSearch] = useState('')
   const [onlineLoading, setOnlineLoading] = useState(false)
   const [downloading, setDownloading] = useState('')
@@ -110,8 +121,8 @@ export default function SkillsPage() {
 
   const loadAgents = async () => {
     try {
-      const list = (await invoke('list_agents')) as any[]
-      setAgents(list.map((a: any) => ({ id: a.id, name: a.name })))
+      const list = (await invoke('list_agents')) as Array<{ id: string; name: string }>
+      setAgents(list.map((a) => ({ id: a.id, name: a.name })))
       if (list.length > 0) setSelectedAgent(list[0].id)
     } catch { /* ignore */ }
     setLoading(false)
@@ -134,7 +145,7 @@ export default function SkillsPage() {
       const path = q
         ? `/api/v1/skill-hub/search?q=${encodeURIComponent(q)}`
         : '/api/v1/skill-hub/search'
-      const resp = await invoke<any>('cloud_api_proxy', { method: 'GET', path, body: null })
+      const resp = await invoke<{ skills?: OnlineSkill[] }>('cloud_api_proxy', { method: 'GET', path, body: null })
       const data = resp
       setOnlineSkills(data.skills || [])
     } catch (e) {
@@ -417,7 +428,7 @@ export default function SkillsPage() {
           ) : onlineSkills.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>{t('skills.emptyOnline')}</div>
           ) : (
-            onlineSkills.map((s: any) => (
+            onlineSkills.map((s) => (
               <div key={s.slug} style={{
                 display: 'flex', alignItems: 'center', gap: 14, padding: '14px 0',
                 borderBottom: '1px solid var(--border-subtle)',

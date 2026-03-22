@@ -71,7 +71,7 @@ export default function ChannelsPage() {
         : c.id === 'wechat' ? { ...c, connected: hasWeixin }
         : c
       ))
-    } catch (e: any) {
+    } catch (e: unknown) {
       setLoadError(String(e))
     }
   }
@@ -135,7 +135,7 @@ export default function ChannelsPage() {
           }
         }
         setError(t('channels.errorTimeout'))
-      } catch (e: any) { setError(t('channels.errorLoginFailed') + ': ' + String(e)); console.error(e) }
+      } catch (e: unknown) { setError(t('channels.errorLoginFailed') + ': ' + String(e)); console.error(e) }
       setSaving(false)
       return
     }
@@ -150,7 +150,7 @@ export default function ChannelsPage() {
         setConfiguring(null); setFormValues({}); setError('')
         toast.success(t('channels.successConfigured'))
         checkStatuses()
-      } catch (e: any) { setError(t('channels.errorSaveFailed') + ': ' + String(e)) }
+      } catch (e: unknown) { setError(t('channels.errorSaveFailed') + ': ' + String(e)) }
       setSaving(false)
       return
     }
@@ -179,7 +179,7 @@ export default function ChannelsPage() {
       setConfiguring(null); setFormValues({}); setError('')
       toast.success(t('channels.successConnected'))
       checkStatuses()
-    } catch (e: any) { setError(t('channels.errorConnectFailed') + ': ' + String(e)) }
+    } catch (e: unknown) { setError(t('channels.errorConnectFailed') + ': ' + String(e)) }
     setSaving(false)
   }
 

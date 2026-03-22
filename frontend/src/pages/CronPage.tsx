@@ -180,7 +180,7 @@ export default function CronPage() {
     if (!form.name.trim()) { toast.info(t('cronExtra.validationName')); return }
 
     // 构建 schedule
-    let schedule: any
+    let schedule: { kind: string; expr?: string; tz?: string; secs?: number; ts?: number }
     if (form.scheduleKind === 'cron') {
       schedule = { kind: 'cron', expr: form.cronExpr, tz: form.cronTz }
     } else if (form.scheduleKind === 'every') {
@@ -192,7 +192,7 @@ export default function CronPage() {
     }
 
     // 构建 actionPayload
-    let actionPayload: any
+    let actionPayload: { type: string; prompt?: string; sessionStrategy?: string; command?: string; serverName?: string; toolName?: string; args?: Record<string, unknown> }
     if (form.jobType === 'agent') {
       if (!form.prompt.trim()) { toast.info(t('cronExtra.validationPrompt')); return }
       actionPayload = { type: 'agent', prompt: form.prompt, sessionStrategy: form.sessionStrategy }
@@ -267,7 +267,7 @@ export default function CronPage() {
             </label>
             <label style={labelStyle}>
               {t('cron.fieldType')}
-              <select value={form.jobType} onChange={e => updateForm({ jobType: e.target.value as any })} style={inputStyle}>
+              <select value={form.jobType} onChange={e => updateForm({ jobType: e.target.value as CreateForm['jobType'] })} style={inputStyle}>
                 <option value="agent">{t('cron.typeAgent')}</option>
                 <option value="shell">{t('cron.typeShell')}</option>
                 <option value="mcp_tool">MCP Tool</option>
@@ -325,7 +325,7 @@ export default function CronPage() {
                 </label>
                 <label style={{ ...labelStyle, marginTop: 8 }}>
                   {t('cronExtra.sessionStrategy')}
-                  <select value={form.sessionStrategy} onChange={e => updateForm({ sessionStrategy: e.target.value as any })} style={inputStyle}>
+                  <select value={form.sessionStrategy} onChange={e => updateForm({ sessionStrategy: e.target.value as CreateForm['sessionStrategy'] })} style={inputStyle}>
                     <option value="new">{t('cronExtra.sessionNew')}</option>
                     <option value="reuse">{t('cronExtra.sessionReuse')}</option>
                   </select>

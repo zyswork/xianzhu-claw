@@ -44,8 +44,8 @@ export default function MemoryPage() {
 
   const loadAgents = async () => {
     try {
-      const list = (await invoke('list_agents')) as any[]
-      setAgents(list.map((a: any) => ({ id: a.id, name: a.name })))
+      const list = (await invoke('list_agents')) as Array<{ id: string; name: string }>
+      setAgents(list.map((a) => ({ id: a.id, name: a.name })))
       if (list.length > 0) setSelectedAgent(list[0].id)
     } catch (e) {
       showMsg('error', 'Failed to load agents')
@@ -55,7 +55,7 @@ export default function MemoryPage() {
 
   const loadData = async () => {
     try {
-      const detail = (await invoke('get_agent_detail', { agentId: selectedAgent })) as any
+      const detail = (await invoke('get_agent_detail', { agentId: selectedAgent })) as { memories?: Memory[] } & Partial<AgentStats>
       setMemories(detail?.memories || [])
       setStats({
         sessionCount: detail?.sessionCount || 0,
@@ -74,7 +74,7 @@ export default function MemoryPage() {
     if (!await confirm(t('memory.confirmExtract'))) return
     setActionLoading(true)
     try {
-      const result = (await invoke('extract_memories_from_history', { agentId: selectedAgent })) as any
+      const result = (await invoke('extract_memories_from_history', { agentId: selectedAgent })) as { message?: string; extracted?: number }
       showMsg('success', result?.message || t('memory.successExtracted', { count: result?.extracted || 0 }))
       await loadData()
     } catch (e) {

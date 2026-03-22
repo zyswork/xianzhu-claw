@@ -146,8 +146,8 @@ export default function AgentCreatePage() {
       // 跳到预览步骤
       setMode('manual')
       setStep(2)
-    } catch (e: any) {
-      setError(String(e?.message || e || t('agentCreate.aiGenerateFailed')))
+    } catch (e: unknown) {
+      setError(String((e as Error)?.message || e || t('agentCreate.aiGenerateFailed')))
     } finally {
       setAiGenerating(false)
     }
@@ -187,8 +187,8 @@ export default function AgentCreatePage() {
         })
         navigate(`/agents/${agent.id}`)
       }
-    } catch (e: any) {
-      setError(String(e?.message || e || t('chatPage.createFailed')))
+    } catch (e: unknown) {
+      setError(String((e as Error)?.message || e || t('chatPage.createFailed')))
       setCreating(false)
     }
   }

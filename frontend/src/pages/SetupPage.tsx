@@ -48,14 +48,14 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
     // Node.js
     setSetupStatus(s => ({ ...s, node: 'running' }))
     try {
-      const rt = await invoke<any>('check_runtime')
+      const rt = await invoke<{ installed: boolean }>('check_runtime')
       if (!rt?.installed) await invoke('setup_runtime')
       setSetupStatus(s => ({ ...s, node: 'done' }))
     } catch { setSetupStatus(s => ({ ...s, node: 'skip' })) }
 
     // 默认 Agent
     try {
-      const agents = await invoke<any[]>('list_agents')
+      const agents = await invoke<Array<{ id: string; name: string }>>('list_agents')
       if (!agents || agents.length === 0) {
         await invoke('create_agent', {
           name: t('chatPage.templateGeneral'), systemPrompt: '你是一个有用的AI助手，擅长回答各种问题。', model: 'gpt-4o',
@@ -66,24 +66,24 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
 
     // 加载技能
     try {
-      const agents = await invoke<any[]>('list_agents')
+      const agents = await invoke<Array<{ id: string; name: string }>>('list_agents')
       if (agents?.length) {
-        const list = await invoke<any[]>('list_skills', { agentId: agents[0].id })
-        setSkills((list || []).map((s: any) => ({ name: s.name, desc: s.description || '', icon: '\u{1F527}' })))
+        const list = await invoke<Array<{ name: string; description?: string }>>('list_skills', { agentId: agents[0].id })
+        setSkills((list || []).map((s) => ({ name: s.name, desc: s.description || '', icon: '\u{1F527}' })))
       }
     } catch { /* ignore */ }
 
     // 加载 providers
     try {
-      const p = await invoke<any[]>('get_providers')
-      setProviders((p || []).map((x: any) => ({ name: x.name, hasKey: !!(x.apiKey && x.enabled) })))
+      const p = await invoke<Array<{ name: string; apiKey?: string; enabled: boolean }>>('get_providers')
+      setProviders((p || []).map((x) => ({ name: x.name, hasKey: !!(x.apiKey && x.enabled) })))
     } catch { /* ignore */ }
   }
 
   const handleSaveProvider = async () => {
     if (!apiKey.trim()) return
     try {
-      const p = await invoke<any[]>('get_providers') || []
+      const p = await invoke<Array<{ name: string; apiKey?: string; enabled: boolean; id?: string }>>('get_providers') || []
       const custom = {
         id: 'custom-' + Date.now(),
         name: t('settingsExtra.customProvider'),

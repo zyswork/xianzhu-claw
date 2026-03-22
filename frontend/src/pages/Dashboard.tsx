@@ -55,8 +55,8 @@ export default function Dashboard() {
       setCache(c as CacheStats)
 
       // 从 list_agents 提取摘要
-      const agentList = (a as any[]) || []
-      const summaries: AgentSummary[] = agentList.map((ag: any) => ({
+      const agentList = (a as Array<{ id: string; name: string; model: string; sessionCount?: number }>) || []
+      const summaries: AgentSummary[] = agentList.map((ag) => ({
         id: ag.id,
         name: ag.name,
         model: ag.model,

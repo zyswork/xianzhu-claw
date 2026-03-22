@@ -42,8 +42,8 @@ export default function PluginsPage() {
 
   const loadAgents = async () => {
     try {
-      const list = (await invoke('list_agents')) as any[]
-      setAgents(list.map((a: any) => ({ id: a.id, name: a.name })))
+      const list = (await invoke('list_agents')) as Array<{ id: string; name: string }>
+      setAgents(list.map((a) => ({ id: a.id, name: a.name })))
       if (list.length > 0) setSelectedAgent(list[0].id)
     } catch {}
     setLoading(false)

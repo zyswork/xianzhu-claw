@@ -90,6 +90,22 @@ interface Skill {
   path: string
 }
 
+interface SubagentInfo {
+  id: string
+  name: string
+  status: string
+}
+
+interface ProviderInfo {
+  id: string
+  name: string
+  apiType: string
+  enabled: boolean
+  apiKey?: string
+  baseUrl?: string
+  models: Array<{ id: string; name?: string }>
+}
+
 interface CronJob {
   id: string
   name: string
@@ -99,6 +115,7 @@ interface CronJob {
   enabled: boolean
   failStreak: number
   nextRunAt: number | null
+  next_run_at?: number | null
   lastRunAt: number | null
 }
 
@@ -696,7 +713,7 @@ function ChatTab({ agentId }: { agentId: string }) {
       case 'model': {
         if (!args.trim()) {
           try {
-            const detail = await invoke<any>('get_agent_detail', { agentId })
+            const detail = await invoke<Record<string, any>>('get_agent_detail', { agentId })
             return `${t('agentDetail.currentModel')}: **${detail?.model}**\nTemperature: ${detail?.temperature ?? 'default'}\nMax Tokens: ${detail?.maxTokens ?? 'default'}`
           } catch (e) { return t('agentDetailSub.queryFailed') + ': ' + e }
         }
@@ -733,25 +750,25 @@ function ChatTab({ agentId }: { agentId: string }) {
 
       case 'tools': {
         try {
-          const detail = await invoke<any>('get_agent_detail', { agentId })
+          const detail = await invoke<Record<string, any>>('get_agent_detail', { agentId })
           return `## ${t('agentDetailSub.availableTools')} (${detail?.toolCount || 0})\n\n${t('agentDetailSub.toolsDesc')}`
         } catch (e) { return t('agentDetailSub.queryFailed') + ': ' + e }
       }
 
       case 'skills': {
         try {
-          const list = await invoke<any[]>('list_skills', { agentId })
+          const list = await invoke<Skill[]>('list_skills', { agentId })
           if (!list?.length) return t('agentDetailSub.noInstalledSkills')
-          return `## ${t('agentDetailSub.installedSkills')} (${list.length})\n\n${list.map((s: any) => `- **${s.name}** ${s.enabled ? '✓' : '✗'} ${s.description || ''}`).join('\n')}`
+          return `## ${t('agentDetailSub.installedSkills')} (${list.length})\n\n${list.map((s: Skill) => `- **${s.name}** ${s.enabled ? '✓' : '✗'} ${s.description || ''}`).join('\n')}`
         } catch (e) { return t('agentDetailSub.queryFailed') + ': ' + e }
       }
 
       case 'providers': {
         try {
-          const providers = await invoke<any[]>('get_providers')
-          return `## ${t('agentDetailSub.providerConfig')} (${providers?.length || 0})\n\n${(providers || []).map((p: any) => {
+          const providers = await invoke<ProviderInfo[]>('get_providers')
+          return `## ${t('agentDetailSub.providerConfig')} (${providers?.length || 0})\n\n${(providers || []).map((p: ProviderInfo) => {
             const hasKey = p.apiKey && p.apiKey.length > 0
-            const models = (p.models || []).map((m: any) => m.name || m.id).join(', ')
+            const models = (p.models || []).map((m: { id: string; name?: string }) => m.name || m.id).join(', ')
             return `- **${p.name}** (${p.apiType}) ${p.enabled ? '✓' : '✗'} Key:${hasKey ? t('agentDetailSub.keyYes') : t('agentDetailSub.keyNo')}\n  ${t('agentDetailSub.modelLabel')}: ${models || t('agentDetailSub.keyNo')}\n  ${t('agentDetailSub.urlLabel')}: ${p.baseUrl || t('agentDetailSub.defaultLabel')}`
           }).join('\n')}`
         } catch (e) { return t('agentDetailSub.queryFailed') + ': ' + e }
@@ -759,7 +776,7 @@ function ChatTab({ agentId }: { agentId: string }) {
 
       case 'memory': {
         try {
-          const detail = await invoke<any>('get_agent_detail', { agentId })
+          const detail = await invoke<Record<string, any>>('get_agent_detail', { agentId })
           return `## ${t('agentDetailSub.memoryStats')}\n- ${t('agentDetailSub.memoryCount')}: ${detail?.memories?.length || 0}\n- ${t('agentDetailSub.vectorCount')}: ${detail?.vectorCount || 0}\n- ${t('agentDetailSub.embeddingCacheCount')}: ${detail?.embeddingCacheCount || 0}\n- ${t('agentDetailSub.sessionCount')}: ${detail?.sessionCount || 0}\n- ${t('agentDetailSub.messageCount')}: ${detail?.messageCount || 0}`
         } catch (e) { return t('agentDetailSub.queryFailed') + ': ' + e }
       }
@@ -809,9 +826,9 @@ function ChatTab({ agentId }: { agentId: string }) {
 
       case 'agents': {
         try {
-          const list = await invoke<any[]>('list_agents')
+          const list = await invoke<Agent[]>('list_agents')
           if (!list?.length) return t('agentDetailSub.noAgents')
-          return `## ${t('agentDetailSub.agentList')} (${list.length})\n\n${list.map((a: any) =>
+          return `## ${t('agentDetailSub.agentList')} (${list.length})\n\n${list.map((a: Agent) =>
             `- **${a.name}** (\`${a.model}\`) ID: \`${a.id?.substring(0, 8)}...\``
           ).join('\n')}`
         } catch (e) { return t('agentDetailSub.queryFailed') + ': ' + e }
@@ -820,14 +837,14 @@ function ChatTab({ agentId }: { agentId: string }) {
       case 'kill': {
         if (!args.trim()) return t('agentDetailSub.killUsage')
         try {
-          const subagents = await invoke<any[]>('list_subagents', { agentId })
-          const running = subagents?.filter((s: any) => s.status === 'Running') || []
+          const subagents = await invoke<SubagentInfo[]>('list_subagents', { agentId })
+          const running = subagents?.filter((s: SubagentInfo) => s.status === 'Running') || []
           if (running.length === 0) return t('agentDetailSub.noRunningSubagents')
           if (args.trim().toLowerCase() === 'all') {
             for (const sa of running) { await invoke('cancel_subagent', { subagentId: sa.id }) }
             return t('agentDetailSub.terminatedN', { n: running.length })
           }
-          const target = running.find((s: any) => s.id.startsWith(args.trim()) || s.name === args.trim())
+          const target = running.find((s: SubagentInfo) => s.id.startsWith(args.trim()) || s.name === args.trim())
           if (!target) return t('agentDetailSub.notFoundSubagent') + ': ' + args.trim()
           await invoke('cancel_subagent', { subagentId: target.id })
           return t('agentDetailSub.terminatedSubagent', { name: target.name })
@@ -837,9 +854,9 @@ function ChatTab({ agentId }: { agentId: string }) {
       case 'skill': {
         if (!args.trim()) {
           try {
-            const list = await invoke<any[]>('list_skills', { agentId })
+            const list = await invoke<Skill[]>('list_skills', { agentId })
             if (!list?.length) return t('agentDetailSub.noSkills') + '. ' + t('agentDetailSub.skillUsageHint')
-            return `${t('agentDetailSub.availableSkills')}:\n${list.map((s: any) => `- ${s.name} ${s.enabled ? '✓' : '✗'}`).join('\n')}\n\n${t('agentDetailSub.activateSkillHint')}`
+            return `${t('agentDetailSub.availableSkills')}:\n${list.map((s: Skill) => `- ${s.name} ${s.enabled ? '✓' : '✗'}`).join('\n')}\n\n${t('agentDetailSub.activateSkillHint')}`
           } catch (e) { return t('agentDetailSub.queryFailed') + ': ' + e }
         }
         // 激活技能（发送带技能关键词的消息给 LLM）
@@ -1406,7 +1423,7 @@ function CronTab({ agentId }: { agentId: string }) {
               <tr key={job.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: '10px 12px' }}>{job.name}</td>
                 <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: 12 }}>{formatSchedule(job.schedule, t)}</td>
-                <td style={{ padding: '10px 12px', fontSize: 12 }}>{formatTime(job.nextRunAt ?? (job as any).next_run_at)}</td>
+                <td style={{ padding: '10px 12px', fontSize: 12 }}>{formatTime(job.nextRunAt ?? job.next_run_at ?? null)}</td>
                 <td style={{ padding: '10px 12px' }}>
                   <span style={{
                     padding: '2px 8px', borderRadius: 4, fontSize: 11,
@@ -1453,7 +1470,7 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
   useEffect(() => {
     ;(async () => {
       try {
-        const providers = await invoke<any[]>('get_providers')
+        const providers = await invoke<ProviderInfo[]>('get_providers')
         const list: { id: string; label: string }[] = []
         for (const p of providers) {
           if (!p.enabled) continue

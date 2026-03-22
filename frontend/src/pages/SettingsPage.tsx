@@ -622,8 +622,8 @@ function AdvancedSettings() {
   const [dailyLimit, setDailyLimit] = useState('')
   const [cloudUrl, setCloudUrl] = useState('')
   const [cloudKey, setCloudKey] = useState('')
-  const [health, setHealth] = useState<any>(null)
-  const [cacheStats, setCacheStats] = useState<any>(null)
+  const [health, setHealth] = useState<{ db: boolean; agents: number; memories: number; today_tokens: number } | null>(null)
+  const [cacheStats, setCacheStats] = useState<{ response_cache?: { entries: number; total_hits: number }; embedding_cache?: { entries: number } } | null>(null)
   const [saving, setSaving] = useState(false)
 
   const loadSettings = async () => {
@@ -658,8 +658,8 @@ function AdvancedSettings() {
       if (cloudUrl) await invoke('set_setting', { key: 'cloud_gateway_url', value: cloudUrl })
       if (cloudKey) await invoke('set_setting', { key: 'cloud_api_key', value: cloudKey })
       toast.success(t('settings.successSaved'))
-    } catch (e: any) {
-      toast.error(t('settingsExtra.saveFailed') + ': ' + (e?.message || e))
+    } catch (e: unknown) {
+      toast.error(t('settingsExtra.saveFailed') + ': ' + ((e as Error)?.message || e))
     }
     setSaving(false)
   }
@@ -717,7 +717,7 @@ function AdvancedSettings() {
               } else {
                 toast.error(t('settingsExtra.connectionFailed') + ': ' + JSON.stringify(data).substring(0, 200))
               }
-            } catch (e: any) { toast.error(t('settingsExtra.connectionFailed') + ': ' + (e?.message || e)) }
+            } catch (e: unknown) { toast.error(t('settingsExtra.connectionFailed') + ': ' + ((e as Error)?.message || e)) }
           }}
           style={{ padding: '4px 12px', fontSize: '12px', border: '1px solid var(--border-subtle)', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'var(--bg-elevated)' }}
         >

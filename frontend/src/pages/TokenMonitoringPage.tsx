@@ -66,7 +66,7 @@ export default function TokenMonitoringPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    invoke('list_agents').then((r: any) => {
+    invoke<Agent[]>('list_agents').then((r) => {
       if (Array.isArray(r)) {
         setAgents(r)
         if (r.length > 0) setSelectedAgent(r[0].id)
@@ -81,9 +81,9 @@ export default function TokenMonitoringPage() {
     if (!selectedAgent) return
     setLoading(true)
     Promise.all([
-      invoke('get_token_stats', { agentId: selectedAgent, days }),
-      invoke('get_token_daily_stats', { agentId: selectedAgent, days }),
-    ]).then(([s, d]: any) => {
+      invoke<AgentTokenStats>('get_token_stats', { agentId: selectedAgent, days }),
+      invoke<DailyStats[]>('get_token_daily_stats', { agentId: selectedAgent, days }),
+    ]).then(([s, d]) => {
       setStats(s)
       setDaily(d || [])
     }).catch(console.error)
