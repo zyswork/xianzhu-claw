@@ -2609,6 +2609,128 @@ async fn verify_telegram_token(bot_token: String) -> Result<serde_json::Value, S
     }
 }
 
+/// 验证 Discord Bot Token 并保存 + 启动 Gateway
+#[tauri::command]
+async fn discord_connect(
+    state: State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
+    bot_token: String,
+) -> Result<serde_json::Value, String> {
+    let token = bot_token.trim().to_string();
+    // 验证 Token
+    let client = reqwest::Client::new();
+    let resp = client.get("https://discord.com/api/v10/users/@me")
+        .header("Authorization", format!("Bot {}", token))
+        .send().await.map_err(|e| format!("请求失败: {}", e))?;
+
+    let data: serde_json::Value = resp.json().await
+        .map_err(|e| format!("解析失败: {}", e))?;
+
+    if data["id"].as_str().is_none() {
+        return Ok(serde_json::json!({
+            "ok": false,
+            "error": data["message"].as_str().unwrap_or("Invalid token"),
+        }));
+    }
+
+    let username = data["username"].as_str().unwrap_or("");
+    let discriminator = data["discriminator"].as_str().unwrap_or("0");
+
+    // 保存 Token
+    let _ = sqlx::query("INSERT OR REPLACE INTO settings (key, value) VALUES ('discord_bot_token', ?)")
+        .bind(&token).execute(state.orchestrator.pool()).await;
+
+    // 立即启动 Gateway
+    let pool = state.orchestrator.pool().clone();
+    let orch = state.orchestrator.clone();
+    let handle = app_handle.clone();
+    let t = token.clone();
+    tokio::spawn(async move {
+        channels::discord::start_gateway(
+            channels::discord::DiscordConfig { bot_token: t },
+            pool, orch, handle,
+        ).await;
+    });
+
+    log::info!("Discord: 已连接 Bot {}#{}", username, discriminator);
+    Ok(serde_json::json!({
+        "ok": true,
+        "username": username,
+        "discriminator": discriminator,
+        "id": data["id"],
+    }))
+}
+
+/// 验证 Slack Token 并保存 + 启动 Socket Mode
+#[tauri::command]
+async fn slack_connect(
+    state: State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
+    bot_token: String,
+    app_token: String,
+) -> Result<serde_json::Value, String> {
+    let bt = bot_token.trim().to_string();
+    let at = app_token.trim().to_string();
+
+    // 验证 Bot Token
+    let client = reqwest::Client::new();
+    let resp = client.post("https://slack.com/api/auth.test")
+        .header("Authorization", format!("Bearer {}", bt))
+        .send().await.map_err(|e| format!("请求失败: {}", e))?;
+
+    let data: serde_json::Value = resp.json().await
+        .map_err(|e| format!("解析失败: {}", e))?;
+
+    if data["ok"].as_bool() != Some(true) {
+        return Ok(serde_json::json!({
+            "ok": false,
+            "error": data["error"].as_str().unwrap_or("Invalid bot token"),
+        }));
+    }
+
+    let team = data["team"].as_str().unwrap_or("");
+    let user = data["user"].as_str().unwrap_or("");
+
+    // 验证 App Token（尝试获取 WebSocket URL）
+    let ws_resp = client.post("https://slack.com/api/apps.connections.open")
+        .header("Authorization", format!("Bearer {}", at))
+        .send().await.map_err(|e| format!("App Token 验证失败: {}", e))?;
+
+    let ws_data: serde_json::Value = ws_resp.json().await
+        .map_err(|e| format!("解析失败: {}", e))?;
+
+    if ws_data["ok"].as_bool() != Some(true) {
+        return Ok(serde_json::json!({
+            "ok": false,
+            "error": format!("App Token 无效: {}", ws_data["error"].as_str().unwrap_or("unknown")),
+        }));
+    }
+
+    // 保存 Token
+    let _ = sqlx::query("INSERT OR REPLACE INTO settings (key, value) VALUES ('slack_bot_token', ?)")
+        .bind(&bt).execute(state.orchestrator.pool()).await;
+    let _ = sqlx::query("INSERT OR REPLACE INTO settings (key, value) VALUES ('slack_app_token', ?)")
+        .bind(&at).execute(state.orchestrator.pool()).await;
+
+    // 立即启动 Socket Mode
+    let pool = state.orchestrator.pool().clone();
+    let orch = state.orchestrator.clone();
+    let handle = app_handle.clone();
+    tokio::spawn(async move {
+        channels::slack::start_socket_mode(
+            channels::slack::SlackConfig { bot_token: bt, app_token: at },
+            pool, orch, handle,
+        ).await;
+    });
+
+    log::info!("Slack: 已连接 team={}, bot={}", team, user);
+    Ok(serde_json::json!({
+        "ok": true,
+        "team": team,
+        "user": user,
+    }))
+}
+
 /// Token 使用统计 — 按天/模型聚合
 #[tauri::command]
 async fn get_token_stats(
@@ -3584,6 +3706,8 @@ async fn main() {
             weixin_poll_status,
             weixin_save_token,
             verify_telegram_token,
+            discord_connect,
+            slack_connect,
         ])
         .build(tauri::generate_context!())
         .expect("error building tauri application");

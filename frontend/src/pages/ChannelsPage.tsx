@@ -164,13 +164,14 @@ export default function ChannelsPage() {
     if (channelId === 'discord') {
       const botToken = formValues.botToken?.trim()
       if (!botToken) { setError(t('channels.errorFillToken')); return }
-      setSaving(true); setError('')
+      setSaving(true); setError(t('channels.verifyingToken'))
       try {
-        await invoke('set_setting', { key: 'discord_bot_token', value: botToken })
+        const result = await invoke<{ ok: boolean; username?: string; error?: string }>('discord_connect', { botToken })
+        if (!result.ok) { setError(t('channels.tokenInvalid') + ': ' + (result.error || '')); setSaving(false); return }
         setConfiguring(null); setFormValues({}); setError('')
-        toast.success(t('channels.successConfigured'))
+        toast.success(t('channels.successConnected') + ` (@${result.username})`)
         checkStatuses()
-      } catch (e: unknown) { setError(t('channels.errorSaveFailed') + ': ' + String(e)) }
+      } catch (e: unknown) { setError(t('channels.errorConnectFailed') + ': ' + String(e)) }
       setSaving(false)
       return
     }
@@ -178,14 +179,14 @@ export default function ChannelsPage() {
       const botToken = formValues.botToken?.trim()
       const appToken = formValues.appToken?.trim()
       if (!botToken || !appToken) { setError(t('channels.errorFillFields')); return }
-      setSaving(true); setError('')
+      setSaving(true); setError(t('channels.verifyingToken'))
       try {
-        await invoke('set_setting', { key: 'slack_bot_token', value: botToken })
-        await invoke('set_setting', { key: 'slack_app_token', value: appToken })
+        const result = await invoke<{ ok: boolean; team?: string; user?: string; error?: string }>('slack_connect', { botToken, appToken })
+        if (!result.ok) { setError(t('channels.tokenInvalid') + ': ' + (result.error || '')); setSaving(false); return }
         setConfiguring(null); setFormValues({}); setError('')
-        toast.success(t('channels.successConfigured'))
+        toast.success(t('channels.successConnected') + ` (${result.team})`)
         checkStatuses()
-      } catch (e: unknown) { setError(t('channels.errorSaveFailed') + ': ' + String(e)) }
+      } catch (e: unknown) { setError(t('channels.errorConnectFailed') + ': ' + String(e)) }
       setSaving(false)
       return
     }
