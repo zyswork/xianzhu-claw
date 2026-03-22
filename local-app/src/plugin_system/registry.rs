@@ -122,18 +122,17 @@ impl PluginRegistry {
             PluginType::Channel, "\u{1F4F1}",
         ));
 
-        // 规划中的渠道
         self.register(PluginManifest::builtin(
             "discord-channel", "Discord",
-            "通过 Bot API 接入 Discord 服务器",
+            "通过 Gateway WebSocket 接入 Discord 服务器",
             PluginType::Channel, "\u{1F3AE}",
-        ).with_status("planned"));
+        ));
 
         self.register(PluginManifest::builtin(
             "slack-channel", "Slack",
-            "Socket Mode 接入 Slack 工作区",
+            "Socket Mode 接入 Slack 工作区（无需公网）",
             PluginType::Channel, "\u{1F4BC}",
-        ).with_status("planned"));
+        ));
 
         // ═══════════════════════════════════════════
         // 记忆后端

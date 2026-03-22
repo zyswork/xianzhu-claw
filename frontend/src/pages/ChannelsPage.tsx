@@ -23,8 +23,8 @@ const CHANNEL_DEFS: Omit<ChannelInfo, 'desc'>[] = [
   { id: 'feishu', name: '飞书 (Lark)', icon: '\u{1F426}', connected: false, configFields: [{ key: 'appId', label: 'App ID', placeholder: 'cli_xxx' }, { key: 'appSecret', label: 'App Secret', placeholder: '', type: 'password' }] },
   { id: 'dingtalk', name: '钉钉', icon: '\u{1F4AC}', connected: false },
   { id: 'wechat', name: '微信', icon: '\u{1F4F1}', connected: false },
-  { id: 'discord', name: 'Discord', icon: '\u{1F3AE}', connected: false },
-  { id: 'slack', name: 'Slack', icon: '\u{1F4BC}', connected: false },
+  { id: 'discord', name: 'Discord', icon: '\u{1F3AE}', connected: false, configFields: [{ key: 'botToken', label: 'Bot Token', placeholder: 'MTIz...NzY.Gw...', type: 'password' }] },
+  { id: 'slack', name: 'Slack', icon: '\u{1F4BC}', connected: false, configFields: [{ key: 'botToken', label: 'Bot Token (xoxb-)', placeholder: 'xoxb-...', type: 'password' }, { key: 'appToken', label: 'App Token (xapp-)', placeholder: 'xapp-...', type: 'password' }] },
 ]
 
 const DESC_KEYS: Record<string, string> = {
@@ -60,6 +60,11 @@ export default function ChannelsPage() {
       const hasFeishu = !!feishuId
       const weixinToken = await invoke<string | null>('get_setting', { key: 'weixin_bot_token' })
       const hasWeixin = !!weixinToken
+      const discordToken = await invoke<string | null>('get_setting', { key: 'discord_bot_token' })
+      const hasDiscord = !!discordToken
+      const slackBotToken = await invoke<string | null>('get_setting', { key: 'slack_bot_token' })
+      const slackAppToken = await invoke<string | null>('get_setting', { key: 'slack_app_token' })
+      const hasSlack = !!slackBotToken && !!slackAppToken
 
       const hasToken = !!token
       let botInfo = null
@@ -69,6 +74,8 @@ export default function ChannelsPage() {
         c.id === 'telegram' ? { ...c, connected: hasToken, bot: botInfo }
         : c.id === 'feishu' ? { ...c, connected: hasFeishu }
         : c.id === 'wechat' ? { ...c, connected: hasWeixin }
+        : c.id === 'discord' ? { ...c, connected: hasDiscord }
+        : c.id === 'slack' ? { ...c, connected: hasSlack }
         : c
       ))
     } catch (e: unknown) {
@@ -147,6 +154,34 @@ export default function ChannelsPage() {
       try {
         await invoke('set_setting', { key: 'feishu_app_id', value: appId })
         await invoke('set_setting', { key: 'feishu_app_secret', value: appSecret })
+        setConfiguring(null); setFormValues({}); setError('')
+        toast.success(t('channels.successConfigured'))
+        checkStatuses()
+      } catch (e: unknown) { setError(t('channels.errorSaveFailed') + ': ' + String(e)) }
+      setSaving(false)
+      return
+    }
+    if (channelId === 'discord') {
+      const botToken = formValues.botToken?.trim()
+      if (!botToken) { setError(t('channels.errorFillToken')); return }
+      setSaving(true); setError('')
+      try {
+        await invoke('set_setting', { key: 'discord_bot_token', value: botToken })
+        setConfiguring(null); setFormValues({}); setError('')
+        toast.success(t('channels.successConfigured'))
+        checkStatuses()
+      } catch (e: unknown) { setError(t('channels.errorSaveFailed') + ': ' + String(e)) }
+      setSaving(false)
+      return
+    }
+    if (channelId === 'slack') {
+      const botToken = formValues.botToken?.trim()
+      const appToken = formValues.appToken?.trim()
+      if (!botToken || !appToken) { setError(t('channels.errorFillFields')); return }
+      setSaving(true); setError('')
+      try {
+        await invoke('set_setting', { key: 'slack_bot_token', value: botToken })
+        await invoke('set_setting', { key: 'slack_app_token', value: appToken })
         setConfiguring(null); setFormValues({}); setError('')
         toast.success(t('channels.successConfigured'))
         checkStatuses()

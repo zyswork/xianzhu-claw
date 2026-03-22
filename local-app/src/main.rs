@@ -3442,6 +3442,58 @@ async fn main() {
                 });
             }
 
+            // Discord Bot
+            {
+                let dc_pool = pool_for_setup.clone();
+                let dc_orch = app_state_for_setup.orchestrator.clone();
+                let dc_handle = app.handle().clone();
+                tokio::spawn(async move {
+                    let token: Option<String> = sqlx::query_scalar(
+                        "SELECT value FROM settings WHERE key = 'discord_bot_token'"
+                    ).fetch_optional(&dc_pool).await.ok().flatten();
+
+                    if let Some(token) = token {
+                        if !token.trim().is_empty() {
+                            channels::discord::start_gateway(
+                                channels::discord::DiscordConfig { bot_token: token.trim().to_string() },
+                                dc_pool, dc_orch, dc_handle,
+                            ).await;
+                        }
+                    } else {
+                        log::info!("Discord: 未配置 bot token，跳过");
+                    }
+                });
+            }
+
+            // Slack Socket Mode
+            {
+                let sk_pool = pool_for_setup.clone();
+                let sk_orch = app_state_for_setup.orchestrator.clone();
+                let sk_handle = app.handle().clone();
+                tokio::spawn(async move {
+                    let bot_token: Option<String> = sqlx::query_scalar(
+                        "SELECT value FROM settings WHERE key = 'slack_bot_token'"
+                    ).fetch_optional(&sk_pool).await.ok().flatten();
+                    let app_token: Option<String> = sqlx::query_scalar(
+                        "SELECT value FROM settings WHERE key = 'slack_app_token'"
+                    ).fetch_optional(&sk_pool).await.ok().flatten();
+
+                    if let (Some(bt), Some(at)) = (bot_token, app_token) {
+                        if !bt.trim().is_empty() && !at.trim().is_empty() {
+                            channels::slack::start_socket_mode(
+                                channels::slack::SlackConfig {
+                                    bot_token: bt.trim().to_string(),
+                                    app_token: at.trim().to_string(),
+                                },
+                                sk_pool, sk_orch, sk_handle,
+                            ).await;
+                        }
+                    } else {
+                        log::info!("Slack: 未配置 token，跳过");
+                    }
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

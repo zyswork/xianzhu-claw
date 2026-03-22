@@ -6,3 +6,5 @@
 pub mod telegram;
 pub mod feishu;
 pub mod weixin;
+pub mod discord;
+pub mod slack;
