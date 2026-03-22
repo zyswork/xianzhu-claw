@@ -173,14 +173,14 @@ export default function AgentDetailPage() {
       </div>
 
       {/* Tab 栏 */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', padding: '0 24px' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', padding: '0 24px', overflowX: 'auto', flexShrink: 0 }}>
         {TAB_KEYS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             style={{
               padding: '10px 16px', border: 'none', cursor: 'pointer',
-              fontSize: 14, backgroundColor: 'transparent',
+              fontSize: 14, backgroundColor: 'transparent', whiteSpace: 'nowrap',
               color: activeTab === tab.id ? '#007bff' : '#666',
               borderBottom: activeTab === tab.id ? '2px solid #007bff' : '2px solid transparent',
               fontWeight: activeTab === tab.id ? 600 : 400,
@@ -192,7 +192,7 @@ export default function AgentDetailPage() {
       </div>
 
       {/* Tab 内容 */}
-      <div style={{ flex: 1, overflow: 'auto' }}>
+      <div style={{ flex: 1, overflow: activeTab === 'chat' ? 'hidden' : 'auto', minHeight: 0 }}>
         {activeTab === 'chat' && <ChatTab agentId={agentId} />}
         {activeTab === 'soul' && <div style={{ padding: 16 }}><SoulFileTab agentId={agentId} /></div>}
         {activeTab === 'tools' && <div style={{ padding: 16 }}><ToolsTab agentId={agentId} /></div>}
@@ -882,9 +882,9 @@ function ChatTab({ agentId }: { agentId: string }) {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
       {/* 会话列表 */}
-      <div style={{ width: 200, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ width: 200, minWidth: 200, flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: 8 }}>
           <button onClick={createSession} style={{
             width: '100%', padding: '8px', backgroundColor: 'var(--accent)', color: 'white',
