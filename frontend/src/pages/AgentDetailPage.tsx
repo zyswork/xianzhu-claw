@@ -1011,20 +1011,20 @@ function ChatTab({ agentId }: { agentId: string }) {
           </div>
         ) : (
           <>
-            <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: 16 }}>
               {messages.map((msg, i) => {
                 // 工具调用标记（历史加载的结构化消息）
                 if (msg.role === 'tool') {
                   const isExpanded = expandedTools.has(i)
                   return (
-                    <div key={i} style={{ marginBottom: 6 }}>
+                    <div key={i} style={{ marginBottom: 6, maxWidth: '85%' }}>
                       <div
                         onClick={() => toggleTool(i)}
                         style={{
                           padding: '3px 10px', borderRadius: isExpanded ? '6px 6px 0 0' : 6,
                           backgroundColor: 'var(--warning-bg)', border: '1px solid rgba(251,191,36,0.3)',
                           fontSize: 12, color: 'var(--warning)', display: 'inline-flex', alignItems: 'center', gap: 5,
-                          cursor: 'pointer', userSelect: 'none',
+                          cursor: 'pointer', userSelect: 'none', maxWidth: '100%', overflow: 'hidden',
                         }}
                       >
                         <span style={{ flexShrink: 0, fontSize: 11, color: '#bbb' }}>{isExpanded ? '\u25BC' : '\u25B6'}</span>
@@ -1091,9 +1091,9 @@ function ChatTab({ agentId }: { agentId: string }) {
                             </div>
                           ) : (
                             <div key={pi} style={{
-                              maxWidth: '70%', padding: '10px 14px', borderRadius: 12,
+                              maxWidth: '70%', minWidth: 0, padding: '10px 14px', borderRadius: 12,
                               backgroundColor: 'var(--bg-glass)', color: 'var(--text-primary)',
-                              fontSize: 14, lineHeight: 1.6, wordBreak: 'break-word',
+                              fontSize: 14, lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'anywhere',
                               marginBottom: 4,
                             }}>
                               {renderMd(part.content)}
@@ -1115,6 +1115,7 @@ function ChatTab({ agentId }: { agentId: string }) {
                     marginBottom: 12, display: 'flex',
                     justifyContent: isUser ? 'flex-end' : 'flex-start',
                     alignItems: 'flex-start', gap: 8,
+                    overflow: 'hidden',
                   }}>
                     {/* 左侧头像（AI / system） */}
                     {!isUser && (
@@ -1125,13 +1126,14 @@ function ChatTab({ agentId }: { agentId: string }) {
                     )}
                     <div style={{
                       maxWidth: isSystem ? '85%' : '70%',
+                      minWidth: 0,
                       padding: '10px 14px', borderRadius: 12,
                       backgroundColor: isUser ? 'var(--accent)' : isSystem ? '#f0fdf4' : '#f3f4f6',
                       color: isUser ? 'white' : '#333',
                       border: isSystem ? '1px solid #bbf7d0' : 'none',
                       fontSize: isSystem ? 13 : 14,
-                      lineHeight: 1.6, wordBreak: 'break-word',
-                      minWidth: streaming && i === messages.length - 1 && !msg.content ? 120 : undefined,
+                      lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'anywhere',
+                      minHeight: streaming && i === messages.length - 1 && !msg.content ? 40 : undefined,
                     }}>
                       {(msg.role === 'assistant' || isSystem) ? (
                         msg.content
