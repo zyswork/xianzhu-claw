@@ -11,6 +11,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useI18n, SUPPORTED_LOCALES, LOCALE_LABELS } from '../i18n'
+import { toast } from '../hooks/useToast'
 import type { Locale } from '../i18n'
 
 interface ProviderModel {
@@ -656,9 +657,9 @@ function AdvancedSettings() {
       if (dailyLimit) await invoke('set_setting', { key: 'daily_token_limit', value: dailyLimit })
       if (cloudUrl) await invoke('set_setting', { key: 'cloud_gateway_url', value: cloudUrl })
       if (cloudKey) await invoke('set_setting', { key: 'cloud_api_key', value: cloudKey })
-      alert(t('settings.successSaved'))
+      toast.success(t('settings.successSaved'))
     } catch (e: any) {
-      alert(t('settingsExtra.saveFailed') + ': ' + (e?.message || e))
+      toast.error(t('settingsExtra.saveFailed') + ': ' + (e?.message || e))
     }
     setSaving(false)
   }
@@ -703,7 +704,7 @@ function AdvancedSettings() {
         </div>
         <button
           onClick={async () => {
-            if (!embeddingKey || !embeddingUrl) { alert(t('settingsExtra.fillKeyFirst')); return }
+            if (!embeddingKey || !embeddingUrl) { toast.info(t('settingsExtra.fillKeyFirst')); return }
             try {
               const res = await fetch(embeddingUrl, {
                 method: 'POST',
@@ -712,11 +713,11 @@ function AdvancedSettings() {
               })
               const data = await res.json()
               if (data?.data?.[0]?.embedding) {
-                alert(t('settingsExtra.connectionSuccess', { dim: String(data.data[0].embedding.length), token: String(data.usage?.total_tokens || '?') }))
+                toast.success(t('settingsExtra.connectionSuccess', { dim: String(data.data[0].embedding.length), token: String(data.usage?.total_tokens || '?') }))
               } else {
-                alert(t('settingsExtra.connectionFailed') + ': ' + JSON.stringify(data).substring(0, 200))
+                toast.error(t('settingsExtra.connectionFailed') + ': ' + JSON.stringify(data).substring(0, 200))
               }
-            } catch (e: any) { alert(t('settingsExtra.connectionFailed') + ': ' + (e?.message || e)) }
+            } catch (e: any) { toast.error(t('settingsExtra.connectionFailed') + ': ' + (e?.message || e)) }
           }}
           style={{ padding: '4px 12px', fontSize: '12px', border: '1px solid var(--border-subtle)', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'var(--bg-elevated)' }}
         >

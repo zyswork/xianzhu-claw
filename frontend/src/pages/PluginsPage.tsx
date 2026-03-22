@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useI18n } from '../i18n'
+import { toast } from '../hooks/useToast'
 
 interface PluginInfo {
   id: string; name: string; version: string; description: string
@@ -66,14 +67,14 @@ export default function PluginsPage() {
     try {
       await invoke('toggle_system_plugin', { pluginId, enabled: !currentEnabled })
       await loadPlugins()
-    } catch (e) { alert(t('cronExtra.operationFailed') + ': ' + e) }
+    } catch (e) { toast.error(t('cronExtra.operationFailed') + ': ' + e) }
   }
 
   const toggleAgentPlugin = async (pluginId: string, currentEnabled: boolean) => {
     try {
       await invoke('set_agent_plugin', { agentId: selectedAgent, pluginId, enabled: !currentEnabled })
       await loadAgentStates()
-    } catch (e) { alert(t('cronExtra.operationFailed') + ': ' + e) }
+    } catch (e) { toast.error(t('cronExtra.operationFailed') + ': ' + e) }
   }
 
   const openConfig = async (pluginId: string) => {
@@ -90,7 +91,7 @@ export default function PluginsPage() {
       await invoke('save_plugin_config', { pluginId: configuring, configJson: JSON.stringify(configValues) })
       setConfiguring(null)
       setConfigValues({})
-    } catch (e) { alert(t('settingsExtra.saveFailed') + ': ' + e) }
+    } catch (e) { toast.error(t('settingsExtra.saveFailed') + ': ' + e) }
   }
 
   const getAgentEnabled = (pluginId: string, globalEnabled: boolean): boolean => {

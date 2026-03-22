@@ -245,11 +245,10 @@ export default function MemoryPage() {
           </div>
           {memories.length === 0 && (
             <div style={{ color: 'var(--text-muted)', fontSize: '12px', lineHeight: '1.6' }}>
-              记忆会在对话过程中自动积累。Agent 通过 memory_store 工具<br />
-              将重要信息保存为长期记忆（core/episodic/semantic/procedural）。
+              {t('memory.hintAutoAccumulate')}
               {stats.messageCount > 0 && (
                 <div style={{ marginTop: '8px', color: 'var(--text-secondary)' }}>
-                  当前已有 {stats.messageCount} 条消息、{stats.sessionCount} 个会话
+                  {stats.messageCount} {t('memory.statMessages')} · {stats.sessionCount} {t('memory.statSessions')}
                 </div>
               )}
             </div>
@@ -279,7 +278,7 @@ export default function MemoryPage() {
                   </span>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>|</span>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    {formatTime(m.updated_at || m.created_at)}
+                    {formatTime(m.updated_at || m.created_at, t)}
                   </span>
                 </div>
                 <div style={{
@@ -310,12 +309,11 @@ function MiniCard({ label, value, color }: { label: string; value: number; color
   )
 }
 
-function formatTime(ts: number): string {
+function formatTime(ts: number, t: (key: string, params?: Record<string, string | number>) => string): string {
   if (!ts) return ''
   const d = new Date(ts)
   const now = Date.now()
   const diff = now - ts
-  const t = useI18n.getState().t
   if (diff < 60_000) return t('common.justNow')
   if (diff < 3600_000) return t('common.minutesAgo', { n: Math.floor(diff / 60_000) })
   if (diff < 86400_000) return t('common.hoursAgo', { n: Math.floor(diff / 3600_000) })

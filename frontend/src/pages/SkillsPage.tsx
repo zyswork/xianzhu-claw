@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useI18n } from '../i18n'
+import { toast } from '../hooks/useToast'
 
 interface MarketplaceSkill {
   name: string
@@ -155,8 +156,8 @@ export default function SkillsPage() {
       const msg = await invoke<string>('download_skill_from_hub', { slug })
       await loadAll() // 刷新本地 marketplace 列表
       loadOnlineSkills(onlineSearch) // 刷新在线列表（更新"已有"状态）
-      alert(msg)
-    } catch (e) { alert(t('skills.downloadFailed') + ': ' + e) }
+      toast.success(msg)
+    } catch (e) { toast.error(t('skills.downloadFailed') + ': ' + e) }
     setDownloading('')
   }
 
@@ -165,9 +166,9 @@ export default function SkillsPage() {
     setPublishing(skillName)
     try {
       const msg = await invoke<string>('publish_skill_to_hub', { skillName, author })
-      alert(msg)
+      toast.success(msg)
       if (activeTab === 'online') loadOnlineSkills(onlineSearch)
-    } catch (e) { alert(t('skills.publishFailed') + ': ' + e) }
+    } catch (e) { toast.error(t('skills.publishFailed') + ': ' + e) }
     setPublishing('')
   }
 
@@ -178,7 +179,7 @@ export default function SkillsPage() {
     try {
       await invoke('install_skill_to_agent', { agentId: selectedAgent, skillName })
       await loadAll()
-    } catch (e) { alert(t('skills.installFailed') + ': ' + e) }
+    } catch (e) { toast.error(t('skills.installFailed') + ': ' + e) }
     setOperating('')
   }
 
@@ -188,7 +189,7 @@ export default function SkillsPage() {
     try {
       await invoke('uninstall_skill_from_agent', { agentId: selectedAgent, skillName })
       await loadAll()
-    } catch (e) { alert(t('skills.uninstallFailed') + ': ' + e) }
+    } catch (e) { toast.error(t('skills.uninstallFailed') + ': ' + e) }
     setOperating('')
   }
 

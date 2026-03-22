@@ -12,6 +12,7 @@ import { listen } from '@tauri-apps/api/event'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useI18n } from '../i18n'
+import { toast } from '../hooks/useToast'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -374,6 +375,17 @@ function ChatTab({ agentId }: { agentId: string }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
+  const streamingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 安全超时：streaming 超过 120 秒自动恢复
+  useEffect(() => {
+    if (streaming) {
+      streamingTimerRef.current = setTimeout(() => setStreaming(false), 120_000)
+    } else if (streamingTimerRef.current) {
+      clearTimeout(streamingTimerRef.current)
+      streamingTimerRef.current = null
+    }
+    return () => { if (streamingTimerRef.current) clearTimeout(streamingTimerRef.current) }
+  }, [streaming])
   const [renamingSession, setRenamingSession] = useState('')
   const [renameValue, setRenameValue] = useState('')
   const [pendingImages, setPendingImages] = useState<string[]>([]) // base64 data URLs
@@ -926,9 +938,9 @@ function ChatTab({ agentId }: { agentId: string }) {
                     if (!confirm(t('agentDetailSub.cleanupConfirm'))) return
                     try {
                       const r = await invoke<any>('cleanup_system_sessions', { agentId, keepDays: 7 })
-                      alert(t('agentDetailSub.cleanupDone', { sessions: r.deletedSessions, messages: r.deletedMessages }))
+                      toast.success(t('agentDetailSub.cleanupDone', { sessions: r.deletedSessions, messages: r.deletedMessages }))
                       loadSessions()
-                    } catch (err) { alert(t('agentDetailSub.cleanupFailed') + ': ' + err) }
+                    } catch (err) { toast.error(t('agentDetailSub.cleanupFailed') + ': ' + err) }
                   }}
                   style={{ fontSize: 10, padding: '1px 6px', border: '1px solid var(--border-subtle)', borderRadius: 3, background: 'var(--bg-elevated)', cursor: 'pointer', color: 'var(--text-muted)' }}
                 >

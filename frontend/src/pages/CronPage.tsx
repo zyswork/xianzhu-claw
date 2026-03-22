@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useI18n } from '../i18n'
+import { toast } from '../hooks/useToast'
 
 // Tauri invoke
 const invoke = (window as any).__TAURI__?.invoke || (async () => {})
@@ -149,7 +150,7 @@ export default function CronPage() {
       }
       loadJobs()
     } catch (e) {
-      alert(t('cronExtra.operationFailed') + ': ' + e)
+      toast.error(t('cronExtra.operationFailed') + ': ' + e)
     }
   }
 
@@ -158,7 +159,7 @@ export default function CronPage() {
       await invoke('trigger_cron_job', { jobId })
       loadJobs()
     } catch (e) {
-      alert(t('cronExtra.triggerFailed') + ': ' + e)
+      toast.error(t('cronExtra.triggerFailed') + ': ' + e)
     }
   }
 
@@ -169,12 +170,12 @@ export default function CronPage() {
       if (selectedJob === jobId) setSelectedJob(null)
       loadJobs()
     } catch (e) {
-      alert(t('cronExtra.deleteFailed') + ': ' + e)
+      toast.error(t('cronExtra.deleteFailed') + ': ' + e)
     }
   }
 
   const handleCreate = async () => {
-    if (!form.name.trim()) { alert(t('cronExtra.validationName')); return }
+    if (!form.name.trim()) { toast.info(t('cronExtra.validationName')); return }
 
     // 构建 schedule
     let schedule: any
@@ -184,22 +185,22 @@ export default function CronPage() {
       schedule = { kind: 'every', secs: form.everySecs }
     } else {
       const ts = form.atDatetime ? Math.floor(new Date(form.atDatetime).getTime() / 1000) : 0
-      if (!ts) { alert(t('cronExtra.validationTime')); return }
+      if (!ts) { toast.info(t('cronExtra.validationTime')); return }
       schedule = { kind: 'at', ts }
     }
 
     // 构建 actionPayload
     let actionPayload: any
     if (form.jobType === 'agent') {
-      if (!form.prompt.trim()) { alert(t('cronExtra.validationPrompt')); return }
+      if (!form.prompt.trim()) { toast.info(t('cronExtra.validationPrompt')); return }
       actionPayload = { type: 'agent', prompt: form.prompt, sessionStrategy: form.sessionStrategy }
     } else if (form.jobType === 'shell') {
-      if (!form.command.trim()) { alert(t('cronExtra.validationCommand')); return }
+      if (!form.command.trim()) { toast.info(t('cronExtra.validationCommand')); return }
       actionPayload = { type: 'shell', command: form.command }
     } else {
-      if (!form.serverName.trim() || !form.toolName.trim()) { alert(t('cronExtra.validationMcp')); return }
+      if (!form.serverName.trim() || !form.toolName.trim()) { toast.info(t('cronExtra.validationMcp')); return }
       let args = {}
-      try { args = JSON.parse(form.toolArgs) } catch { alert(t('cronExtra.validationJson')); return }
+      try { args = JSON.parse(form.toolArgs) } catch { toast.info(t('cronExtra.validationJson')); return }
       actionPayload = { type: 'mcp_tool', serverName: form.serverName, toolName: form.toolName, args }
     }
 
@@ -230,7 +231,7 @@ export default function CronPage() {
       setForm({ ...defaultForm })
       setShowAdvanced(false)
     } catch (e) {
-      alert(t('cronExtra.createFailed') + ': ' + e)
+      toast.error(t('cronExtra.createFailed') + ': ' + e)
     } finally {
       setCreating(false)
     }

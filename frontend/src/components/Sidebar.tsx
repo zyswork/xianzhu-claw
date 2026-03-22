@@ -56,7 +56,7 @@ export default function Sidebar() {
       </div>
 
       {/* 导航 */}
-      <nav style={{ flex: 1, padding: '4px 0' }}>
+      <nav style={{ flex: 1, padding: '4px 0', overflowY: 'auto' }}>
         {menuItems.map((item) => {
           const isActive = location.pathname === item.path ||
             (item.path === '/agents' && location.pathname.startsWith('/agents'))

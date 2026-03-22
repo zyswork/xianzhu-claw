@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useI18n } from '../i18n'
+import { toast } from '../hooks/useToast'
 
 const TOTAL_STEPS = 4
 
@@ -96,7 +97,7 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
       await invoke('set_setting', { key: 'providers', value: JSON.stringify(p) })
       setProviders(prev => [...prev, { name: custom.name, hasKey: true }])
       setApiKey('')
-    } catch (e) { alert(t('settingsExtra.saveFailed') + ': ' + e) }
+    } catch (e) { toast.error(t('settingsExtra.saveFailed') + ': ' + e) }
   }
 
   const pages = [

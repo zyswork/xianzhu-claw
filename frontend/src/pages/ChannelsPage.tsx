@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { QRCodeSVG } from 'qrcode.react'
 import { useI18n } from '../i18n'
+import { toast } from '../hooks/useToast'
 
 async function cloudApi(method: string, path: string, body?: any): Promise<any> {
   return invoke('cloud_api_proxy', { method, path, body: body || null })
@@ -112,7 +113,7 @@ export default function ChannelsPage() {
                 await invoke('set_setting', { key: 'weixin_bot_token', value: token })
                 if (baseUrl) await invoke('set_setting', { key: 'weixin_base_url', value: baseUrl })
                 setConfiguring(null); setError(''); setWeixinQr('')
-                alert(t('channels.successConnected'))
+                toast.success(t('channels.successConnected'))
                 checkStatuses()
                 setSaving(false)
                 return
@@ -145,13 +146,13 @@ export default function ChannelsPage() {
         await invoke('set_setting', { key: 'feishu_app_id', value: appId })
         await invoke('set_setting', { key: 'feishu_app_secret', value: appSecret })
         setConfiguring(null); setFormValues({}); setError('')
-        alert(t('channels.successConfigured'))
+        toast.success(t('channels.successConfigured'))
         checkStatuses()
       } catch (e: any) { setError(t('channels.errorSaveFailed') + ': ' + String(e)) }
       setSaving(false)
       return
     }
-    if (channelId !== 'telegram') { alert(t('channels.errorNotSupported')); return }
+    if (channelId !== 'telegram') { toast.info(t('channels.errorNotSupported')); return }
     const token = formValues.botToken?.trim()
     if (!token) { setError(t('channels.errorFillToken')); return }
 
@@ -174,7 +175,7 @@ export default function ChannelsPage() {
       // 桌面离线时的 Fallback 由云端 sync 机制单独处理
 
       setConfiguring(null); setFormValues({}); setError('')
-      alert(t('channels.successConnected'))
+      toast.success(t('channels.successConnected'))
       checkStatuses()
     } catch (e: any) { setError(t('channels.errorConnectFailed') + ': ' + String(e)) }
     setSaving(false)
@@ -257,7 +258,7 @@ export default function ChannelsPage() {
             ) : (
               <button onClick={() => {
                 if (ch.id === 'wechat') { handleSetup('wechat'); return }
-                ch.configFields ? setConfiguring(ch.id) : alert(t('channels.errorNotSupported'))
+                ch.configFields ? setConfiguring(ch.id) : toast.info(t('channels.errorNotSupported'))
               }} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-subtle)', fontSize: 12, cursor: 'pointer', color: 'var(--text-accent)' }}>
                 {ch.id === 'wechat' ? t('channels.btnScanConnect') : t('channels.btnConfigure')}
               </button>
