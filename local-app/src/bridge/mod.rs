@@ -5,4 +5,4 @@
 
 pub mod client;
 
-pub use client::{BridgeClient, BridgeConfig, ForwardedMessage};
+pub use client::{BridgeClient, BridgeConfig};

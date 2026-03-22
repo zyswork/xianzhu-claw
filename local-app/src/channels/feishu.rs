@@ -58,13 +58,19 @@ pub struct FeishuConfig {
 /// 飞书 API 基地址
 const FEISHU_BASE: &str = "https://open.feishu.cn/open-apis";
 
-/// 启动飞书长连接（后台 tokio task）
+static RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 启动飞书长连接（后台 tokio task，单例）
 pub async fn start_feishu(
     config: FeishuConfig,
     pool: sqlx::SqlitePool,
     orchestrator: Arc<Orchestrator>,
     app_handle: tauri::AppHandle,
 ) {
+    if RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        log::info!("飞书: 连接已在运行，跳过");
+        return;
+    }
     let app_id = config.app_id.clone();
     let app_secret = config.app_secret.clone();
     log::info!("飞书: 启动连接 (app_id: {}...)", &app_id[..app_id.len().min(10)]);

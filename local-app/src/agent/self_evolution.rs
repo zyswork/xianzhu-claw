@@ -124,7 +124,7 @@ const MEMORY_REVIEW_PROMPT: &str = r#"你是一个后台反思代理。请审查
 pub async fn spawn_background_review(
     pool: sqlx::SqlitePool,
     agent_id: String,
-    session_id: String,
+    _session_id: String,
     api_key: String,
     api_type: String,
     base_url: Option<String>,

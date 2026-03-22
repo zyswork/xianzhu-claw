@@ -15,15 +15,20 @@ pub struct WeixinConfig {
     pub bot_token: String,
 }
 
-/// 启动微信长轮询
+static RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 启动微信长轮询（单例）
 pub async fn start_weixin(
     config: WeixinConfig,
     pool: sqlx::SqlitePool,
     orchestrator: Arc<Orchestrator>,
     app_handle: tauri::AppHandle,
 ) {
+    if RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        log::info!("微信: 轮询已在运行，跳过");
+        return;
+    }
     let token = config.bot_token.clone();
-    // 使用完整的 bot_token（格式: bot_id:token，不要拆分）
     log::info!("微信: 启动长轮询 (token: {}...)", &token[..token.len().min(15)]);
 
     tokio::spawn(async move {
@@ -156,7 +161,7 @@ async fn handle_weixin_message(
     let message_type = msg["message_type"].as_i64().unwrap_or(0);
     let message_state = msg["message_state"].as_i64().unwrap_or(-1);
     let from_user = msg["from_user_id"].as_str().unwrap_or("");
-    let to_user = msg["to_user_id"].as_str().unwrap_or("");
+    let _to_user = msg["to_user_id"].as_str().unwrap_or("");
     let context_token = msg["context_token"].as_str().unwrap_or("");
 
     log::info!("微信: handle_message type={} state={} from={} items={}",

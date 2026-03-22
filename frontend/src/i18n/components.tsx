@@ -8,6 +8,7 @@
 import React from 'react'
 import { useI18n } from './store'
 import { showConfirm } from '../hooks/useConfirm'
+import { toast } from '../hooks/useToast'
 
 // ─── 核心：通用翻译组件 ───
 
@@ -212,8 +213,8 @@ export async function confirmI18n(key: string, params?: Record<string, string | 
   return showConfirm(t(key, params))
 }
 
-/** i18n 提示框 */
+/** i18n 提示框（使用 toast 替代 alert） */
 export function alertI18n(key: string, params?: Record<string, string | number>) {
   const { t } = useI18n.getState()
-  alert(t(key, params))
+  toast.info(t(key, params))
 }

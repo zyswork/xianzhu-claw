@@ -7,7 +7,7 @@ pub mod openai_compat;
 pub mod anthropic;
 pub mod ollama;
 
-use super::provider_trait::{ModelProvider, ProviderRegistry};
+use super::provider_trait::ProviderRegistry;
 
 /// 创建包含所有内置 provider 的注册表
 pub fn create_default_registry() -> ProviderRegistry {

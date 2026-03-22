@@ -11,13 +11,19 @@ pub struct TelegramConfig {
     pub bot_token: String,
 }
 
-/// 启动 Telegram 长轮询（后台 tokio task）
+static RUNNING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 启动 Telegram 长轮询（后台 tokio task，单例）
 pub async fn start_polling(
     config: TelegramConfig,
     pool: sqlx::SqlitePool,
     orchestrator: Arc<Orchestrator>,
     app_handle: tauri::AppHandle,
 ) {
+    if RUNNING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        log::info!("Telegram: 轮询已在运行，跳过");
+        return;
+    }
     let token = config.bot_token.clone();
     log::info!("Telegram: 启动本地轮询 (token: {}...)", &token[..token.len().min(15)]);
 
@@ -293,7 +299,7 @@ async fn send_message(token: &str, chat_id: i64, text: &str) {
 fn markdown_to_telegram_html(md: &str) -> String {
     let mut html = String::with_capacity(md.len() * 2);
     let mut in_code_block = false;
-    let mut code_lang = String::new();
+    let mut _code_lang = String::new();
 
     for line in md.lines() {
         // 代码块
@@ -302,11 +308,11 @@ fn markdown_to_telegram_html(md: &str) -> String {
                 html.push_str("</code></pre>\n");
                 in_code_block = false;
             } else {
-                code_lang = line.trim_start().trim_start_matches('`').to_string();
-                if code_lang.is_empty() {
+                _code_lang = line.trim_start().trim_start_matches('`').to_string();
+                if _code_lang.is_empty() {
                     html.push_str("<pre><code>");
                 } else {
-                    html.push_str(&format!("<pre><code class=\"language-{}\">", escape_html(&code_lang)));
+                    html.push_str(&format!("<pre><code class=\"language-{}\">", escape_html(&_code_lang)));
                 }
                 in_code_block = true;
             }

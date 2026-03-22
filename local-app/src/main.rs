@@ -1852,7 +1852,7 @@ async fn download_skill_from_hub(
         let _ = std::fs::create_dir_all(&dest);
         let name = meta["name"].as_str().unwrap_or(&slug);
         let desc = meta["description"].as_str().unwrap_or("");
-        let category = meta["category"].as_str().unwrap_or("general");
+        let _category = meta["category"].as_str().unwrap_or("general");
         let tags: Vec<String> = meta["tags"].as_array()
             .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
             .unwrap_or_default();
@@ -3411,7 +3411,7 @@ async fn main() {
                                     let base_url = p["baseUrl"].as_str().unwrap_or("");
                                     let base_url_opt = if base_url.is_empty() { None } else { Some(base_url) };
 
-                                    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+                                    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel::<String>();
                                     let orch_clone = orch.clone();
                                     let fwd_clone = fwd.clone();
 

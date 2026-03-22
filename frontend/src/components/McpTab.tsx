@@ -12,6 +12,7 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useI18n } from '../i18n'
+import { toast } from '../hooks/useToast'
 
 interface McpServer {
   id: string
@@ -124,7 +125,7 @@ export default function McpTab({ agentId }: McpTabProps) {
       setError('')
       const imported = await invoke<McpServer[]>('import_claude_mcp_config', { agentId })
       await loadServers()
-      alert(t('mcpTab.importSuccess', { count: imported.length }))
+      toast.success(t('mcpTab.importSuccess', { count: imported.length }))
     } catch (e) { setError(String(e)) }
     finally { setImporting(false) }
   }

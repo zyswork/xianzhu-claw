@@ -8,7 +8,6 @@ pub mod registry;
 pub mod provider_trait;
 pub mod providers;
 
-pub use manifest::{PluginManifest, PluginType, ConfigField};
 pub use registry::PluginRegistry;
-pub use provider_trait::{ModelProvider, ProviderRegistry, CallConfig};
+pub use provider_trait::{ProviderRegistry, CallConfig};
 pub use providers::create_default_registry;
