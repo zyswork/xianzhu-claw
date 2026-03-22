@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { useI18n } from '../i18n'
 
 // Tauri invoke
 const invoke = (window as any).__TAURI__?.invoke || (async () => {})
@@ -92,6 +93,7 @@ function scheduleDesc(s: CronJob['schedule']): string {
 }
 
 export default function CronPage() {
+  const { t } = useI18n()
   const [jobs, setJobs] = useState<CronJob[]>([])
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [runs, setRuns] = useState<CronRun[]>([])
@@ -161,7 +163,7 @@ export default function CronPage() {
   }
 
   const handleDelete = async (jobId: string) => {
-    if (!confirm('确定删除此任务？')) return
+    if (!confirm(t('cron.confirmDelete'))) return
     try {
       await invoke('delete_cron_job', { jobId })
       if (selectedJob === jobId) setSelectedJob(null)
@@ -236,17 +238,17 @@ export default function CronPage() {
 
   const updateForm = (patch: Partial<CreateForm>) => setForm(f => ({ ...f, ...patch }))
 
-  if (loading) return <div style={{ padding: 20 }}>加载中...</div>
+  if (loading) return <div style={{ padding: 20 }}>{t('common.loading')}</div>
 
   return (
     <div style={{ padding: '20px', maxWidth: 1200 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h2 style={{ margin: 0, fontSize: 20 }}>定时任务</h2>
+        <h2 style={{ margin: 0, fontSize: 20 }}>{t('cron.title')}</h2>
         <button
           onClick={() => setShowCreate(!showCreate)}
           style={{ ...btnStyle, padding: '6px 16px', fontSize: 13, background: showCreate ? '#eee' : '#1976d2', color: showCreate ? '#333' : '#fff', border: 'none' }}
         >
-          {showCreate ? '取消' : '+ 新建任务'}
+          {showCreate ? t('common.cancel') : t('cron.btnCreate')}
         </button>
       </div>
 
@@ -256,15 +258,15 @@ export default function CronPage() {
           {/* 基础字段 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <label style={labelStyle}>
-              任务名称
+              {t('cron.fieldName')}
               <input value={form.name} onChange={e => updateForm({ name: e.target.value })}
                 style={inputStyle} placeholder="例：每日数据备份" />
             </label>
             <label style={labelStyle}>
-              任务类型
+              {t('cron.fieldType')}
               <select value={form.jobType} onChange={e => updateForm({ jobType: e.target.value as any })} style={inputStyle}>
-                <option value="agent">Agent（AI 执行）</option>
-                <option value="shell">Shell（命令行）</option>
+                <option value="agent">{t('cron.typeAgent')}</option>
+                <option value="shell">{t('cron.typeShell')}</option>
                 <option value="mcp_tool">MCP Tool</option>
               </select>
             </label>
@@ -272,13 +274,13 @@ export default function CronPage() {
 
           {/* 调度方式 */}
           <div style={{ marginBottom: 12 }}>
-            <label style={{ ...labelStyle, marginBottom: 4 }}>调度方式</label>
+            <label style={{ ...labelStyle, marginBottom: 4 }}>{t('cron.fieldSchedule')}</label>
             <div style={{ display: 'flex', gap: 12, marginBottom: 8 }}>
               {(['cron', 'every', 'at'] as const).map(k => (
                 <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
                   <input type="radio" name="scheduleKind" checked={form.scheduleKind === k}
                     onChange={() => updateForm({ scheduleKind: k })} />
-                  {{ cron: 'Cron 表达式', every: '固定间隔', at: '一次性定时' }[k]}
+                  {{ cron: t('cron.scheduleCron'), every: t('cron.scheduleEvery'), at: t('cron.scheduleAt') }[k]}
                 </label>
               ))}
             </div>
@@ -316,7 +318,7 @@ export default function CronPage() {
                 <label style={labelStyle}>
                   Prompt
                   <textarea value={form.prompt} onChange={e => updateForm({ prompt: e.target.value })}
-                    style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} placeholder="AI 执行的指令..." />
+                    style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} placeholder={t('cron.promptPlaceholder')} />
                 </label>
                 <label style={{ ...labelStyle, marginTop: 8 }}>
                   会话策略
@@ -359,29 +361,29 @@ export default function CronPage() {
           <div style={{ marginBottom: 12 }}>
             <button onClick={() => setShowAdvanced(!showAdvanced)}
               style={{ ...btnStyle, border: 'none', background: 'none', color: 'var(--text-secondary)', padding: 0, fontSize: 13 }}>
-              {showAdvanced ? '▼' : '▶'} 高级选项
+              {showAdvanced ? '▼' : '▶'} {t('cron.advancedOptions')}
             </button>
             {showAdvanced && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 8 }}>
                 <label style={labelStyle}>
-                  超时（秒）
+                  {t('cron.fieldTimeout')}
                   <input type="number" value={form.timeoutSecs}
                     onChange={e => updateForm({ timeoutSecs: parseInt(e.target.value) || 300 })} style={inputStyle} />
                 </label>
                 <label style={labelStyle}>
-                  最大并发
+                  {t('cron.fieldMaxConcurrent')}
                   <input type="number" min={1} value={form.maxConcurrent}
                     onChange={e => updateForm({ maxConcurrent: parseInt(e.target.value) || 1 })} style={inputStyle} />
                 </label>
                 <label style={labelStyle}>
-                  冷却（秒）
+                  {t('cron.fieldCooldown')}
                   <input type="number" min={0} value={form.cooldownSecs}
                     onChange={e => updateForm({ cooldownSecs: parseInt(e.target.value) || 0 })} style={inputStyle} />
                 </label>
                 <label style={labelStyle}>
-                  每日最大次数
+                  {t('cron.fieldMaxDaily')}
                   <input type="number" min={0} value={form.maxDailyRuns}
-                    onChange={e => updateForm({ maxDailyRuns: e.target.value })} style={inputStyle} placeholder="不限" />
+                    onChange={e => updateForm({ maxDailyRuns: e.target.value })} style={inputStyle} placeholder={t('cron.unlimited')} />
                 </label>
                 <label style={labelStyle}>
                   最大连续失败
@@ -394,7 +396,7 @@ export default function CronPage() {
 
           <button onClick={handleCreate} disabled={creating}
             style={{ ...btnStyle, padding: '8px 24px', fontSize: 14, background: '#1976d2', color: '#fff', border: 'none', opacity: creating ? 0.6 : 1 }}>
-            {creating ? '创建中...' : '创建任务'}
+            {creating ? t('common.creating') : t('common.create')}
           </button>
         </div>
       )}
@@ -403,19 +405,19 @@ export default function CronPage() {
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>
           <tr style={{ borderBottom: '2px solid #e0e0e0', textAlign: 'left' }}>
-            <th style={thStyle}>状态</th>
-            <th style={thStyle}>名称</th>
-            <th style={thStyle}>类型</th>
-            <th style={thStyle}>调度</th>
-            <th style={thStyle}>下次执行</th>
-            <th style={thStyle}>失败</th>
-            <th style={thStyle}>操作</th>
+            <th style={thStyle}>{t('cron.columnStatus')}</th>
+            <th style={thStyle}>{t('cron.columnName')}</th>
+            <th style={thStyle}>{t('cron.columnType')}</th>
+            <th style={thStyle}>{t('cron.columnSchedule')}</th>
+            <th style={thStyle}>{t('cron.columnNextRun')}</th>
+            <th style={thStyle}>{t('cron.columnFailures')}</th>
+            <th style={thStyle}>{t('common.actions')}</th>
           </tr>
         </thead>
         <tbody>
           {jobs.length === 0 ? (
             <tr><td colSpan={7} style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)' }}>
-              暂无定时任务
+              {t('cron.emptyJobs')}
             </td></tr>
           ) : jobs.map(job => (
             <tr
@@ -444,11 +446,11 @@ export default function CronPage() {
               </td>
               <td style={tdStyle}>
                 <button onClick={(e) => { e.stopPropagation(); handleToggle(job) }}
-                  style={btnStyle}>{job.enabled ? '暂停' : '恢复'}</button>
+                  style={btnStyle}>{job.enabled ? t('cron.actionPause') : t('cron.actionResume')}</button>
                 <button onClick={(e) => { e.stopPropagation(); handleTrigger(job.id) }}
-                  style={btnStyle}>触发</button>
+                  style={btnStyle}>{t('cron.actionTrigger')}</button>
                 <button onClick={(e) => { e.stopPropagation(); handleDelete(job.id) }}
-                  style={{ ...btnStyle, color: '#f44336' }}>删除</button>
+                  style={{ ...btnStyle, color: '#f44336' }}>{t('common.delete')}</button>
               </td>
             </tr>
           ))}
@@ -459,7 +461,7 @@ export default function CronPage() {
       {selectedJob && (
         <div style={{ marginTop: 24 }}>
           <h3 style={{ fontSize: 16, margin: '0 0 12px' }}>
-            运行记录 - {jobs.find(j => j.id === selectedJob)?.name}
+            {t('cron.sectionRuns')} - {jobs.find(j => j.id === selectedJob)?.name}
           </h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
@@ -473,7 +475,7 @@ export default function CronPage() {
             </thead>
             <tbody>
               {runs.length === 0 ? (
-                <tr><td colSpan={5} style={{ padding: 12, color: 'var(--text-muted)' }}>暂无记录</td></tr>
+                <tr><td colSpan={5} style={{ padding: 12, color: 'var(--text-muted)' }}>{t('common.noRecords')}</td></tr>
               ) : runs.map(run => (
                 <tr key={run.id} style={{ borderBottom: '1px solid #eee' }}>
                   <td style={tdStyle}>

@@ -11,6 +11,7 @@ import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
+import { useI18n } from '../i18n'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -25,6 +26,7 @@ function renderMd(text: string) {
 }
 /** 思考中动画 */
 function ThinkingIndicator() {
+  const { t } = useI18n()
   const [dots, setDots] = useState('')
   const [elapsed, setElapsed] = useState(0)
 
@@ -40,7 +42,7 @@ function ThinkingIndicator() {
         display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
         backgroundColor: 'var(--accent)', animation: 'pulse 1.5s ease-in-out infinite',
       }} />
-      <span>思考中{dots}</span>
+      <span>{t('agentDetail.thinking')}{dots}</span>
       {elapsed > 3 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{elapsed}s</span>}
       <style>{`@keyframes pulse { 0%, 100% { opacity: 0.3; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }`}</style>
     </div>
@@ -107,18 +109,18 @@ function formatSchedule(s: CronJob['schedule']): string {
 
 type TabId = 'chat' | 'soul' | 'tools' | 'mcp' | 'skills' | 'cron' | 'autonomy' | 'plugins' | 'settings' | 'subagents' | 'audit'
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'chat', label: '对话' },
-  { id: 'soul', label: 'Soul' },
-  { id: 'tools', label: '工具' },
-  { id: 'mcp', label: 'MCP' },
-  { id: 'skills', label: 'Skills' },
-  { id: 'cron', label: '定时任务' },
-  { id: 'autonomy', label: '自治' },
-  { id: 'plugins', label: '插件' },
-  { id: 'subagents', label: '子Agent' },
-  { id: 'settings', label: '设置' },
-  { id: 'audit', label: '审计' },
+const TAB_KEYS: { id: TabId; labelKey: string }[] = [
+  { id: 'chat', labelKey: 'agentDetail.tabChat' },
+  { id: 'soul', labelKey: 'agentDetail.tabSoul' },
+  { id: 'tools', labelKey: 'agentDetail.tabTools' },
+  { id: 'mcp', labelKey: 'agentDetail.tabMcp' },
+  { id: 'skills', labelKey: 'agentDetail.tabSkills' },
+  { id: 'cron', labelKey: 'agentDetail.tabCron' },
+  { id: 'autonomy', labelKey: 'agentDetail.tabAutonomy' },
+  { id: 'plugins', labelKey: 'agentDetail.tabPlugins' },
+  { id: 'subagents', labelKey: 'agentDetail.tabSubagents' },
+  { id: 'settings', labelKey: 'agentDetail.tabSettings' },
+  { id: 'audit', labelKey: 'agentDetail.tabAudit' },
 ]
 
 // ─── Main Component ──────────────────────────────────────────
@@ -126,6 +128,7 @@ const TABS: { id: TabId; label: string }[] = [
 export default function AgentDetailPage() {
   const { agentId } = useParams<{ agentId: string }>()
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [agent, setAgent] = useState<Agent | null>(null)
   const [activeTab, setActiveTab] = useState<TabId>('chat')
   const [loading, setLoading] = useState(true)
@@ -145,8 +148,8 @@ export default function AgentDetailPage() {
     })()
   }, [agentId])
 
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>加载中...</div>
-  if (!agent || !agentId) return <div style={{ padding: 40, textAlign: 'center' }}>Agent 不存在</div>
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>{t('common.loading')}</div>
+  if (!agent || !agentId) return <div style={{ padding: 40, textAlign: 'center' }}>{t('agentDetail.notFound')}</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -171,7 +174,7 @@ export default function AgentDetailPage() {
 
       {/* Tab 栏 */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', padding: '0 24px' }}>
-        {TABS.map((tab) => (
+        {TAB_KEYS.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -183,7 +186,7 @@ export default function AgentDetailPage() {
               fontWeight: activeTab === tab.id ? 600 : 400,
             }}
           >
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -232,7 +235,7 @@ function SessionItem({ s, activeSession, onSelect, onDelete, renamingSession, re
       ) : (
         <div onClick={onSelect} onDoubleClick={onStartRename}
           style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          title={isSystem ? s.title : '双击重命名'}
+          title={isSystem ? s.title : useI18n.getState().t('agentDetail.hintRename')}
         >
           {isSystem && <span style={{ color: 'var(--text-muted)', marginRight: 4 }}>&#x23F0;</span>}
           {s.title}
@@ -307,6 +310,7 @@ function convertLocalPath(path: string): string {
 function ToolBar({ messageCount, showCompact, onCompact }: {
   messageCount: number; showCompact: boolean; onCompact: () => Promise<string>
 }) {
+  const { t } = useI18n()
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [msg, setMsg] = useState('')
 
@@ -320,14 +324,14 @@ function ToolBar({ messageCount, showCompact, onCompact }: {
       setTimeout(() => { setStatus('idle'); setMsg('') }, 3000)
     } catch (e) {
       setStatus('error')
-      setMsg('压缩失败: ' + e)
+      setMsg(t('agentDetail.errorCompact') + ': ' + e)
       setTimeout(() => { setStatus('idle'); setMsg('') }, 4000)
     }
   }
 
   return (
     <div style={{ padding: '4px 16px', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-      <span>{messageCount} 条消息</span>
+      <span>{messageCount}{t('agentDetail.messages')}</span>
       {msg && (
         <span style={{ color: status === 'error' ? '#ef4444' : '#22c55e', fontSize: 11 }}>{msg}</span>
       )}
@@ -342,7 +346,7 @@ function ToolBar({ messageCount, showCompact, onCompact }: {
             color: status === 'loading' ? '#d1d5db' : '#6b7280',
           }}
         >
-          {status === 'loading' ? '压缩中...' : '压缩历史'}
+          {status === 'loading' ? t('agentDetail.compacting') : t('agentDetail.compactHistory')}
         </button>
       )}
     </div>
@@ -364,6 +368,7 @@ const isSystemSession = (title: string) =>
   title.startsWith('heartbeat-') || title.startsWith('[heartbeat]')
 
 function ChatTab({ agentId }: { agentId: string }) {
+  const { t } = useI18n()
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSession, setActiveSession] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
@@ -458,11 +463,11 @@ function ChatTab({ agentId }: { agentId: string }) {
         for (const m of structured) {
           if (m.role === 'system') continue
           if (m.role === 'tool') {
-            parsed.push({ role: 'tool', content: m.content || '', toolName: m.name || '工具' })
+            parsed.push({ role: 'tool', content: m.content || '', toolName: m.name || t('common.tools') })
           } else if (m.role === 'assistant' && m.tool_calls) {
             if (m.content) parsed.push({ role: 'assistant', content: m.content })
             for (const tc of (Array.isArray(m.tool_calls) ? m.tool_calls : [])) {
-              parsed.push({ role: 'tool', content: '', toolName: tc.function?.name || tc.name || '工具' })
+              parsed.push({ role: 'tool', content: '', toolName: tc.function?.name || tc.name || t('common.tools') })
             }
           } else {
             parsed.push({ role: m.role, content: m.content || '' })
@@ -525,7 +530,7 @@ function ChatTab({ agentId }: { agentId: string }) {
     const unlisten3 = listen<string>('llm-error', (e) => {
       setStreaming(false)
       streamBuf.current = ''
-      setMessages((prev) => [...prev, { role: 'system', content: `错误: ${e.payload}` }])
+      setMessages((prev) => [...prev, { role: 'system', content: `${t('common.error')}: ${e.payload}` }])
     })
 
     // 外部消息事件（Telegram/Mobile）— 带 sessionId 和消息内容
@@ -609,7 +614,7 @@ function ChatTab({ agentId }: { agentId: string }) {
   }
 
   const deleteSession = async (sessionId: string) => {
-    if (!confirm('确定要删除这个对话吗？')) return
+    if (!confirm(t('agentDetail.confirmDeleteSession'))) return
     try {
       await invoke('delete_session', { sessionId })
       setSessions((prev) => prev.filter((s) => s.id !== sessionId))
@@ -658,55 +663,55 @@ function ChatTab({ agentId }: { agentId: string }) {
 
       case 'new':
         await createSession()
-        return '已创建新会话'
+        return t('agentDetail.successNewSession')
 
       case 'clear':
         if (activeSession) {
           await invoke('clear_history', { sessionId: activeSession })
           setMessages([])
-          return '历史已清空'
+          return t('agentDetail.successCleared')
         }
-        return '没有活跃的会话'
+        return t('agentDetail.errorNoSession')
 
       case 'compact':
         if (activeSession) {
           try {
             const r = await invoke<string>('compact_session', { agentId, sessionId: activeSession })
             return r
-          } catch (e) { return '压缩失败: ' + e }
+          } catch (e) { return t('agentDetail.errorCompact') + ': ' + e }
         }
-        return '没有活跃的会话'
+        return t('agentDetail.errorNoSession')
 
       case 'rename': {
         if (!args.trim()) return '用法: /rename <新名称>'
         if (activeSession) {
           await invoke('rename_session', { sessionId: activeSession, title: args.trim() })
           setSessions((prev) => prev.map((s) => s.id === activeSession ? { ...s, title: args.trim() } : s))
-          return `会话已重命名为「${args.trim()}」`
+          return t('agentDetail.successRenamed', { name: args.trim() })
         }
-        return '没有活跃的会话'
+        return t('agentDetail.errorNoSession')
       }
 
       case 'model': {
         if (!args.trim()) {
           try {
             const detail = await invoke<any>('get_agent_detail', { agentId })
-            return `当前模型: **${detail?.model}**\n温度: ${detail?.temperature ?? '默认'}\nMax Tokens: ${detail?.maxTokens ?? '默认'}`
+            return `${t('agentDetail.currentModel')}: **${detail?.model}**\nTemperature: ${detail?.temperature ?? 'default'}\nMax Tokens: ${detail?.maxTokens ?? 'default'}`
           } catch (e) { return '查询失败: ' + e }
         }
         try {
           await invoke('update_agent', { agentId, model: args.trim() })
-          return `模型已切换为 **${args.trim()}**`
+          return `${t('agentDetail.switchedTo')} **${args.trim()}**`
         } catch (e) { return '切换失败: ' + e }
       }
 
       case 'temp': {
-        const t = parseFloat(args)
-        if (isNaN(t) || t < 0 || t > 2) return '用法: /temp <0-2>，如 /temp 0.7'
+        const tempVal = parseFloat(args)
+        if (isNaN(tempVal) || tempVal < 0 || tempVal > 2) return '/temp <0-2>, e.g. /temp 0.7'
         try {
-          await invoke('update_agent', { agentId, temperature: t })
-          return `温度已调整为 **${t}**`
-        } catch (e) { return '调整失败: ' + e }
+          await invoke('update_agent', { agentId, temperature: tempVal })
+          return `${t('agentDetail.tempAdjusted')} **${tempVal}**`
+        } catch (e) { return 'Failed: ' + e }
       }
 
       case 'status': {
@@ -770,25 +775,25 @@ function ChatTab({ agentId }: { agentId: string }) {
         if (activeSession) {
           await invoke('clear_history', { sessionId: activeSession })
           setMessages([])
-          return '会话已重置（历史已清空，会话保留）'
+          return 'Session reset (history cleared, session preserved)'
         }
-        return '没有活跃的会话'
+        return t('agentDetail.errorNoSession')
       }
 
       case 'stop': {
         if (streaming) {
           setStreaming(false)
           streamBuf.current = ''
-          return '已停止生成'
+          return 'Generation stopped'
         }
-        return '当前没有正在生成的回复'
+        return 'No active generation'
       }
 
       case 'export': {
-        if (!activeSession || messages.length === 0) return '没有可导出的消息'
+        if (!activeSession || messages.length === 0) return t('agentDetail.noMessagesExport')
         const md = messages.map((m) => {
-          if (m.role === 'user') return `**用户:** ${m.content}`
-          if (m.role === 'assistant') return `**助手:** ${m.content}`
+          if (m.role === 'user') return `${t('agentDetail.exportUser')} ${m.content}`
+          if (m.role === 'assistant') return `${t('agentDetail.exportAssistant')} ${m.content}`
           if (m.role === 'tool') return `> 🔧 ${m.toolName}: ${m.content}`
           return `> ${m.content}`
         }).join('\n\n---\n\n')
@@ -913,7 +918,7 @@ function ChatTab({ agentId }: { agentId: string }) {
             width: '100%', padding: '8px', backgroundColor: 'var(--accent)', color: 'white',
             border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13,
           }}>
-            + 新对话
+            {t('agentDetail.newSession')}
           </button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -984,7 +989,7 @@ function ChatTab({ agentId }: { agentId: string }) {
       >
         {!activeSession ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-            选择或创建一个对话
+            {t('chat.selectConversation')}
           </div>
         ) : (
           <>
@@ -1201,7 +1206,7 @@ function ChatTab({ agentId }: { agentId: string }) {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleSend() } }}
                   onPaste={handlePaste}
-                  placeholder="输入消息... (/ 查看命令，可粘贴图片)"
+                  placeholder={t('agentDetail.inputHint')}
                   disabled={streaming}
                   style={{ flex: 1, padding: '10px', border: '1px solid var(--border-subtle)', borderRadius: 6, fontSize: 14 }}
                 />
@@ -1214,7 +1219,7 @@ function ChatTab({ agentId }: { agentId: string }) {
                     opacity: streaming || !input.trim() ? 0.6 : 1,
                   }}
                 >
-                  {streaming ? '生成中...' : '发送'}
+                  {streaming ? t('agentDetail.generating') : t('common.send')}
                 </button>
               </div>
             </div>
@@ -1432,6 +1437,7 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
   onUpdate: (a: Agent) => void
   onDelete: () => void
 }) {
+  const { t } = useI18n()
   const [name, setName] = useState(agent.name)
   const [model, setModel] = useState(agent.model)
   const [temperature, setTemperature] = useState(agent.temperature ?? 0.7)
@@ -1469,7 +1475,7 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
         maxTokens: maxTokens !== agent.maxTokens ? maxTokens : null,
       })
       onUpdate({ ...agent, name, model, temperature, maxTokens })
-      setMsg('保存成功')
+      setMsg(t('settings.successSaved'))
     } catch (e) { setMsg(String(e)) }
     finally { setSaving(false) }
   }
@@ -1485,7 +1491,7 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
     <div style={{ padding: 20, maxWidth: 500 }}>
       <h3 style={{ margin: '0 0 20px', fontSize: 16 }}>Agent 设置</h3>
 
-      {msg && <div style={{ padding: 8, backgroundColor: msg === '保存成功' ? '#dcfce7' : '#fef2f2', color: msg === '保存成功' ? '#16a34a' : '#dc2626', borderRadius: 6, marginBottom: 16, fontSize: 13 }}>{msg}</div>}
+      {msg && <div style={{ padding: 8, backgroundColor: msg === t('settings.successSaved') ? '#dcfce7' : '#fef2f2', color: msg === t('settings.successSaved') ? '#16a34a' : '#dc2626', borderRadius: 6, marginBottom: 16, fontSize: 13 }}>{msg}</div>}
 
       {/* 名称 */}
       <div style={{ marginBottom: 16 }}>
@@ -1507,7 +1513,7 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
         <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>Temperature: {temperature.toFixed(1)}</label>
         <input type="range" min="0" max="2" step="0.1" value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} style={{ width: '100%' }} />
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)' }}>
-          <span>精确 0</span><span>平衡 0.7</span><span>创意 2.0</span>
+          <span>{t('agentCreate.tempPrecise')} 0</span><span>{t('agentCreate.tempBalanced')} 0.7</span><span>{t('agentCreate.tempCreative')} 2.0</span>
         </div>
       </div>
 
@@ -1523,7 +1529,7 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
         border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, marginBottom: 32,
         opacity: saving ? 0.6 : 1,
       }}>
-        {saving ? '保存中...' : '保存设置'}
+        {saving ? t('common.saving') : t('common.save')}
       </button>
 
       {/* 危险区域 */}
@@ -1543,13 +1549,13 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
               padding: '8px 16px', backgroundColor: '#dc2626', color: 'white',
               border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13,
             }}>
-              确认删除
+              {t('agents.btnConfirmDelete')}
             </button>
             <button onClick={() => setDeleteConfirm(false)} style={{
               padding: '8px 16px', backgroundColor: 'var(--bg-glass)', color: 'var(--text-primary)',
               border: '1px solid var(--border-subtle)', borderRadius: 6, cursor: 'pointer', fontSize: 13,
             }}>
-              取消
+              {t('common.cancel')}
             </button>
           </div>
         )}
@@ -1755,6 +1761,7 @@ interface SystemPlugin {
 }
 
 function PluginsTab() {
+  const { t } = useI18n()
   const [plugins, setPlugins] = useState<SystemPlugin[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -1779,9 +1786,9 @@ function PluginsTab() {
 
   return (
     <div style={{ padding: 20, maxWidth: 700 }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>已加载插件</h3>
+      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>{t('agentDetail.pluginsTitle')}</h3>
       <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
-        系统级插件提供渠道、模型、记忆等运行时能力。在侧边栏"插件"页面查看详情。
+        {t('agentDetail.pluginsDesc')}
       </p>
 
       {Object.entries(grouped).map(([type, items]) => (

@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { Link } from 'react-router-dom'
+import { useI18n } from '../i18n'
 
 interface HealthData {
   status: string
@@ -30,6 +31,7 @@ interface AgentSummary {
 }
 
 export default function Dashboard() {
+  const { t } = useI18n()
   const [health, setHealth] = useState<HealthData | null>(null)
   const [cache, setCache] = useState<CacheStats | null>(null)
   const [agents, setAgents] = useState<AgentSummary[]>([])
@@ -62,7 +64,7 @@ export default function Dashboard() {
       }))
       setAgents(summaries)
     } catch (e) {
-      setError('加载数据失败: ' + String(e))
+      setError(t('dashboard.errorLoading', { error: String(e) }))
     }
     setLoading(false)
   }
@@ -72,19 +74,19 @@ export default function Dashboard() {
       <div style={{ padding: '24px', display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
         <div style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: '24px', marginBottom: '8px' }}>...</div>
-          <div>加载中</div>
+          <div>{t('common.loading')}</div>
         </div>
       </div>
     )
   }
 
   const statusColor = health?.status === 'healthy' ? '#22c55e' : '#ef4444'
-  const statusLabel = health?.status === 'healthy' ? '运行正常' : '异常'
+  const statusLabel = health?.status === 'healthy' ? t('dashboard.statusHealthy') : t('dashboard.statusUnhealthy')
 
   return (
     <div style={{ padding: '24px', maxWidth: '1200px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 600 }}>仪表板</h1>
+        <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 600 }}>{t('dashboard.title')}</h1>
         <button
           onClick={loadAll}
           style={{
@@ -92,7 +94,7 @@ export default function Dashboard() {
             border: '1px solid var(--border-subtle)', borderRadius: '6px', cursor: 'pointer',
           }}
         >
-          刷新
+          {t('dashboard.refresh')}
         </button>
       </div>
 
@@ -101,58 +103,58 @@ export default function Dashboard() {
       {/* 状态卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
         <StatCard
-          label="系统状态"
+          label={t('dashboard.systemStatus')}
           value={statusLabel}
           valueColor={statusColor}
           icon="pulse"
-          sub={health?.db ? '数据库连接正常' : '数据库异常'}
+          sub={health?.db ? t('dashboard.dbConnected') : t('dashboard.dbError')}
         />
         <StatCard
-          label="Agent 数量"
+          label={t('dashboard.agentCount')}
           value={String(health?.agents ?? 0)}
           valueColor="#3b82f6"
           icon="agent"
-          sub={`${agents.length} 个已注册`}
+          sub={`${agents.length} ${t('dashboard.registered')}`}
         />
         <StatCard
-          label="今日 Token"
+          label={t('dashboard.todayTokens')}
           value={formatNumber(health?.today_tokens ?? 0)}
           valueColor="#8b5cf6"
           icon="token"
-          sub={`约 $${((health?.today_tokens ?? 0) / 1000 * 0.002).toFixed(4)}`}
+          sub={`${t('common.approxCost')}${((health?.today_tokens ?? 0) / 1000 * 0.002).toFixed(4)}`}
         />
         <StatCard
-          label="记忆条数"
+          label={t('dashboard.memoryCount')}
           value={String(health?.memories ?? 0)}
           valueColor="#f59e0b"
           icon="memory"
-          sub="总记忆体"
+          sub={t('dashboard.totalMemory')}
         />
         <StatCard
-          label="响应缓存"
+          label={t('dashboard.responseCache')}
           value={String(cache?.response_cache?.entries ?? 0)}
           valueColor="#06b6d4"
           icon="cache"
-          sub={`命中 ${cache?.response_cache?.total_hits ?? 0} 次`}
+          sub={`${t('dashboard.cacheHits')} ${cache?.response_cache?.total_hits ?? 0} ${t('common.times')}`}
         />
         <StatCard
-          label="嵌入缓存"
+          label={t('dashboard.embeddingCache')}
           value={String(cache?.embedding_cache?.entries ?? 0)}
           valueColor="#10b981"
           icon="embed"
-          sub="向量缓存"
+          sub={t('dashboard.cacheVectors')}
         />
       </div>
 
       {/* Agent 列表 */}
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>Agent 概览</h2>
-          <Link to="/agents" style={{ fontSize: '13px', color: 'var(--text-accent)', textDecoration: 'none' }}>查看全部 &rarr;</Link>
+          <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 600 }}>{t('dashboard.agentsOverview')}</h2>
+          <Link to="/agents" style={{ fontSize: '13px', color: 'var(--text-accent)', textDecoration: 'none' }}>{t('common.viewAll')} &rarr;</Link>
         </div>
         {agents.length === 0 ? (
           <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', backgroundColor: 'var(--bg-glass)', borderRadius: '8px' }}>
-            暂无 Agent，<Link to="/agents/new" style={{ color: 'var(--text-accent)' }}>创建一个</Link>
+            {t('dashboard.emptyAgents')}<Link to="/agents/new" style={{ color: 'var(--text-accent)' }}>{t('dashboard.createOne')}</Link>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
@@ -182,7 +184,7 @@ export default function Dashboard() {
                   }}>
                     {agent.model}
                   </span>
-                  {agent.sessionCount > 0 && `${agent.sessionCount} 个会话`}
+                  {agent.sessionCount > 0 && `${agent.sessionCount}${t('common.sessions')}`}
                 </div>
               </Link>
             ))}
@@ -192,15 +194,15 @@ export default function Dashboard() {
 
       {/* 快捷操作 */}
       <div>
-        <h2 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 600 }}>快捷操作</h2>
+        <h2 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 600 }}>{t('dashboard.quickActions')}</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
           {[
-            { to: '/agents/new', label: '创建 Agent', color: 'var(--text-accent)', bg: '#eff6ff' },
-            { to: '/skills', label: '技能管理', color: '#8b5cf6', bg: '#f5f3ff' },
-            { to: '/memory', label: '记忆管理', color: '#f59e0b', bg: '#fffbeb' },
-            { to: '/cron', label: '定时任务', color: '#06b6d4', bg: '#ecfeff' },
-            { to: '/token-monitoring', label: 'Token 监控', color: 'var(--error)', bg: '#fef2f2' },
-            { to: '/settings', label: '系统设置', color: 'var(--text-secondary)', bg: '#f9fafb' },
+            { to: '/agents/new', label: t('dashboard.createAgent'), color: 'var(--text-accent)', bg: '#eff6ff' },
+            { to: '/skills', label: t('dashboard.skillManagement'), color: '#8b5cf6', bg: '#f5f3ff' },
+            { to: '/memory', label: t('dashboard.memoryManagement'), color: '#f59e0b', bg: '#fffbeb' },
+            { to: '/cron', label: t('dashboard.cronJobs'), color: '#06b6d4', bg: '#ecfeff' },
+            { to: '/token-monitoring', label: t('dashboard.tokenMonitoring'), color: 'var(--error)', bg: '#fef2f2' },
+            { to: '/settings', label: t('dashboard.systemSettings'), color: 'var(--text-secondary)', bg: '#f9fafb' },
           ].map((item) => (
             <Link
               key={item.to}

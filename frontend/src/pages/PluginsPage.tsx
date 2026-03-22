@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 interface PluginInfo {
   id: string; name: string; version: string; description: string
@@ -18,16 +19,18 @@ interface AgentPluginState {
 }
 
 const TYPE_ORDER = ['模型提供商', '渠道', '记忆后端', '嵌入模型', '功能扩展']
-const TYPE_LABELS: Record<string, string> = {
-  '模型提供商': '模型', '渠道': '渠道', '记忆后端': '记忆', '嵌入模型': '嵌入', '功能扩展': '功能',
+// TYPE_LABELS keys match backend pluginType values; display labels use i18n
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  '模型提供商': 'plugins.typeModel', '渠道': 'plugins.typeChannel', '记忆后端': 'plugins.typeMemory', '嵌入模型': 'plugins.typeEmbedding', '功能扩展': 'plugins.typeFeatures',
 }
 
 export default function PluginsPage() {
+  const { t } = useI18n()
   const [plugins, setPlugins] = useState<PluginInfo[]>([])
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
   const [selectedAgent, setSelectedAgent] = useState('')
   const [agentStates, setAgentStates] = useState<AgentPluginState[]>([])
-  const [activeType, setActiveType] = useState('全部')
+  const [activeType, setActiveType] = useState('all')
   const [configuring, setConfiguring] = useState<string | null>(null)
   const [configValues, setConfigValues] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
@@ -95,8 +98,8 @@ export default function PluginsPage() {
     return state ? state.enabled : globalEnabled
   }
 
-  const types = ['全部', ...TYPE_ORDER]
-  const filtered = activeType === '全部' ? plugins : plugins.filter(p => p.pluginType === activeType)
+  const types = ['all', ...TYPE_ORDER]
+  const filtered = activeType === 'all' ? plugins : plugins.filter(p => p.pluginType === activeType)
 
   // 分组
   const grouped: Record<string, PluginInfo[]> = {}
@@ -105,7 +108,7 @@ export default function PluginsPage() {
     grouped[p.pluginType].push(p)
   }
 
-  if (loading) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>加载中...</div>
+  if (loading) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.loading')}</div>
 
   const configuringPlugin = plugins.find(p => p.id === configuring)
 
@@ -113,13 +116,13 @@ export default function PluginsPage() {
     <div style={{ padding: '24px 32px', maxWidth: 900 }}>
       {/* 标题 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>插件</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{t('plugins.title')}</h1>
         <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, backgroundColor: 'var(--bg-glass)', color: 'var(--text-secondary)' }}>
-          {plugins.length} 个
+          {plugins.length}{t('plugins.labelCount')}
         </span>
         <span style={{ flex: 1 }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Agent:</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('plugins.labelAgent')}</span>
           <select value={selectedAgent} onChange={e => setSelectedAgent(e.target.value)}
             style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border-subtle)', fontSize: 12 }}>
             {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -127,20 +130,20 @@ export default function PluginsPage() {
         </div>
       </div>
       <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 16px' }}>
-        全局开关控制插件是否可用，Agent 开关控制该 Agent 是否使用此插件
+        {t('plugins.hintSwitches')}
       </p>
 
       {/* 分类 Tab */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap' }}>
-        {types.map(t => (
-          <button key={t} onClick={() => setActiveType(t)}
+        {types.map(tp => (
+          <button key={tp} onClick={() => setActiveType(tp)}
             style={{
               padding: '5px 12px', borderRadius: 14, fontSize: 12, cursor: 'pointer',
-              backgroundColor: activeType === t ? 'var(--accent)' : 'var(--bg-glass)',
-              color: activeType === t ? '#fff' : 'var(--text-secondary)',
-              border: 'none', fontWeight: activeType === t ? 600 : 400,
+              backgroundColor: activeType === tp ? 'var(--accent)' : 'var(--bg-glass)',
+              color: activeType === tp ? '#fff' : 'var(--text-secondary)',
+              border: 'none', fontWeight: activeType === tp ? 600 : 400,
             }}>
-            {TYPE_LABELS[t] || t}
+            {tp === 'all' ? t('plugins.tabAll') : (TYPE_LABEL_KEYS[tp] ? t(TYPE_LABEL_KEYS[tp]) : tp)}
           </button>
         ))}
       </div>
@@ -174,11 +177,11 @@ export default function PluginsPage() {
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button onClick={saveConfig}
               style={{ padding: '6px 16px', borderRadius: 6, backgroundColor: 'var(--accent)', color: '#fff', border: 'none', fontSize: 12, cursor: 'pointer' }}>
-              保存
+              {t('common.save')}
             </button>
             <button onClick={() => { setConfiguring(null); setConfigValues({}) }}
               style={{ padding: '6px 16px', borderRadius: 6, border: '1px solid var(--border-subtle)', fontSize: 12, cursor: 'pointer' }}>
-              取消
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -213,10 +216,10 @@ export default function PluginsPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 600 }}>{plugin.name}</span>
-                      {plugin.builtin && plugin.status === 'active' && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, backgroundColor: '#6366F1', color: '#fff' }}>内置</span>}
-                      {plugin.status === 'ready' && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, backgroundColor: '#f59e0b', color: '#fff' }}>就绪</span>}
-                      {plugin.status === 'planned' && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, backgroundColor: '#9ca3af', color: '#fff' }}>规划中</span>}
-                      {plugin.connected && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, backgroundColor: '#22c55e', color: '#fff' }}>已连接</span>}
+                      {plugin.builtin && plugin.status === 'active' && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, backgroundColor: '#6366F1', color: '#fff' }}>{t('plugins.labelBuiltin')}</span>}
+                      {plugin.status === 'ready' && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, backgroundColor: '#f59e0b', color: '#fff' }}>{t('plugins.statusReady')}</span>}
+                      {plugin.status === 'planned' && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, backgroundColor: '#9ca3af', color: '#fff' }}>{t('plugins.statusPlanned')}</span>}
+                      {plugin.connected && <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 3, backgroundColor: '#22c55e', color: '#fff' }}>{t('plugins.statusConnected')}</span>}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {plugin.description}
@@ -227,13 +230,13 @@ export default function PluginsPage() {
                   {plugin.configSchema.length > 0 && plugin.status !== 'planned' && (
                     <button onClick={() => openConfig(plugin.id)}
                       style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid var(--border-subtle)', fontSize: 11, cursor: 'pointer', color: 'var(--text-secondary)', backgroundColor: 'transparent' }}>
-                      配置
+                      {t('plugins.btnConfig')}
                     </button>
                   )}
 
                   {/* Agent 开关 */}
                   {plugin.status === 'planned' ? (
-                    <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>即将支持</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', flexShrink: 0 }}>{t('plugins.labelComingSoon')}</span>
                   ) : (<>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flexShrink: 0 }}>
                     <div
@@ -249,7 +252,7 @@ export default function PluginsPage() {
                         left: agentEnabled ? 18 : 2, transition: 'left 0.2s',
                       }} />
                     </div>
-                    <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>Agent</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{t('plugins.labelAgentSwitch')}</span>
                   </div>
 
                   {/* 全局开关 */}
@@ -267,7 +270,7 @@ export default function PluginsPage() {
                         left: plugin.enabled ? 18 : 2, transition: 'left 0.2s',
                       }} />
                     </div>
-                    <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>全局</span>
+                    <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>{t('plugins.labelGlobal')}</span>
                   </div>
                   </>)}
                 </div>
@@ -278,11 +281,11 @@ export default function PluginsPage() {
       })}
 
       {filtered.length === 0 && (
-        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>暂无该类型的插件</div>
+        <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>{t('plugins.emptyType')}</div>
       )}
 
       <div style={{ marginTop: 20, padding: '10px 0', borderTop: '1px solid var(--border-subtle)', fontSize: 11, color: 'var(--text-muted)' }}>
-        全局开关：控制插件是否在系统中可用。Agent 开关：控制选定的 Agent 是否使用此插件。不同 Agent 可以有不同的插件组合。
+        {t('plugins.hintDetail')}
       </div>
     </div>
   )

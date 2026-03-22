@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 interface ModelStats {
   model: string
@@ -56,6 +57,7 @@ function formatTokens(n: number): string {
 }
 
 export default function TokenMonitoringPage() {
+  const { t } = useI18n()
   const [agents, setAgents] = useState<Agent[]>([])
   const [selectedAgent, setSelectedAgent] = useState('')
   const [stats, setStats] = useState<AgentTokenStats | null>(null)
@@ -94,7 +96,7 @@ export default function TokenMonitoringPage() {
 
   return (
     <div style={{ padding: 24, maxWidth: 900 }}>
-      <h2 style={{ margin: '0 0 20px', fontSize: 20 }}>Token 监控</h2>
+      <h2 style={{ margin: '0 0 20px', fontSize: 20 }}>{t('tokens.title')}</h2>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <select
@@ -109,18 +111,18 @@ export default function TokenMonitoringPage() {
             padding: '6px 12px', border: `1px solid ${days === d ? '#007bff' : '#ddd'}`,
             borderRadius: 6, backgroundColor: days === d ? '#007bff' : 'white',
             color: days === d ? 'white' : '#333', cursor: 'pointer', fontSize: 13,
-          }}>{d} 天</button>
+          }}>{d}{t('tokens.labelDays')}</button>
         ))}
       </div>
 
-      {loading ? <div style={{ color: 'var(--text-muted)' }}>加载中...</div> : stats && (
+      {loading ? <div style={{ color: 'var(--text-muted)' }}>{t('common.loading')}</div> : stats && (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
             {[
-              { label: '总 Tokens', value: formatTokens(stats.total_tokens), color: '#007bff' },
-              { label: '输入', value: formatTokens(stats.total_input_tokens), color: '#28a745' },
-              { label: '输出', value: formatTokens(stats.total_output_tokens), color: '#fd7e14' },
-              { label: '预估成本', value: `$${totalCost.toFixed(2)}`, color: '#dc3545' },
+              { label: t('tokens.statTotal'), value: formatTokens(stats.total_tokens), color: '#007bff' },
+              { label: t('tokens.statInput'), value: formatTokens(stats.total_input_tokens), color: '#28a745' },
+              { label: t('tokens.statOutput'), value: formatTokens(stats.total_output_tokens), color: '#fd7e14' },
+              { label: t('tokens.statCost'), value: `$${totalCost.toFixed(2)}`, color: '#dc3545' },
             ].map(({ label, value, color }) => (
               <div key={label} style={{
                 padding: 16, borderRadius: 8, border: '1px solid var(--border-subtle)', textAlign: 'center',
@@ -133,7 +135,7 @@ export default function TokenMonitoringPage() {
 
           {daily.length > 0 && (
             <div style={{ marginBottom: 24 }}>
-              <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>每日趋势</h3>
+              <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>{t('tokens.sectionDailyTrend')}</h3>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 120, padding: '0 4px' }}>
                 {daily.map((d, i) => (
                   <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -152,16 +154,16 @@ export default function TokenMonitoringPage() {
 
           {stats.models.length > 0 && (
             <div>
-              <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>模型明细</h3>
+              <h3 style={{ fontSize: 15, margin: '0 0 12px' }}>{t('tokens.sectionModels')}</h3>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                    <th style={{ textAlign: 'left', padding: '8px 12px' }}>模型</th>
-                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>输入</th>
-                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>输出</th>
-                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>总计</th>
-                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>调用次数</th>
-                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>预估成本</th>
+                    <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('tokens.columnModel')}</th>
+                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>{t('tokens.columnInput')}</th>
+                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>{t('tokens.columnOutput')}</th>
+                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>{t('tokens.columnTotal')}</th>
+                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>{t('tokens.columnCalls')}</th>
+                    <th style={{ textAlign: 'right', padding: '8px 12px' }}>{t('tokens.columnCost')}</th>
                   </tr>
                 </thead>
                 <tbody>

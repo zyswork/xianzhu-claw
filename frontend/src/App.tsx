@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense, useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useBackendConnection } from './hooks/useBackendConnection'
+import { useI18n } from './i18n'
 import SplashScreen from './components/SplashScreen'
 import SetupPage from './pages/SetupPage'
 import Layout from './components/Layout'
@@ -21,9 +22,10 @@ const ChannelsPage = lazy(() => import('./pages/ChannelsPage'))
 const PluginsPage = lazy(() => import('./pages/PluginsPage'))
 
 function PageLoader() {
+  const { t } = useI18n()
   return (
     <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-      加载中...
+      {t('common.loading')}
     </div>
   )
 }
@@ -40,6 +42,7 @@ function ProtectedPage({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const { isConnected, retryCount } = useBackendConnection()
+  const { t } = useI18n()
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
 
   // 连接后检查是否需要首次设置
@@ -58,7 +61,7 @@ export default function App() {
   if (!isConnected) {
     return (
       <SplashScreen
-        message={`正在连接后端... (${retryCount})`}
+        message={`${t('common.loading')} (${retryCount})`}
         progress={Math.min((retryCount / 10) * 100, 95)}
       />
     )
@@ -66,7 +69,7 @@ export default function App() {
 
   // 等待检查结果
   if (needsSetup === null) {
-    return <SplashScreen message="检查环境..." progress={50} />
+    return <SplashScreen message={t('setup.stepEnvCheck') + '...'} progress={50} />
   }
 
   // 首次启动引导

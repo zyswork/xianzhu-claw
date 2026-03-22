@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useNavigate } from 'react-router-dom'
+import { useI18n } from '../i18n'
 
 interface Agent {
   id: string
@@ -22,6 +23,7 @@ interface Agent {
 
 export default function AgentListPage() {
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -55,14 +57,14 @@ export default function AgentListPage() {
   }
 
   const formatTime = (ts: number) => {
-    if (!ts) return '未知'
+    if (!ts) return t('common.unknown')
     const d = new Date(ts)
     const now = new Date()
     const diff = now.getTime() - d.getTime()
-    if (diff < 60000) return '刚刚'
-    if (diff < 3600000) return `${Math.floor(diff / 60000)} 分钟前`
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)} 小时前`
-    return d.toLocaleDateString('zh-CN')
+    if (diff < 60000) return t('common.justNow')
+    if (diff < 3600000) return t('common.minutesAgo', { n: Math.floor(diff / 60000) })
+    if (diff < 86400000) return t('common.hoursAgo', { n: Math.floor(diff / 3600000) })
+    return d.toLocaleDateString()
   }
 
   const getModelColor = (model: string) => {
@@ -75,7 +77,7 @@ export default function AgentListPage() {
   }
 
   if (loading) {
-    return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>加载中...</div>
+    return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>{t('common.loading')}</div>
   }
 
   return (
@@ -83,9 +85,9 @@ export default function AgentListPage() {
       {/* 头部 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>Agents</h1>
+          <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600 }}>{t('agents.title')}</h1>
           <p style={{ margin: '4px 0 0', color: 'var(--text-secondary)', fontSize: 14 }}>
-            管理你的 AI 智能体 · {agents.length} 个
+            {t('agents.subtitle', { count: agents.length })}
           </p>
         </div>
         <button
@@ -101,7 +103,7 @@ export default function AgentListPage() {
             cursor: 'pointer',
           }}
         >
-          + 新建 Agent
+          {t('agents.btnCreate')}
         </button>
       </div>
 
@@ -118,8 +120,8 @@ export default function AgentListPage() {
           backgroundColor: 'var(--bg-glass)', borderRadius: 12, border: '2px dashed #e5e7eb',
         }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
-          <h3 style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>还没有 Agent</h3>
-          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>创建你的第一个 AI 智能体开始使用</p>
+          <h3 style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>{t('agents.emptyTitle')}</h3>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>{t('agents.emptyDesc')}</p>
           <button
             onClick={() => navigate('/agents/new')}
             style={{
@@ -127,7 +129,7 @@ export default function AgentListPage() {
               border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer',
             }}
           >
-            创建 Agent
+            {t('dashboard.createAgent')}
           </button>
         </div>
       ) : (
@@ -195,13 +197,13 @@ export default function AgentListPage() {
               {/* 底部信息 */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  更新于 {formatTime(agent.updatedAt)}
+                  {t('agents.updatedAt')} {formatTime(agent.updatedAt)}
                 </span>
                 {/* 快速操作 */}
                 <div style={{ display: 'flex', gap: 4 }} onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => navigate(`/agents/${agent.id}?tab=chat`)}
-                    title="对话"
+                    title={t('agents.actionChat')}
                     style={{
                       padding: '4px 8px', border: '1px solid var(--border-subtle)', borderRadius: 6,
                       backgroundColor: 'white', cursor: 'pointer', fontSize: 14,
@@ -211,7 +213,7 @@ export default function AgentListPage() {
                   </button>
                   <button
                     onClick={() => navigate(`/agents/${agent.id}?tab=settings`)}
-                    title="设置"
+                    title={t('agents.actionSettings')}
                     style={{
                       padding: '4px 8px', border: '1px solid var(--border-subtle)', borderRadius: 6,
                       backgroundColor: 'white', cursor: 'pointer', fontSize: 14,
@@ -221,7 +223,7 @@ export default function AgentListPage() {
                   </button>
                   <button
                     onClick={() => setDeleteConfirm(agent.id)}
-                    title="删除"
+                    title={t('agents.actionDelete')}
                     style={{
                       padding: '4px 8px', border: '1px solid #fecaca', borderRadius: 6,
                       backgroundColor: 'white', cursor: 'pointer', fontSize: 14,
@@ -246,9 +248,9 @@ export default function AgentListPage() {
             backgroundColor: 'white', borderRadius: 12, padding: 24,
             maxWidth: 400, width: '90%',
           }}>
-            <h3 style={{ margin: '0 0 8px' }}>确认删除</h3>
+            <h3 style={{ margin: '0 0 8px' }}>{t('agents.confirmDeleteTitle')}</h3>
             <p style={{ color: 'var(--text-secondary)', margin: '0 0 20px' }}>
-              删除后将清除该 Agent 的所有对话记录、记忆和配置，此操作不可撤销。
+              {t('agents.confirmDeleteDesc')}
             </p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
@@ -258,7 +260,7 @@ export default function AgentListPage() {
                   backgroundColor: 'white', cursor: 'pointer',
                 }}
               >
-                取消
+                {t('common.cancel')}
               </button>
               <button
                 onClick={() => handleDelete(deleteConfirm)}
@@ -267,7 +269,7 @@ export default function AgentListPage() {
                   backgroundColor: '#dc2626', color: 'white', cursor: 'pointer',
                 }}
               >
-                确认删除
+                {t('agents.btnConfirmDelete')}
               </button>
             </div>
           </div>

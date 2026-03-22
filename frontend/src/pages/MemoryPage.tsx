@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 interface Memory {
   id: string
@@ -26,6 +27,7 @@ interface AgentStats {
 }
 
 export default function MemoryPage() {
+  const { t } = useI18n()
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
   const [selectedAgent, setSelectedAgent] = useState('')
   const [memories, setMemories] = useState<Memory[]>([])
@@ -44,7 +46,7 @@ export default function MemoryPage() {
       setAgents(list.map((a: any) => ({ id: a.id, name: a.name })))
       if (list.length > 0) setSelectedAgent(list[0].id)
     } catch (e) {
-      showMsg('error', '加载 Agent 失败')
+      showMsg('error', 'Failed to load agents')
     }
     setLoading(false)
   }
@@ -67,14 +69,14 @@ export default function MemoryPage() {
   }
 
   const handleExtract = async () => {
-    if (!confirm('从历史对话中提取记忆？将调用 LLM 分析对话内容。')) return
+    if (!confirm(t('memory.confirmExtract'))) return
     setActionLoading(true)
     try {
       const result = (await invoke('extract_memories_from_history', { agentId: selectedAgent })) as any
-      showMsg('success', result?.message || `提取了 ${result?.extracted} 条记忆`)
+      showMsg('success', result?.message || t('memory.successExtracted', { count: result?.extracted || 0 }))
       await loadData()
     } catch (e) {
-      showMsg('error', '提取失败: ' + String(e))
+      showMsg('error', 'Extract failed: ' + String(e))
     }
     setActionLoading(false)
   }
@@ -85,20 +87,20 @@ export default function MemoryPage() {
       const result = (await invoke('export_memory_snapshot', { agentId: selectedAgent })) as string
       showMsg('success', result)
     } catch (e) {
-      showMsg('error', '导出失败: ' + String(e))
+      showMsg('error', 'Export failed: ' + String(e))
     }
     setActionLoading(false)
   }
 
   const handleHygiene = async () => {
-    if (!confirm('确定执行记忆清理？将移除低优先级的重复/过期记忆。')) return
+    if (!confirm(t('memory.confirmHygiene'))) return
     setActionLoading(true)
     try {
       const result = (await invoke('run_memory_hygiene', { agentId: selectedAgent })) as string
       showMsg('success', result)
       await loadData()
     } catch (e) {
-      showMsg('error', '清理失败: ' + String(e))
+      showMsg('error', 'Cleanup failed: ' + String(e))
     }
     setActionLoading(false)
   }
@@ -115,7 +117,7 @@ export default function MemoryPage() {
 
   // 按类型分组
   const grouped = filteredMemories.reduce<Record<string, Memory[]>>((acc, m) => {
-    const type = m.memory_type || '未分类'
+    const type = m.memory_type || t('common.uncategorized')
     ;(acc[type] = acc[type] || []).push(m)
     return acc
   }, {})
@@ -127,12 +129,12 @@ export default function MemoryPage() {
     procedural: { bg: '#ede9fe', text: '#5b21b6' },
   }
 
-  if (loading) return <div style={{ padding: '24px', color: 'var(--text-muted)' }}>加载中...</div>
+  if (loading) return <div style={{ padding: '24px', color: 'var(--text-muted)' }}>{t('common.loading')}</div>
 
   return (
     <div style={{ padding: '24px', maxWidth: '900px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 600 }}>记忆管理</h1>
+        <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 600 }}>{t('memory.title')}</h1>
         <div style={{ display: 'flex', gap: '8px' }}>
           <button
             onClick={handleExtract}
@@ -143,7 +145,7 @@ export default function MemoryPage() {
               opacity: actionLoading ? 0.6 : 1,
             }}
           >
-            {actionLoading ? '处理中...' : '从对话提取'}
+            {actionLoading ? t('common.processing') : t('memory.btnExtract')}
           </button>
           <button
             onClick={handleExport}
@@ -154,7 +156,7 @@ export default function MemoryPage() {
               opacity: actionLoading ? 0.6 : 1,
             }}
           >
-            导出快照
+            {t('memory.btnExport')}
           </button>
           <button
             onClick={handleHygiene}
@@ -165,7 +167,7 @@ export default function MemoryPage() {
               opacity: actionLoading ? 0.6 : 1,
             }}
           >
-            清理记忆
+            {t('memory.btnClean')}
           </button>
         </div>
       </div>
@@ -183,7 +185,7 @@ export default function MemoryPage() {
         </select>
         <input
           type="text"
-          placeholder="搜索记忆内容..."
+          placeholder={t('memory.searchPlaceholder')}
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--border-subtle)', borderRadius: '6px', fontSize: '13px' }}
@@ -205,11 +207,11 @@ export default function MemoryPage() {
         display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
         gap: '12px', marginBottom: '20px',
       }}>
-        <MiniCard label="记忆条数" value={memories.length} color="#8b5cf6" />
-        <MiniCard label="向量数" value={stats.vectorCount} color="#f59e0b" />
-        <MiniCard label="会话数" value={stats.sessionCount} color="#3b82f6" />
-        <MiniCard label="消息总数" value={stats.messageCount} color="#10b981" />
-        <MiniCard label="嵌入缓存" value={stats.embeddingCacheCount} color="#06b6d4" />
+        <MiniCard label={t('memory.statCount')} value={memories.length} color="#8b5cf6" />
+        <MiniCard label={t('memory.statVectors')} value={stats.vectorCount} color="#f59e0b" />
+        <MiniCard label={t('memory.statSessions')} value={stats.sessionCount} color="#3b82f6" />
+        <MiniCard label={t('memory.statMessages')} value={stats.messageCount} color="#10b981" />
+        <MiniCard label={t('memory.statEmbeddingCache')} value={stats.embeddingCacheCount} color="#06b6d4" />
       </div>
 
       {/* 记忆类型分布 */}
@@ -239,7 +241,7 @@ export default function MemoryPage() {
         }}>
           <div style={{ fontSize: '32px', marginBottom: '12px', opacity: 0.4 }}>{'\u{1F9E0}'}</div>
           <div style={{ color: 'var(--text-secondary)', fontSize: '14px', marginBottom: '8px' }}>
-            {memories.length === 0 ? '该 Agent 暂无记忆' : '没有匹配的记忆'}
+            {memories.length === 0 ? t('memory.emptyMemories') : t('memory.emptySearch')}
           </div>
           {memories.length === 0 && (
             <div style={{ color: 'var(--text-muted)', fontSize: '12px', lineHeight: '1.6' }}>
@@ -313,8 +315,9 @@ function formatTime(ts: number): string {
   const d = new Date(ts)
   const now = Date.now()
   const diff = now - ts
-  if (diff < 60_000) return '刚刚'
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
-  return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  const t = useI18n.getState().t
+  if (diff < 60_000) return t('common.justNow')
+  if (diff < 3600_000) return t('common.minutesAgo', { n: Math.floor(diff / 60_000) })
+  if (diff < 86400_000) return t('common.hoursAgo', { n: Math.floor(diff / 3600_000) })
+  return d.toLocaleDateString(undefined, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }

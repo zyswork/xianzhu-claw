@@ -3,6 +3,8 @@
  */
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { QRCodeSVG } from 'qrcode.react'
+import { useI18n } from '../i18n'
 
 async function cloudApi(method: string, path: string, body?: any): Promise<any> {
   return invoke('cloud_api_proxy', { method, path, body: body || null })
@@ -18,18 +20,20 @@ const CHANNELS: ChannelInfo[] = [
   { id: 'telegram', name: 'Telegram', icon: '\u{1F4E8}', desc: '通过 Telegram Bot 与 AI 对话。从 @BotFather 获取 Token，一分钟接入。', connected: false, configFields: [{ key: 'botToken', label: 'Bot Token', placeholder: '123456:ABC-DEF...', type: 'password' }] },
   { id: 'feishu', name: '飞书 (Lark)', icon: '\u{1F426}', desc: '飞书群聊 AI 助手。在飞书开放平台创建应用，获取 App ID 和 Secret。', connected: false, configFields: [{ key: 'appId', label: 'App ID', placeholder: 'cli_xxx' }, { key: 'appSecret', label: 'App Secret', placeholder: '', type: 'password' }] },
   { id: 'dingtalk', name: '钉钉', icon: '\u{1F4AC}', desc: '钉钉群机器人接入。', connected: false },
-  { id: 'wechat', name: '微信', icon: '\u{1F4F1}', desc: '通过 iLinkai 协议接入个人微信。扫码登录即可使用。', connected: false, configFields: [{ key: 'qrLogin', label: '扫码登录', placeholder: '点击获取二维码', type: 'qrcode' }] },
+  { id: 'wechat', name: '微信', icon: '\u{1F4F1}', desc: '通过 iLinkai 协议接入个人微信。点击连接后扫码登录。', connected: false },
   { id: 'discord', name: 'Discord', icon: '\u{1F3AE}', desc: '通过 Bot API 接入 Discord。', connected: false },
   { id: 'slack', name: 'Slack', icon: '\u{1F4BC}', desc: 'Socket Mode 接入 Slack 工作区。', connected: false },
 ]
 
 export default function ChannelsPage() {
+  const { t } = useI18n()
   const [channels, setChannels] = useState(CHANNELS)
   const [configuring, setConfiguring] = useState<string | null>(null)
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [loadError, setLoadError] = useState('')
+  const [weixinQr, setWeixinQr] = useState('')
 
   useEffect(() => { checkStatuses() }, [])
 
@@ -41,6 +45,8 @@ export default function ChannelsPage() {
       const infoStr = await invoke<string | null>('get_setting', { key: 'telegram_bot_info' })
       const feishuId = await invoke<string | null>('get_setting', { key: 'feishu_app_id' })
       const hasFeishu = !!feishuId
+      const weixinToken = await invoke<string | null>('get_setting', { key: 'weixin_bot_token' })
+      const hasWeixin = !!weixinToken
 
       const hasToken = !!token
       let botInfo = null
@@ -49,6 +55,7 @@ export default function ChannelsPage() {
       setChannels(prev => prev.map(c =>
         c.id === 'telegram' ? { ...c, connected: hasToken, bot: botInfo }
         : c.id === 'feishu' ? { ...c, connected: hasFeishu }
+        : c.id === 'wechat' ? { ...c, connected: hasWeixin }
         : c
       ))
     } catch (e: any) {
@@ -58,46 +65,64 @@ export default function ChannelsPage() {
 
   const handleSetup = async (channelId: string) => {
     if (channelId === 'wechat') {
-      setSaving(true); setError('正在获取登录二维码...')
+      setConfiguring('wechat')
+      setSaving(true); setError(t('channels.statusGettingQr')); setWeixinQr('')
       try {
         const qrData = await invoke<any>('weixin_get_qrcode')
-        const qrcodeUrl = qrData.qrcode_img_content || qrData.qrcode || ''
-        if (!qrcodeUrl) { setError('获取二维码失败'); setSaving(false); return }
+        console.log('weixin qr data:', qrData)
+        const qrcodeImg = qrData.qrcode_img_content || ''
+        const qrcodeId = qrData.qrcode || ''
+        if (!qrcodeId) { setError('获取二维码失败: ' + JSON.stringify(qrData)); setSaving(false); return }
 
-        // 显示二维码让用户扫
-        setError('请用微信扫描二维码登录（60秒内有效）')
-        const qrWindow = window.open('', '_blank', 'width=300,height=350')
-        if (qrWindow) {
-          qrWindow.document.write(`<html><body style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif"><h3>微信扫码登录</h3><img src="data:image/png;base64,${qrcodeUrl}" style="width:250px;height:250px"/><p style="color:#999;font-size:12px">请用微信扫描二维码</p></body></html>`)
-        }
+        console.log('微信二维码: qrcode=' + qrcodeId + ', img=' + qrcodeImg.substring(0, 80))
 
-        // 轮询扫码状态
-        const qrcode = qrData.qrcode
-        for (let i = 0; i < 30; i++) {
-          await new Promise(r => setTimeout(r, 2000))
+        // qrcode_img_content 是微信扫码链接，用 QRCodeSVG 渲染
+        setWeixinQr(qrcodeImg || `https://ilinkai.weixin.qq.com/ilink/bot/get_bot_qrcode_img?qrcode=${qrcodeId}`)
+        setError(t('channels.statusScanning'))
+
+        // 轮询扫码状态（长轮询，每次请求可能 hold 30+ 秒）
+        for (let i = 0; i < 10; i++) {
           try {
-            const status = await invoke<any>('weixin_poll_status', { qrcode })
-            if (status.status === 'confirmed' && status.bot_token) {
-              await invoke('weixin_save_token', { botToken: status.bot_token })
-              await invoke('set_setting', { key: 'weixin_bot_token', value: status.bot_token })
-              if (qrWindow) qrWindow.close()
-              setConfiguring(null); setError('')
-              alert('微信已连接！重启应用后生效。')
-              checkStatuses()
-              setSaving(false)
-              return
+            const status = await invoke<any>('weixin_poll_status', { qrcode: qrcodeId })
+            console.log('weixin poll result:', JSON.stringify(status))
+
+            if (status === 'timeout' || status?.status === 'wait' || !status?.status) {
+              // 长轮询超时或等待中，继续轮询
+              continue
             }
             if (status.status === 'scaned') {
-              setError('已扫码，请在手机上确认...')
+              setError(t('channels.statusScanned'))
+              continue
+            }
+            if (status.status === 'confirmed') {
+              const token = status.bot_token || ''
+              const baseUrl = status.baseurl || ''
+              if (token) {
+                await invoke('weixin_save_token', { botToken: token })
+                await invoke('set_setting', { key: 'weixin_bot_token', value: token })
+                if (baseUrl) await invoke('set_setting', { key: 'weixin_base_url', value: baseUrl })
+                setConfiguring(null); setError(''); setWeixinQr('')
+                alert(t('channels.successConnected'))
+                checkStatuses()
+                setSaving(false)
+                return
+              } else {
+                setError('登录确认但未获取到 token，请重试')
+                break
+              }
             }
             if (status.status === 'expired') {
-              setError('二维码已过期，请重试')
-              if (qrWindow) qrWindow.close()
+              setError(t('channels.errorQrExpired'))
               break
             }
-          } catch { /* continue polling */ }
+          } catch (pe) {
+            console.error('weixin poll error:', pe)
+            // 超时错误继续轮询
+            if (String(pe).includes('timeout')) continue
+          }
         }
-      } catch (e: any) { setError('微信登录失败: ' + String(e)) }
+        setError(t('channels.errorTimeout'))
+      } catch (e: any) { setError('微信登录失败: ' + String(e)); console.error(e) }
       setSaving(false)
       return
     }
@@ -110,13 +135,13 @@ export default function ChannelsPage() {
         await invoke('set_setting', { key: 'feishu_app_id', value: appId })
         await invoke('set_setting', { key: 'feishu_app_secret', value: appSecret })
         setConfiguring(null); setFormValues({}); setError('')
-        alert('飞书已配置！重启应用后生效。')
+        alert(t('channels.successConfigured'))
         checkStatuses()
       } catch (e: any) { setError('保存失败: ' + String(e)) }
       setSaving(false)
       return
     }
-    if (channelId !== 'telegram') { alert('该频道暂未支持'); return }
+    if (channelId !== 'telegram') { alert(t('channels.errorNotSupported')); return }
     const token = formValues.botToken?.trim()
     if (!token) { setError('请输入 Bot Token'); return }
 
@@ -139,14 +164,14 @@ export default function ChannelsPage() {
       // 桌面离线时的 Fallback 由云端 sync 机制单独处理
 
       setConfiguring(null); setFormValues({}); setError('')
-      alert('Telegram 已连接！重启应用后生效（本地轮询）。')
+      alert(t('channels.successConnected'))
       checkStatuses()
     } catch (e: any) { setError('连接失败: ' + String(e)) }
     setSaving(false)
   }
 
   const handleDisconnect = async (channelId: string) => {
-    if (!confirm('确定断开连接？')) return
+    if (!confirm(t('channels.confirmDisconnect'))) return
     try { await cloudApi('POST', `/api/v1/channels/${channelId}/disconnect`); checkStatuses() } catch {}
   }
 
@@ -154,12 +179,12 @@ export default function ChannelsPage() {
     <div style={{ padding: '24px 32px', maxWidth: 1000 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>频道</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '4px 0 0' }}>将 AI 接入你日常使用的通讯应用</p>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{t('channels.title')}</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: 13, margin: '4px 0 0' }}>{t('channels.subtitle')}</p>
         </div>
         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
           <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: 'var(--success)', marginRight: 6 }} />
-          {channels.filter(c => c.connected).length} 已连接
+          {channels.filter(c => c.connected).length} {t('channels.connected')}
         </div>
       </div>
 
@@ -177,13 +202,28 @@ export default function ChannelsPage() {
               <span style={{ fontSize: 22 }}>{ch.icon}</span>
               <span style={{ fontSize: 15, fontWeight: 600 }}>{ch.name}</span>
               <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, backgroundColor: ch.connected ? 'var(--success-bg)' : 'var(--bg-glass)', color: ch.connected ? 'var(--success)' : 'var(--text-muted)', fontWeight: ch.connected ? 600 : 400 }}>
-                {ch.connected ? '已连接' : '未连接'}
+                {ch.connected ? t('channels.connected') : t('channels.disconnected')}
               </span>
             </div>
             <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 12px', lineHeight: 1.5 }}>{ch.desc}</p>
             {ch.connected && ch.bot && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 8 }}>Bot: @{ch.bot.username}</div>}
 
-            {configuring === ch.id && ch.configFields && (
+            {/* 微信扫码区域 */}
+            {configuring === ch.id && ch.id === 'wechat' && (
+              <div style={{ marginBottom: 12, textAlign: 'center' }}>
+                {error && <div style={{ color: saving ? 'var(--accent)' : 'var(--error)', fontSize: 13, marginBottom: 8 }}>{error}</div>}
+                {weixinQr && (
+                  <div style={{ padding: 16, backgroundColor: '#fff', borderRadius: 12, display: 'inline-block', margin: '8px 0' }}>
+                    <QRCodeSVG value={weixinQr} size={200} />
+                  </div>
+                )}
+                {saving && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('channels.statusWaitingScan')}</div>}
+                {!saving && <button onClick={() => { setConfiguring(null); setError(''); setWeixinQr('') }}
+                  style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border-subtle)', fontSize: 13, cursor: 'pointer', marginTop: 8 }}>{t('common.cancel')}</button>}
+              </div>
+            )}
+
+            {configuring === ch.id && ch.id !== 'wechat' && ch.configFields && (
               <div style={{ marginBottom: 12 }}>
                 {error && <div style={{ color: 'var(--error)', fontSize: 12, marginBottom: 8 }}>{error}</div>}
                 {ch.configFields.map(f => (
@@ -194,18 +234,23 @@ export default function ChannelsPage() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => handleSetup(ch.id)} disabled={saving}
                     style={{ padding: '6px 16px', borderRadius: 8, backgroundColor: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, cursor: 'pointer' }}>
-                    {saving ? '连接中...' : '连接'}
+                    {saving ? t('channels.btnConnecting') : t('channels.btnConnect')}
                   </button>
                   <button onClick={() => { setConfiguring(null); setError('') }}
-                    style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border-subtle)', fontSize: 13, cursor: 'pointer' }}>取消</button>
+                    style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid var(--border-subtle)', fontSize: 13, cursor: 'pointer' }}>{t('common.cancel')}</button>
                 </div>
               </div>
             )}
 
             {configuring !== ch.id && (ch.connected ? (
-              <button onClick={() => handleDisconnect(ch.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-subtle)', fontSize: 12, cursor: 'pointer', color: 'var(--error)' }}>断开连接</button>
+              <button onClick={() => handleDisconnect(ch.id)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-subtle)', fontSize: 12, cursor: 'pointer', color: 'var(--error)' }}>{t('channels.btnDisconnect')}</button>
             ) : (
-              <button onClick={() => ch.configFields ? setConfiguring(ch.id) : alert('该频道暂未支持')} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-subtle)', fontSize: 12, cursor: 'pointer', color: 'var(--text-accent)' }}>点击配置</button>
+              <button onClick={() => {
+                if (ch.id === 'wechat') { handleSetup('wechat'); return }
+                ch.configFields ? setConfiguring(ch.id) : alert(t('channels.errorNotSupported'))
+              }} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border-subtle)', fontSize: 12, cursor: 'pointer', color: 'var(--text-accent)' }}>
+                {ch.id === 'wechat' ? t('channels.btnScanConnect') : t('channels.btnConfigure')}
+              </button>
             ))}
           </div>
         ))}

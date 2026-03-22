@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 interface AuditEntry {
   id: string
@@ -23,6 +24,7 @@ interface AuditEntry {
 }
 
 export default function AuditLogPage() {
+  const { t } = useI18n()
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
   const [selectedAgent, setSelectedAgent] = useState('')
   const [entries, setEntries] = useState<AuditEntry[]>([])
@@ -59,11 +61,11 @@ export default function AuditLogPage() {
     }
   }
 
-  if (loading) return <div style={{ padding: '24px', color: 'var(--text-muted)' }}>加载中...</div>
+  if (loading) return <div style={{ padding: '24px', color: 'var(--text-muted)' }}>{t('common.loading')}</div>
 
   return (
     <div style={{ padding: '24px', maxWidth: '1100px' }}>
-      <h1 style={{ margin: '0 0 20px', fontSize: '22px', fontWeight: 600 }}>审计日志</h1>
+      <h1 style={{ margin: '0 0 20px', fontSize: '22px', fontWeight: 600 }}>{t('audit.title')}</h1>
 
       {/* 筛选栏 */}
       <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
@@ -78,7 +80,7 @@ export default function AuditLogPage() {
         </select>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-          共 {entries.length} 条{entries.length === PAGE_SIZE ? '+' : ''}
+          {t('audit.labelTotal')} {entries.length}{t('audit.labelEntries')}{entries.length === PAGE_SIZE ? '+' : ''}
         </span>
       </div>
 
@@ -88,19 +90,19 @@ export default function AuditLogPage() {
           padding: '40px', textAlign: 'center', color: 'var(--text-muted)',
           backgroundColor: 'var(--bg-glass)', borderRadius: '8px', border: '1px solid var(--border-subtle)',
         }}>
-          暂无审计记录
+          {t('audit.emptyLogs')}
         </div>
       ) : (
         <div style={{ border: '1px solid var(--border-subtle)', borderRadius: '8px', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ backgroundColor: 'var(--bg-glass)' }}>
-                <th style={thStyle}>时间</th>
-                <th style={thStyle}>工具</th>
-                <th style={thStyle}>状态</th>
-                <th style={thStyle}>策略</th>
-                <th style={thStyle}>耗时</th>
-                <th style={thStyle}>操作</th>
+                <th style={thStyle}>{t('audit.columnTime')}</th>
+                <th style={thStyle}>{t('audit.columnTool')}</th>
+                <th style={thStyle}>{t('audit.columnStatus')}</th>
+                <th style={thStyle}>{t('audit.columnPolicy')}</th>
+                <th style={thStyle}>{t('audit.columnDuration')}</th>
+                <th style={thStyle}>{t('audit.columnActions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -124,7 +126,7 @@ export default function AuditLogPage() {
                         backgroundColor: entry.success ? '#d1fae5' : '#fef2f2',
                         color: entry.success ? '#065f46' : '#991b1b',
                       }}>
-                        {entry.success ? '成功' : '失败'}
+                        {entry.success ? t('audit.statusSuccess') : t('audit.statusFailure')}
                       </span>
                     </td>
                     <td style={tdStyle}>
@@ -145,7 +147,7 @@ export default function AuditLogPage() {
                           borderRadius: '4px', backgroundColor: 'var(--bg-elevated)', cursor: 'pointer',
                         }}
                       >
-                        {expandedId === entry.id ? '收起' : '详情'}
+                        {expandedId === entry.id ? t('common.collapse') : t('common.details')}
                       </button>
                     </td>
                   </tr>
@@ -154,7 +156,7 @@ export default function AuditLogPage() {
                       <td colSpan={6} style={{ padding: '12px 16px', backgroundColor: 'var(--bg-glass)' }}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                           <div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>参数</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('audit.labelParams')}</div>
                             <pre style={{
                               margin: 0, padding: '8px', backgroundColor: '#1e1e1e', color: '#d4d4d4',
                               borderRadius: '6px', fontSize: '11px', overflow: 'auto', maxHeight: '200px',
@@ -163,7 +165,7 @@ export default function AuditLogPage() {
                             </pre>
                           </div>
                           <div>
-                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>结果</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('audit.labelResult')}</div>
                             <pre style={{
                               margin: 0, padding: '8px', backgroundColor: '#1e1e1e', color: '#d4d4d4',
                               borderRadius: '6px', fontSize: '11px', overflow: 'auto', maxHeight: '200px',
@@ -173,7 +175,7 @@ export default function AuditLogPage() {
                           </div>
                         </div>
                         <div style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                          策略来源: {entry.policySource} | 会话: {entry.sessionId?.substring(0, 8)}...
+                          {t('audit.labelPolicySource')}: {entry.policySource} | {t('audit.labelSession')}: {entry.sessionId?.substring(0, 8)}...
                         </div>
                       </td>
                     </tr>
@@ -192,15 +194,15 @@ export default function AuditLogPage() {
           disabled={page === 0}
           style={{ ...pageBtnStyle, opacity: page === 0 ? 0.4 : 1 }}
         >
-          上一页
+          {t('common.prevPage')}
         </button>
-        <span style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '32px' }}>第 {page + 1} 页</span>
+        <span style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '32px' }}>{t('common.page')}{page + 1}{t('common.pageSuffix')}</span>
         <button
           onClick={() => setPage(page + 1)}
           disabled={entries.length < PAGE_SIZE}
           style={{ ...pageBtnStyle, opacity: entries.length < PAGE_SIZE ? 0.4 : 1 }}
         >
-          下一页
+          {t('common.nextPage')}
         </button>
       </div>
     </div>

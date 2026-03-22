@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 interface MarketplaceSkill {
   name: string
@@ -23,31 +24,31 @@ interface InstalledSkill {
   source: string
 }
 
-// 技能元数据（icon + 分类）
+// 技能元数据（icon + 分类 key）
 const SKILL_META: Record<string, { icon: string; category: string }> = {
-  // 生产力
-  'mail-ops':         { icon: '\u{1F4E8}', category: '生产力' },
-  'oa-schedule':      { icon: '\u{1F4C5}', category: '生产力' },
-  'oa-task':          { icon: '\u2705',     category: '生产力' },
-  'oa-meeting':       { icon: '\u{1F4C5}', category: '生产力' },
-  'oa-common':        { icon: '\u{1F527}', category: '系统' },
-  'summarize':        { icon: '\u{1F4DD}', category: '生产力' },
-  'weather':          { icon: '\u26C5',     category: '生产力' },
-  'apple-notes':      { icon: '\u{1F4D3}', category: '生产力' },
-  'apple-reminders':  { icon: '\u{1F514}', category: '生产力' },
-  // 开发
-  'github':           { icon: '\u{1F4BB}', category: '开发' },
-  'coding-agent':     { icon: '\u{1F916}', category: '开发' },
-  'skill-creator':    { icon: '\u2728',     category: '开发' },
-  'spec-generator':   { icon: '\u{1F4CB}', category: '开发' },
-  'session-logs':     { icon: '\u{1F4DC}', category: '开发' },
-  'tmux':             { icon: '\u{1F5A5}\uFE0F', category: '开发' },
-  // 媒体
-  'nano-banana-pro':  { icon: '\u{1F3A8}', category: '媒体' },
-  'nano-pdf':         { icon: '\u{1F4C4}', category: '媒体' },
-  'peekaboo':         { icon: '\u{1F441}\uFE0F', category: '媒体' },
-  // 平台
-  'clawhub':          { icon: '\u{1F30D}', category: '平台' },
+  // productivity
+  'mail-ops':         { icon: '\u{1F4E8}', category: 'productivity' },
+  'oa-schedule':      { icon: '\u{1F4C5}', category: 'productivity' },
+  'oa-task':          { icon: '\u2705',     category: 'productivity' },
+  'oa-meeting':       { icon: '\u{1F4C5}', category: 'productivity' },
+  'oa-common':        { icon: '\u{1F527}', category: 'system' },
+  'summarize':        { icon: '\u{1F4DD}', category: 'productivity' },
+  'weather':          { icon: '\u26C5',     category: 'productivity' },
+  'apple-notes':      { icon: '\u{1F4D3}', category: 'productivity' },
+  'apple-reminders':  { icon: '\u{1F514}', category: 'productivity' },
+  // development
+  'github':           { icon: '\u{1F4BB}', category: 'development' },
+  'coding-agent':     { icon: '\u{1F916}', category: 'development' },
+  'skill-creator':    { icon: '\u2728',     category: 'development' },
+  'spec-generator':   { icon: '\u{1F4CB}', category: 'development' },
+  'session-logs':     { icon: '\u{1F4DC}', category: 'development' },
+  'tmux':             { icon: '\u{1F5A5}\uFE0F', category: 'development' },
+  // media
+  'nano-banana-pro':  { icon: '\u{1F3A8}', category: 'media' },
+  'nano-pdf':         { icon: '\u{1F4C4}', category: 'media' },
+  'peekaboo':         { icon: '\u{1F441}\uFE0F', category: 'media' },
+  // platform
+  'clawhub':          { icon: '\u{1F30D}', category: 'platform' },
 }
 
 // 内置工具（始终可用，不需安装）
@@ -69,14 +70,29 @@ const BUILTIN_TOOLS = [
   { name: 'agent_self_config', desc: '自身配置', icon: '\u{1F916}' },
 ]
 
-const CATEGORIES = ['全部', '已安装', '可安装', '在线市场', '生产力', '开发', '媒体', '平台', '内置工具']
+const CATEGORY_KEYS = ['all', 'installed', 'available', 'online', 'productivity', 'development', 'media', 'platform', 'builtin']
+
+const CATEGORY_I18N: Record<string, string> = {
+  all: 'skills.tabAll',
+  installed: 'skills.tabInstalled',
+  available: 'skills.tabAvailable',
+  online: 'skills.tabOnlineMarket',
+  productivity: 'skills.categoryProductivity',
+  development: 'skills.categoryDevelopment',
+  media: 'skills.categoryMedia',
+  platform: 'skills.categoryPlatform',
+  system: 'skills.categorySystem',
+  builtin: 'skills.categoryBuiltin',
+  other: 'skills.categoryOther',
+}
 
 export default function SkillsPage() {
+  const { t } = useI18n()
   const [marketplace, setMarketplace] = useState<MarketplaceSkill[]>([])
   const [installed, setInstalled] = useState<InstalledSkill[]>([])
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
   const [selectedAgent, setSelectedAgent] = useState('')
-  const [activeTab, setActiveTab] = useState('全部')
+  const [activeTab, setActiveTab] = useState('all')
   const [loading, setLoading] = useState(true)
   const [operating, setOperating] = useState('')
   const [onlineSkills, setOnlineSkills] = useState<any[]>([])
@@ -87,7 +103,7 @@ export default function SkillsPage() {
 
   useEffect(() => { loadAgents() }, [])
   useEffect(() => { if (selectedAgent) loadAll() }, [selectedAgent])
-  useEffect(() => { if (activeTab === '在线市场') loadOnlineSkills() }, [activeTab])
+  useEffect(() => { if (activeTab === 'online') loadOnlineSkills() }, [activeTab])
 
   const loadAgents = async () => {
     try {
@@ -150,7 +166,7 @@ export default function SkillsPage() {
     try {
       const msg = await invoke<string>('publish_skill_to_hub', { skillName, author })
       alert(msg + '\n\n所有用户都可以在"在线市场"看到并下载这个技能了。')
-      if (activeTab === '在线市场') loadOnlineSkills(onlineSearch)
+      if (activeTab === 'online') loadOnlineSkills(onlineSearch)
     } catch (e) { alert('发布失败: ' + e) }
     setPublishing('')
   }
@@ -167,7 +183,7 @@ export default function SkillsPage() {
   }
 
   const handleUninstall = async (skillName: string) => {
-    if (!confirm(`确定从当前 Agent 卸载 ${skillName}？`)) return
+    if (!confirm(`${t('skills.btnUninstall')} ${skillName}?`)) return
     setOperating(skillName)
     try {
       await invoke('uninstall_skill_from_agent', { agentId: selectedAgent, skillName })
@@ -185,7 +201,7 @@ export default function SkillsPage() {
   const allSkills: DisplaySkill[] = [
     // 技能市场的技能
     ...marketplace.map(s => {
-      const meta = SKILL_META[s.name] || { icon: '\u{1F9E9}', category: '其他' }
+      const meta = SKILL_META[s.name] || { icon: '\u{1F9E9}', category: 'other' }
       return {
         name: s.name,
         desc: s.description || '',
@@ -200,7 +216,7 @@ export default function SkillsPage() {
     ...installed
       .filter(s => !marketplace.some(m => m.name === s.name) && !BUILTIN_TOOLS.some(b => b.name === s.name))
       .map(s => {
-        const meta = SKILL_META[s.name] || { icon: '\u{1F9E9}', category: '其他' }
+        const meta = SKILL_META[s.name] || { icon: '\u{1F9E9}', category: 'other' }
         return {
           name: s.name, desc: s.description || '', icon: meta.icon,
           category: meta.category, installed: true, isBuiltin: false, tools_count: 0,
@@ -208,18 +224,18 @@ export default function SkillsPage() {
       }),
     // 内置工具
     ...BUILTIN_TOOLS.map(b => ({
-      name: b.name, desc: b.desc, icon: b.icon, category: '内置工具',
+      name: b.name, desc: b.desc, icon: b.icon, category: 'builtin',
       installed: true, isBuiltin: true, tools_count: 0,
     })),
   ]
 
-  const filtered = activeTab === '全部' ? allSkills.filter(s => !s.isBuiltin)
-    : activeTab === '已安装' ? allSkills.filter(s => s.installed && !s.isBuiltin)
-    : activeTab === '可安装' ? allSkills.filter(s => !s.installed && !s.isBuiltin)
-    : activeTab === '内置工具' ? allSkills.filter(s => s.isBuiltin)
+  const filtered = activeTab === 'all' ? allSkills.filter(s => !s.isBuiltin)
+    : activeTab === 'installed' ? allSkills.filter(s => s.installed && !s.isBuiltin)
+    : activeTab === 'available' ? allSkills.filter(s => !s.installed && !s.isBuiltin)
+    : activeTab === 'builtin' ? allSkills.filter(s => s.isBuiltin)
     : allSkills.filter(s => s.category === activeTab)
 
-  if (loading) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>加载中...</div>
+  if (loading) return <div style={{ padding: 24, color: 'var(--text-muted)' }}>{t('common.loading')}</div>
 
   const installedCount = allSkills.filter(s => s.installed && !s.isBuiltin).length
   const availableCount = allSkills.filter(s => !s.installed && !s.isBuiltin).length
@@ -228,17 +244,17 @@ export default function SkillsPage() {
     <div style={{ padding: '24px 32px', maxWidth: 900 }}>
       {/* 标题栏 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>技能广场</h1>
+        <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{t('skills.title')}</h1>
         <span style={{
           fontSize: 12, padding: '2px 8px', borderRadius: 10,
           backgroundColor: 'var(--bg-glass)', color: 'var(--text-secondary)',
         }}>
-          {marketplace.length} 个技能
+          {t('skills.countSkills', { count: marketplace.length })}
         </span>
         <span style={{ flex: 1 }} />
         {/* Agent 选择器 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>安装到：</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('skills.installTo')}</span>
           <select
             value={selectedAgent}
             onChange={(e) => setSelectedAgent(e.target.value)}
@@ -251,8 +267,8 @@ export default function SkillsPage() {
 
       {/* 分类 Tab */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, flexWrap: 'wrap' }}>
-        {CATEGORIES.map(cat => {
-          const count = cat === '已安装' ? installedCount : cat === '可安装' ? availableCount : undefined
+        {CATEGORY_KEYS.map(cat => {
+          const count = cat === 'installed' ? installedCount : cat === 'available' ? availableCount : undefined
           return (
             <button
               key={cat}
@@ -265,7 +281,7 @@ export default function SkillsPage() {
                 transition: 'all 0.15s ease',
               }}
             >
-              {cat}{count !== undefined ? ` ${count}` : ''}
+              {t(CATEGORY_I18N[cat] || cat)}{count !== undefined ? ` ${count}` : ''}
             </button>
           )
         })}
@@ -301,19 +317,19 @@ export default function SkillsPage() {
                   <span style={{
                     fontSize: 10, padding: '1px 6px', borderRadius: 4,
                     backgroundColor: '#6366F1', color: '#fff', fontWeight: 600,
-                  }}>内置</span>
+                  }}>{t('skills.labelBuiltin')}</span>
                 )}
                 {!skill.isBuiltin && skill.installed && (
                   <span style={{
                     fontSize: 10, padding: '1px 6px', borderRadius: 4,
                     backgroundColor: 'var(--success)', color: '#fff', fontWeight: 600,
-                  }}>已安装</span>
+                  }}>{t('skills.labelInstalled')}</span>
                 )}
                 {skill.tools_count > 0 && (
                   <span style={{
                     fontSize: 10, padding: '1px 6px', borderRadius: 4,
                     backgroundColor: 'var(--bg-glass)', color: 'var(--text-muted)',
-                  }}>{skill.tools_count} 工具</span>
+                  }}>{skill.tools_count} {t('skills.labelTools')}</span>
                 )}
               </div>
               {skill.desc && (
@@ -339,7 +355,7 @@ export default function SkillsPage() {
                       color: 'var(--accent)', fontWeight: 500,
                     }}
                   >
-                    {publishing === skill.name ? '...' : '发布'}
+                    {publishing === skill.name ? '...' : t('skills.btnPublish')}
                   </button>
                   <button
                     onClick={() => handleUninstall(skill.name)}
@@ -350,7 +366,7 @@ export default function SkillsPage() {
                       color: 'var(--error)', fontWeight: 500,
                     }}
                   >
-                    {operating === skill.name ? '...' : '卸载'}
+                    {operating === skill.name ? '...' : t('skills.btnUninstall')}
                   </button>
                 </>) : (
                   <button
@@ -361,7 +377,7 @@ export default function SkillsPage() {
                       border: 'none', backgroundColor: 'var(--accent)', color: '#fff', fontWeight: 500,
                     }}
                   >
-                    {operating === skill.name ? '安装中...' : '安装'}
+                    {operating === skill.name ? t('skills.btnInstalling') : t('skills.btnInstall')}
                   </button>
                 )}
               </div>
@@ -369,34 +385,34 @@ export default function SkillsPage() {
           </div>
         ))}
 
-        {filtered.length === 0 && activeTab !== '在线市场' && (
+        {filtered.length === 0 && activeTab !== 'online' && (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>
-            该分类暂无技能
+            {t('skills.emptyCategory')}
           </div>
         )}
       </div>
 
       {/* 在线市场 */}
-      {activeTab === '在线市场' && (
+      {activeTab === 'online' && (
         <div style={{ marginTop: 16 }}>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             <input
               value={onlineSearch}
               onChange={e => setOnlineSearch(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) loadOnlineSkills(onlineSearch) }}
-              placeholder="搜索在线技能..."
+              placeholder={t('skills.searchOnline')}
               style={{ flex: 1, padding: '8px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', fontSize: 13 }}
             />
             <button onClick={() => loadOnlineSkills(onlineSearch)}
               style={{ padding: '8px 16px', borderRadius: 6, backgroundColor: 'var(--accent)', color: '#fff', border: 'none', fontSize: 13, cursor: 'pointer' }}>
-              搜索
+              {t('common.search')}
             </button>
           </div>
 
           {onlineLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>加载中...</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>{t('common.loading')}</div>
           ) : onlineSkills.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>暂无在线技能</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-muted)' }}>{t('skills.emptyOnline')}</div>
           ) : (
             onlineSkills.map((s: any) => (
               <div key={s.slug} style={{
@@ -420,7 +436,7 @@ export default function SkillsPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                   <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>v{s.version}</span>
                   {installedNames.has(s.slug) || marketplace.some(m => m.name === s.slug) ? (
-                    <span style={{ fontSize: 11, color: 'var(--success)', fontWeight: 500 }}>已有</span>
+                    <span style={{ fontSize: 11, color: 'var(--success)', fontWeight: 500 }}>{t('skills.labelHas')}</span>
                   ) : (
                     <button
                       onClick={() => handleDownloadFromHub(s.slug)}
@@ -430,7 +446,7 @@ export default function SkillsPage() {
                         border: 'none', backgroundColor: 'var(--accent)', color: '#fff', fontWeight: 500,
                       }}
                     >
-                      {downloading === s.slug ? '下载中...' : '下载'}
+                      {downloading === s.slug ? t('skills.btnDownloading') : t('skills.btnDownload')}
                     </button>
                   )}
                 </div>
@@ -445,7 +461,7 @@ export default function SkillsPage() {
         marginTop: 24, padding: '12px 0', borderTop: '1px solid var(--border-subtle)',
         fontSize: 12, color: 'var(--text-muted)',
       }}>
-        技能安装到选定的 Agent，不同 Agent 可以有不同的技能组合。安装后 Agent 会在对话中自动使用对应技能。
+        {t('skills.hintBottom')}
       </div>
     </div>
   )

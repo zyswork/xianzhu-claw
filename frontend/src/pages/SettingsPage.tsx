@@ -10,6 +10,8 @@
 
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n, SUPPORTED_LOCALES, LOCALE_LABELS } from '../i18n'
+import type { Locale } from '../i18n'
 
 interface ProviderModel {
   id: string
@@ -115,6 +117,7 @@ const PRESET_PROVIDERS: Omit<Provider, 'apiKey' | 'apiKeyMasked'>[] = [
 ]
 
 export default function SettingsPage() {
+  const { t } = useI18n()
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -156,7 +159,7 @@ export default function SettingsPage() {
   }
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`确定删除供应商 "${name}"？`)) return
+    if (!confirm(t('settings.confirmDeleteProvider', { name }))) return
     try {
       await invoke('delete_provider', { providerId: id })
       setMessage({ type: 'success', text: `${name} 已删除` })
@@ -239,7 +242,7 @@ export default function SettingsPage() {
   }
 
   if (loading) {
-    return <div style={{ padding: '20px' }}>加载中...</div>
+    return <div style={{ padding: '20px' }}>{t('common.loading')}</div>
   }
 
   // 未添加的预置供应商
@@ -251,9 +254,9 @@ export default function SettingsPage() {
     <div style={{ padding: '20px', maxWidth: '700px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <div>
-          <h1 style={{ marginTop: 0, marginBottom: '4px' }}>模型供应商</h1>
+          <h1 style={{ marginTop: 0, marginBottom: '4px' }}>{t('settings.title')}</h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '13px', margin: 0 }}>
-            管理 LLM 供应商和模型。支持 OpenAI 兼容接口的供应商可直接添加。
+            {t('settings.subtitle')}
           </p>
         </div>
         <div style={{ position: 'relative' }}>
@@ -264,7 +267,7 @@ export default function SettingsPage() {
               border: 'none', borderRadius: '6px', fontSize: '13px', cursor: 'pointer',
             }}
           >
-            + 添加供应商
+            {t('settings.btnAddProvider')}
           </button>
           {showAddMenu && (
             <div style={{
@@ -349,7 +352,7 @@ export default function SettingsPage() {
                   backgroundColor: hasKey || isOllama ? '#28a745' : '#ffc107',
                   color: hasKey || isOllama ? 'white' : '#333',
                 }}>
-                  {isOllama ? '本地' : hasKey ? '已配置' : '未配置 Key'}
+                  {isOllama ? t('settings.labelLocal') : hasKey ? t('settings.labelConfigured') : t('settings.labelNoKey')}
                 </span>
                 <span style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '2px 6px', backgroundColor: 'var(--bg-glass)', borderRadius: '3px' }}>
                   {p.apiType}
@@ -364,7 +367,7 @@ export default function SettingsPage() {
                       border: '1px solid var(--border-subtle)', borderRadius: '4px', backgroundColor: 'var(--bg-elevated)',
                     }}
                   >
-                    编辑
+                    {t('common.edit')}
                   </button>
                 )}
                 <button
@@ -374,7 +377,7 @@ export default function SettingsPage() {
                     border: '1px solid #f5c6cb', borderRadius: '4px', backgroundColor: 'var(--bg-elevated)', color: '#dc3545',
                   }}
                 >
-                  删除
+                  {t('common.delete')}
                 </button>
               </div>
             </div>
@@ -387,7 +390,7 @@ export default function SettingsPage() {
                     fontSize: '12px', padding: '3px 10px', borderRadius: '4px',
                     backgroundColor: '#fff3cd', color: '#856404', border: '1px solid #ffc107',
                   }}>
-                    未添加模型 — 请点击"编辑"添加模型后才能在对话中使用
+                    {t('settings.warningNoModels')}
                   </span>
                 )}
                 {p.models?.map((m) => (
@@ -409,7 +412,7 @@ export default function SettingsPage() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                   <div>
-                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>名称</label>
+                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{t('common.name')}</label>
                     <input
                       value={editForm.name}
                       onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
@@ -417,20 +420,20 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>API 类型</label>
+                    <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{t('settings.fieldApiType')}</label>
                     <select
                       value={editForm.apiType}
                       onChange={(e) => setEditForm({ ...editForm, apiType: e.target.value })}
                       style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box' }}
                     >
-                      <option value="openai">OpenAI 兼容</option>
-                      <option value="anthropic">Anthropic</option>
+                      <option value="openai">{t('settings.apiTypeOpenai')}</option>
+                      <option value="anthropic">{t('settings.apiTypeAnthropic')}</option>
                     </select>
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Base URL</label>
+                  <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>{t('settings.fieldBaseUrl')}</label>
                   <input
                     value={editForm.baseUrl}
                     onChange={(e) => setEditForm({ ...editForm, baseUrl: e.target.value })}
@@ -441,13 +444,13 @@ export default function SettingsPage() {
 
                 <div>
                   <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                    API Key {p.apiKeyMasked && <span style={{ color: 'var(--text-muted)' }}>（当前: {p.apiKeyMasked}，留空保持不变）</span>}
+                    {t('settings.fieldApiKey')} {p.apiKeyMasked && <span style={{ color: 'var(--text-muted)' }}>({t('settings.labelCurrent')}: {p.apiKeyMasked}, {t('settings.placeholderKeep')})</span>}
                   </label>
                   <input
                     type="password"
                     value={editForm.apiKey || ''}
                     onChange={(e) => setEditForm({ ...editForm, apiKey: e.target.value })}
-                    placeholder={p.apiKeyMasked ? '留空保持不变' : '输入 API Key'}
+                    placeholder={p.apiKeyMasked ? t('settings.placeholderKeep') : t('settings.placeholderEnterKey')}
                     style={{ width: '100%', padding: '6px 10px', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box' }}
                   />
                 </div>
@@ -455,7 +458,7 @@ export default function SettingsPage() {
                 {/* 模型列表编辑 */}
                 <div>
                   <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '6px' }}>
-                    模型列表 <span style={{ color: '#dc3545' }}>*</span>
+                    {t('settings.fieldModels')} <span style={{ color: '#dc3545' }}>*</span>
                   </label>
                   {editForm.models.length === 0 && (
                     <div style={{
@@ -463,7 +466,7 @@ export default function SettingsPage() {
                       backgroundColor: '#fff3cd', color: '#856404', fontSize: '12px',
                       border: '1px solid #ffc107',
                     }}>
-                      请至少添加一个模型，否则无法在对话中使用此供应商。输入供应商支持的模型 ID（如 gpt-4o-mini、deepseek-chat 等）。
+                      {t('settings.warningAddModels')}
                     </div>
                   )}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '8px' }}>
@@ -486,14 +489,14 @@ export default function SettingsPage() {
                     <input
                       value={newModelId}
                       onChange={(e) => setNewModelId(e.target.value)}
-                      placeholder="模型 ID (如 gpt-4o)"
+                      placeholder={t('settings.fieldModelId')}
                       style={{ flex: 1, padding: '5px 8px', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addModelToForm() } }}
                     />
                     <input
                       value={newModelName}
                       onChange={(e) => setNewModelName(e.target.value)}
-                      placeholder="显示名称 (可选)"
+                      placeholder={t('settings.fieldModelDisplayName')}
                       style={{ flex: 1, padding: '5px 8px', border: '1px solid var(--border-subtle)', borderRadius: '4px', fontSize: '12px' }}
                       onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addModelToForm() } }}
                     />
@@ -505,7 +508,7 @@ export default function SettingsPage() {
                         border: '1px solid var(--border-subtle)', borderRadius: '4px', backgroundColor: newModelId.trim() ? '#e9ecef' : '#f5f5f5',
                       }}
                     >
-                      添加
+                      {t('common.add')}
                     </button>
                   </div>
                 </div>
@@ -519,7 +522,7 @@ export default function SettingsPage() {
                       border: '1px solid var(--border-subtle)', borderRadius: '4px', backgroundColor: 'var(--bg-elevated)',
                     }}
                   >
-                    取消
+                    {t('common.cancel')}
                   </button>
                   <button
                     onClick={handleSave}
@@ -528,7 +531,7 @@ export default function SettingsPage() {
                       border: 'none', borderRadius: '4px', backgroundColor: 'var(--accent)', color: '#fff',
                     }}
                   >
-                    保存
+                    {t('common.save')}
                   </button>
                 </div>
               </div>
@@ -539,7 +542,7 @@ export default function SettingsPage() {
 
       {providers.length === 0 && (
         <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px 0' }}>
-          暂无供应商配置，点击上方「+ 添加供应商」开始
+          {t('settings.emptyProviders')}
         </div>
       )}
 
@@ -548,7 +551,7 @@ export default function SettingsPage() {
         marginTop: '20px', padding: '12px', backgroundColor: '#f8f9fa',
         borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)',
       }}>
-        <strong>提示：</strong>支持通过环境变量自动导入 API Key（启动时读取）：
+        <strong>{t('settings.hintEnvVars')}</strong>
         <pre style={{
           margin: '8px 0 0', padding: '8px', backgroundColor: '#e9ecef',
           borderRadius: '4px', fontSize: '12px', overflow: 'auto',
@@ -559,6 +562,9 @@ export DEEPSEEK_API_KEY="sk-..."`}
         </pre>
       </div>
 
+      {/* 语言设置 */}
+      <LanguageSettings />
+
       {/* 高级设置 */}
       <AdvancedSettings />
     </div>
@@ -567,6 +573,7 @@ export DEEPSEEK_API_KEY="sk-..."`}
 
 /** 高级设置面板（嵌入配置 + 系统状态 + 缓存统计） */
 function AdvancedSettings() {
+  const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
   const [embeddingKey, setEmbeddingKey] = useState('')
   const [embeddingUrl, setEmbeddingUrl] = useState('')
@@ -610,7 +617,7 @@ function AdvancedSettings() {
       if (dailyLimit) await invoke('set_setting', { key: 'daily_token_limit', value: dailyLimit })
       if (cloudUrl) await invoke('set_setting', { key: 'cloud_gateway_url', value: cloudUrl })
       if (cloudKey) await invoke('set_setting', { key: 'cloud_api_key', value: cloudKey })
-      alert('设置已保存')
+      alert(t('settings.successSaved'))
     } catch (e: any) {
       alert('保存失败: ' + (e?.message || e))
     }
@@ -626,7 +633,7 @@ function AdvancedSettings() {
           padding: '8px 20px', background: 'none', border: '1px solid #ccc',
           borderRadius: '4px', cursor: 'pointer', color: 'var(--text-secondary)',
         }}>
-          高级设置
+          {t('settings.sectionAdvanced')}
         </button>
       </div>
     )
@@ -635,15 +642,15 @@ function AdvancedSettings() {
   return (
     <div style={{ marginTop: '20px', padding: '16px', border: '1px solid #e0e0e0', borderRadius: '8px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ margin: 0 }}>高级设置</h3>
+        <h3 style={{ margin: 0 }}>{t('settings.sectionAdvanced')}</h3>
         <button onClick={() => setExpanded(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}>×</button>
       </div>
 
       {/* 向量嵌入 */}
       <div style={{ marginBottom: '16px' }}>
-        <h4 style={{ margin: '0 0 8px', color: 'var(--text-secondary)' }}>向量嵌入（语义检索）</h4>
+        <h4 style={{ margin: '0 0 8px', color: 'var(--text-secondary)' }}>{t('settings.sectionEmbedding')}</h4>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px' }}>
-          配置后，记忆检索从关键词匹配升级为语义理解。支持 OpenAI 兼容 API。
+          {t('settings.hintEmbedding')}
         </p>
         <input placeholder="Embedding API Key（如 sk-...）" value={embeddingKey} onChange={e => setEmbeddingKey(e.target.value)}
           style={{ width: '100%', padding: '6px', marginBottom: '6px', boxSizing: 'border-box' }} type="password" />
@@ -674,15 +681,15 @@ function AdvancedSettings() {
           }}
           style={{ padding: '4px 12px', fontSize: '12px', border: '1px solid var(--border-subtle)', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'var(--bg-elevated)' }}
         >
-          测试连接
+          {t('settings.btnTestConnection')}
         </button>
       </div>
 
       {/* 云端连接（混合架构） */}
       <div style={{ marginBottom: '16px' }}>
-        <h4 style={{ margin: '0 0 8px', color: 'var(--text-secondary)' }}>云端连接（混合架构）</h4>
+        <h4 style={{ margin: '0 0 8px', color: 'var(--text-secondary)' }}>{t('settings.sectionCloud')}</h4>
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px' }}>
-          配置后，桌面端自动连接云端。移动端可通过云端远程控制桌面 Agent。
+          {t('settings.hintCloud')}
         </p>
         <input placeholder="Gateway URL（如 wss://zys-openclaw.com/ws/bridge）" value={cloudUrl} onChange={e => setCloudUrl(e.target.value)}
           style={{ width: '100%', padding: '6px', marginBottom: '6px', boxSizing: 'border-box' }} />
@@ -692,8 +699,8 @@ function AdvancedSettings() {
 
       {/* Token 限额 */}
       <div style={{ marginBottom: '16px' }}>
-        <h4 style={{ margin: '0 0 8px', color: 'var(--text-secondary)' }}>每日 Token 限额</h4>
-        <input placeholder="每日上限（0 = 不限制）" value={dailyLimit} onChange={e => setDailyLimit(e.target.value)}
+        <h4 style={{ margin: '0 0 8px', color: 'var(--text-secondary)' }}>{t('settings.sectionDailyLimit')}</h4>
+        <input placeholder={t('settings.fieldDailyLimit')} value={dailyLimit} onChange={e => setDailyLimit(e.target.value)}
           style={{ width: '200px', padding: '6px' }} type="number" />
       </div>
 
@@ -702,22 +709,47 @@ function AdvancedSettings() {
         border: 'none', borderRadius: '4px', cursor: saving ? 'not-allowed' : 'pointer',
         marginBottom: '16px',
       }}>
-        {saving ? '保存中...' : '保存设置'}
+        {saving ? t('common.saving') : t('common.save')}
       </button>
 
       {/* 系统状态 */}
       {health && (
         <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '6px', fontSize: '13px' }}>
-          <h4 style={{ margin: '0 0 8px' }}>系统状态</h4>
-          <div>数据库: {health.db ? '正常' : '异常'} | Agent: {health.agents} | 记忆: {health.memories} | 今日 Token: {health.today_tokens?.toLocaleString()}</div>
+          <h4 style={{ margin: '0 0 8px' }}>{t('settings.sectionSystemStatus')}</h4>
+          <div>{t('settings.labelDatabase')}: {health.db ? t('common.healthy') : t('common.error')} | {t('settings.labelAgents')}: {health.agents} | {t('settings.labelMemories')}: {health.memories} | {t('settings.labelTodayTokens')}: {health.today_tokens?.toLocaleString()}</div>
           {cacheStats && (
             <div style={{ marginTop: '4px' }}>
-              响应缓存: {cacheStats.response_cache?.entries} 条 ({cacheStats.response_cache?.total_hits} 次命中) |
-              嵌入缓存: {cacheStats.embedding_cache?.entries} 条
+              {t('settings.labelResponseCache')}: {cacheStats.response_cache?.entries}{t('common.entries')} ({cacheStats.response_cache?.total_hits}{t('settings.labelHits')}) |
+              {t('settings.labelEmbeddingCache')}: {cacheStats.embedding_cache?.entries}{t('common.entries')}
             </div>
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/** 语言设置 */
+function LanguageSettings() {
+  const { locale, setLocale, t } = useI18n()
+
+  return (
+    <div style={{ marginTop: 24, padding: '16px 20px', borderRadius: 12, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-elevated)' }}>
+      <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 600 }}>
+        {'\u{1F310}'}  {t('settings.sectionLanguage')}
+      </h3>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{t('settings.labelLanguage')}</span>
+        <select
+          value={locale}
+          onChange={e => setLocale(e.target.value as Locale)}
+          style={{ padding: '6px 12px', borderRadius: 6, border: '1px solid var(--border-subtle)', fontSize: 13, cursor: 'pointer' }}
+        >
+          {SUPPORTED_LOCALES.map(loc => (
+            <option key={loc} value={loc}>{LOCALE_LABELS[loc]}</option>
+          ))}
+        </select>
+      </div>
     </div>
   )
 }

@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useNavigate } from 'react-router-dom'
+import { useI18n } from '../i18n'
 
 interface ProviderModel {
   id: string
@@ -49,15 +50,16 @@ const TEMPLATES = [
 
 /** 温度预设 */
 const TEMP_PRESETS = [
-  { id: 'precise', label: '精确', value: 0.2 },
-  { id: 'balanced', label: '平衡', value: 0.7 },
-  { id: 'creative', label: '创意', value: 1.2 },
+  { id: 'precise', labelKey: 'agentCreate.tempPrecise', value: 0.2 },
+  { id: 'balanced', labelKey: 'agentCreate.tempBalanced', value: 0.7 },
+  { id: 'creative', labelKey: 'agentCreate.tempCreative', value: 1.2 },
 ]
 
-const STEPS = ['基本信息', '模型配置', '预览 & 创建']
+const STEP_KEYS = ['agentCreate.stepBasic', 'agentCreate.stepModel', 'agentCreate.stepPreview']
 
 export default function AgentCreatePage() {
   const navigate = useNavigate()
+  const { t } = useI18n()
 
   // 创建模式：manual | ai
   const [mode, setMode] = useState<'manual' | 'ai'>('manual')
@@ -153,6 +155,7 @@ export default function AgentCreatePage() {
 
   // 温度预设匹配
   const activePreset = TEMP_PRESETS.find((p) => Math.abs(p.value - temperature) < 0.05)
+  const STEPS = STEP_KEYS.map(k => t(k))
 
   // 当前选中模型的信息
   const modelInfo = allModels.find((m) => m.id === selectedModel)
@@ -207,7 +210,7 @@ export default function AgentCreatePage() {
               color: mode === m ? '#007bff' : '#666',
             }}
           >
-            {m === 'manual' ? '✏️ 手动配置' : '🤖 AI 生成'}
+            {m === 'manual' ? t('agentCreate.modeManual') : t('agentCreate.modeAi')}
           </button>
         ))}
       </div>
@@ -215,14 +218,14 @@ export default function AgentCreatePage() {
       {/* AI 生成模式 */}
       {mode === 'ai' ? (
         <div>
-          <h2 style={{ margin: '0 0 8px', fontSize: 20 }}>AI 创建 Agent</h2>
+          <h2 style={{ margin: '0 0 8px', fontSize: 20 }}>{t('agentCreate.aiTitle')}</h2>
           <p style={{ color: 'var(--text-secondary)', fontSize: 14, margin: '0 0 20px' }}>
-            描述你想要的 Agent，AI 会自动生成完整配置
+            {t('agentCreate.aiDesc')}
           </p>
           <textarea
             value={aiDescription}
             onChange={(e) => setAiDescription(e.target.value)}
-            placeholder="例如：帮我创建一个代码审查 Agent，擅长 TypeScript 和 Rust，能指出潜在的 bug 和性能问题..."
+            placeholder={t('agentCreate.aiPlaceholder')}
             rows={5}
             style={{
               width: '100%', padding: 12, border: '1px solid var(--border-subtle)', borderRadius: 8,
@@ -243,7 +246,7 @@ export default function AgentCreatePage() {
               opacity: aiGenerating || !aiDescription.trim() ? 0.6 : 1,
             }}
           >
-            {aiGenerating ? '🤖 AI 生成中...' : '🚀 生成 Agent 配置'}
+            {aiGenerating ? t('agentCreate.aiGenerating') : t('agentCreate.aiSubmit')}
           </button>
         </div>
       ) : (
@@ -298,12 +301,12 @@ export default function AgentCreatePage() {
       {/* Step 1: 基本信息 */}
       {step === 0 && (
         <div>
-          <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>基本信息</h3>
+          <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>{t('agentCreate.stepBasic')}</h3>
 
           {/* 模板选择 */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
-              快速选择模板
+              {t('agentCreate.quickTemplates')}
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {TEMPLATES.map((tpl) => (
@@ -333,12 +336,12 @@ export default function AgentCreatePage() {
           {/* Agent 名称 */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
-              Agent 名称 <span style={{ color: '#dc3545' }}>*</span>
+              {t('agentCreate.fieldName')} <span style={{ color: '#dc3545' }}>*</span>
             </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="例如：我的编程助手"
+              placeholder={t('agentCreate.placeholderName')}
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -353,13 +356,13 @@ export default function AgentCreatePage() {
           {/* 系统提示词 */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
-              系统提示词 <span style={{ color: '#dc3545' }}>*</span>
+              {t('agentCreate.fieldSystemPrompt')} <span style={{ color: '#dc3545' }}>*</span>
             </label>
             <textarea
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               rows={5}
-              placeholder="定义 Agent 的角色和行为..."
+              placeholder={t('agentCreate.placeholderSystemPrompt')}
               style={{
                 width: '100%',
                 padding: '10px 12px',
@@ -378,16 +381,16 @@ export default function AgentCreatePage() {
       {/* Step 2: 模型配置 */}
       {step === 1 && (
         <div>
-          <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>模型配置</h3>
+          <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>{t('agentCreate.stepModel')}</h3>
 
           {/* 模型选择 */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
-              模型
+              {t('agentCreate.fieldModel')}
             </label>
             {allModels.length === 0 ? (
               <div style={{ padding: 12, backgroundColor: '#fff3cd', borderRadius: 6, fontSize: 13, color: '#856404' }}>
-                未找到可用模型，请先在设置中配置供应商 API Key。
+                {t('agentCreate.warningNoModels')}
               </div>
             ) : (
               <select
@@ -405,7 +408,7 @@ export default function AgentCreatePage() {
               >
                 {allModels.map((m) => (
                   <option key={m.id} value={m.id} disabled={!m.available}>
-                    {m.label} ({m.providerName}){!m.available ? ' — 未配置 Key' : ''}
+                    {m.label} ({m.providerName}){!m.available ? ` — ${t('settings.labelNoKey')}` : ''}
                   </option>
                 ))}
               </select>
@@ -415,7 +418,7 @@ export default function AgentCreatePage() {
           {/* 温度 */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
-              温度: {temperature.toFixed(1)}
+              {t('agentCreate.fieldTemperature')}: {temperature.toFixed(1)}
             </label>
             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
               {TEMP_PRESETS.map((p) => (
@@ -433,7 +436,7 @@ export default function AgentCreatePage() {
                     cursor: 'pointer',
                   }}
                 >
-                  {p.label} ({p.value})
+                  {t(p.labelKey)} ({p.value})
                 </button>
               ))}
             </div>
@@ -447,15 +450,15 @@ export default function AgentCreatePage() {
               style={{ width: '100%' }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)' }}>
-              <span>精确 0</span>
-              <span>创意 2</span>
+              <span>{t('agentCreate.tempPrecise')} 0</span>
+              <span>{t('agentCreate.tempCreative')} 2</span>
             </div>
           </div>
 
           {/* Max Tokens */}
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
-              最大 Token: {maxTokens}
+              {t('agentCreate.fieldMaxTokens')}: {maxTokens}
             </label>
             <input
               type="range"
@@ -477,7 +480,7 @@ export default function AgentCreatePage() {
       {/* Step 3: 预览 & 创建 */}
       {step === 2 && (
         <div>
-          <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>预览 & 创建</h3>
+          <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>{t('agentCreate.stepPreview')}</h3>
 
           <div
             style={{
@@ -488,13 +491,13 @@ export default function AgentCreatePage() {
           >
             {/* 名称 */}
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #e9ecef' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>名称</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('common.name')}</div>
               <div style={{ fontSize: 15, fontWeight: 600 }}>{name}</div>
             </div>
 
             {/* 系统提示词 */}
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #e9ecef' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>系统提示词</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('agentCreate.fieldSystemPrompt')}</div>
               <div
                 style={{
                   fontSize: 13,
@@ -510,7 +513,7 @@ export default function AgentCreatePage() {
 
             {/* 模型 */}
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #e9ecef' }}>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>模型</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('common.model')}</div>
               <div style={{ fontSize: 14 }}>
                 {modelInfo?.label || selectedModel}
                 {modelInfo && (
@@ -524,18 +527,18 @@ export default function AgentCreatePage() {
             {/* 参数 */}
             <div style={{ padding: '12px 16px', display: 'flex', gap: 32 }}>
               <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>温度</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('agentCreate.fieldTemperature')}</div>
                 <div style={{ fontSize: 14 }}>
                   {temperature.toFixed(1)}
                   {activePreset && (
                     <span style={{ color: 'var(--text-muted)', marginLeft: 6, fontSize: 12 }}>
-                      ({activePreset.label})
+                      ({t(activePreset.labelKey)})
                     </span>
                   )}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>最大 Token</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('agentCreate.fieldMaxTokens')}</div>
                 <div style={{ fontSize: 14 }}>{maxTokens}</div>
               </div>
             </div>
@@ -581,7 +584,7 @@ export default function AgentCreatePage() {
             cursor: creating ? 'not-allowed' : 'pointer',
           }}
         >
-          {step === 0 ? '取消' : '上一步'}
+          {step === 0 ? t('common.cancel') : t('common.prev')}
         </button>
 
         {step < 2 ? (
@@ -599,7 +602,7 @@ export default function AgentCreatePage() {
               fontWeight: 500,
             }}
           >
-            下一步
+            {t('common.next')}
           </button>
         ) : (
           <button
@@ -616,7 +619,7 @@ export default function AgentCreatePage() {
               fontWeight: 600,
             }}
           >
-            {creating ? '创建中...' : '创建'}
+            {creating ? t('common.creating') : t('common.create')}
           </button>
         )}
       </div>

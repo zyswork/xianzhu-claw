@@ -1,3 +1,4 @@
+import { useI18n } from '../i18n'
 import styles from './SplashScreen.module.css'
 
 interface SplashScreenProps {
@@ -6,9 +7,11 @@ interface SplashScreenProps {
 }
 
 export default function SplashScreen({
-  message = '启动中...',
+  message,
   progress = 0
 }: SplashScreenProps) {
+  const { t } = useI18n()
+  const displayMessage = message ?? t('common.loading')
   return (
     <div className={styles.container} data-testid="splash-screen">
       <div className={styles.content}>
@@ -19,7 +22,7 @@ export default function SplashScreen({
         <h1 className={styles.title}>YonClaw</h1>
 
         {/* 状态消息 */}
-        <p className={styles.message}>{message}</p>
+        <p className={styles.message}>{displayMessage}</p>
 
         {/* 进度条 */}
         {progress > 0 && (

@@ -2553,15 +2553,32 @@ async fn weixin_poll_status(qrcode: String) -> Result<serde_json::Value, String>
     channels::weixin::poll_qrcode_status(&qrcode).await
 }
 
-/// 保存微信 token 并启动轮询
+/// 保存微信 token 并立即启动轮询
 #[tauri::command]
 async fn weixin_save_token(
     state: State<'_, Arc<AppState>>,
+    app_handle: tauri::AppHandle,
     bot_token: String,
 ) -> Result<(), String> {
     let _ = sqlx::query("INSERT OR REPLACE INTO settings (key, value) VALUES ('weixin_bot_token', ?)")
         .bind(&bot_token).execute(state.orchestrator.pool()).await;
-    log::info!("微信: token 已保存");
+    // 清空旧的 sync_buf（旧 buf 绑定旧 token，会导致 session timeout）
+    let _ = sqlx::query("DELETE FROM settings WHERE key = 'weixin_sync_buf'")
+        .execute(state.orchestrator.pool()).await;
+    log::info!("微信: token 已保存（旧 sync_buf 已清除），立即启动轮询");
+
+    // 立即启动微信轮询（不等重启）
+    let pool = state.orchestrator.pool().clone();
+    let orch = state.orchestrator.clone();
+    let handle = app_handle.clone();
+    let token = bot_token.clone();
+    tokio::spawn(async move {
+        channels::weixin::start_weixin(
+            channels::weixin::WeixinConfig { bot_token: token },
+            pool, orch, handle,
+        ).await;
+    });
+
     Ok(())
 }
 

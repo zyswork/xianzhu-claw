@@ -23,7 +23,8 @@ pub async fn start_weixin(
     app_handle: tauri::AppHandle,
 ) {
     let token = config.bot_token.clone();
-    log::info!("微信: 启动长轮询 (token: {}...)", &token[..token.len().min(10)]);
+    // 使用完整的 bot_token（格式: bot_id:token，不要拆分）
+    log::info!("微信: 启动长轮询 (token: {}...)", &token[..token.len().min(15)]);
 
     tokio::spawn(async move {
         let client = reqwest::Client::builder()
@@ -33,13 +34,20 @@ pub async fn start_weixin(
 
         let mut get_updates_buf = String::new();
 
+        // 从 settings 读取 base_url（扫码时可能分配了不同的端点）
+        let base_url: String = sqlx::query_scalar(
+            "SELECT value FROM settings WHERE key = 'weixin_base_url'"
+        ).fetch_optional(&pool).await.ok().flatten()
+            .unwrap_or_else(|| WEIXIN_BASE.to_string());
+        log::info!("微信: 使用 API 端点: {}", base_url);
+
         // 从本地缓存恢复 buf
         if let Some(buf) = load_sync_buf(&pool).await {
             get_updates_buf = buf;
         }
 
         loop {
-            match get_updates(&client, &token, &get_updates_buf).await {
+            match get_updates(&client, &token, &get_updates_buf, &base_url).await {
                 Ok(resp) => {
                     // 更新 buf
                     if let Some(buf) = resp.get("get_updates_buf").and_then(|b| b.as_str()) {
@@ -67,6 +75,16 @@ pub async fn start_weixin(
                     }
                 }
                 Err(e) => {
+                    if e.contains("session 过期") || e.contains("session timeout") {
+                        log::error!("微信: Session 已过期，需要重新扫码登录");
+                        // 清除失效 token 和 sync_buf
+                        let _ = sqlx::query("DELETE FROM settings WHERE key IN ('weixin_bot_token', 'weixin_sync_buf')")
+                            .execute(&pool).await;
+                        break; // 退出轮询，等用户重新扫码
+                    }
+                    if e == "timeout" {
+                        continue; // 长轮询超时是正常的
+                    }
                     log::warn!("微信: getUpdates 失败: {}，5秒后重试", e);
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 }
@@ -80,13 +98,14 @@ async fn get_updates(
     client: &reqwest::Client,
     token: &str,
     get_updates_buf: &str,
+    base_url: &str,
 ) -> Result<serde_json::Value, String> {
     let body = serde_json::json!({
         "get_updates_buf": get_updates_buf,
         "base_info": { "channel_version": "yonclaw-1.0.0" },
     });
 
-    let resp = client.post(format!("{}/ilink/bot/getupdates", WEIXIN_BASE))
+    let resp = client.post(format!("{}/ilink/bot/getupdates", base_url))
         .header("Content-Type", "application/json")
         .header("AuthorizationType", "ilink_bot_token")
         .header("Authorization", format!("Bearer {}", token))
@@ -100,17 +119,26 @@ async fn get_updates(
             format!("{}", e)
         })?;
 
-    let data: serde_json::Value = resp.json().await
+    let raw_text = resp.text().await
+        .map_err(|e| format!("读取响应失败: {}", e))?;
+
+    // 只在有消息或错误时打日志（避免空轮询刷屏）
+    if !raw_text.contains("\"msgs\":[]") || raw_text.contains("errcode") {
+        log::info!("微信: getUpdates 响应: {}", &raw_text[..raw_text.len().min(300)]);
+    }
+
+    let data: serde_json::Value = serde_json::from_str(&raw_text)
         .map_err(|e| format!("解析响应失败: {}", e))?;
 
-    let ret = data["ret"].as_i64().unwrap_or(-1);
-    if ret != 0 {
-        let errcode = data["errcode"].as_i64().unwrap_or(0);
+    // 检查错误：只有 errcode=-14 才是真正的 session 过期
+    let errcode = data["errcode"].as_i64().unwrap_or(0);
+    if errcode == -14 {
+        return Err("session 过期，需要重新扫码登录".to_string());
+    }
+
+    let ret = data["ret"].as_i64().unwrap_or(0);
+    if ret != 0 && errcode != 0 {
         let errmsg = data["errmsg"].as_str().unwrap_or("unknown");
-        // -14 = session 过期
-        if errcode == -14 {
-            return Err("session 过期，需要重新扫码登录".to_string());
-        }
         return Err(format!("getUpdates ret={} errcode={} errmsg={}", ret, errcode, errmsg));
     }
 
@@ -125,21 +153,28 @@ async fn handle_weixin_message(
     orchestrator: &Arc<Orchestrator>,
     app_handle: &tauri::AppHandle,
 ) {
-    // 只处理用户消息（message_type=1）
     let message_type = msg["message_type"].as_i64().unwrap_or(0);
-    if message_type != 1 { return; }
-
-    // 只处理新消息（message_state=0）
     let message_state = msg["message_state"].as_i64().unwrap_or(-1);
-    if message_state != 0 { return; }
-
     let from_user = msg["from_user_id"].as_str().unwrap_or("");
     let to_user = msg["to_user_id"].as_str().unwrap_or("");
     let context_token = msg["context_token"].as_str().unwrap_or("");
 
+    log::info!("微信: handle_message type={} state={} from={} items={}",
+        message_type, message_state, &from_user[..from_user.len().min(20)],
+        msg["item_list"].as_array().map_or(0, |a| a.len()));
+
+    // 只处理用户消息（message_type=1），忽略 bot 自己的消息(2)
+    if message_type != 1 { return; }
+
+    // 处理新消息和生成中的消息
+    if message_state != 0 && message_state != 2 { return; }
+
     // 提取文本内容
     let text = extract_text(msg);
-    if text.is_empty() { return; }
+    if text.is_empty() {
+        log::info!("微信: 消息无文本内容，跳过");
+        return;
+    }
 
     log::info!("微信: [{}] {}", from_user, &text[..text.len().min(50)]);
 
@@ -177,29 +212,48 @@ async fn handle_weixin_message(
     let (api_type, api_key, base_url) = match provider_info {
         Some(info) => info,
         None => {
-            send_weixin_text(token, from_user, to_user, context_token, "未配置 LLM Provider").await;
+            send_weixin_text(token, from_user, context_token, "未配置 LLM Provider", pool).await;
             return;
         }
     };
 
-    // 推送到前端
+    // 推送用户消息到前端
     use tauri::Manager;
     let _ = app_handle.emit_all("chat-event", serde_json::json!({
         "type": "message", "sessionId": session_id,
         "role": "user", "content": text, "source": "weixin",
     }));
 
-    // 调用 LLM
+    // 推送"思考中"到前端
+    let _ = app_handle.emit_all("chat-event", serde_json::json!({
+        "type": "thinking", "sessionId": session_id, "source": "weixin",
+    }));
+
+    // 流式调用 LLM
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
     let base_url_opt = if base_url.is_empty() { None } else { Some(base_url.as_str()) };
+
+    // 后台收集 token 并推送流式到桌面端
+    let app_for_stream = app_handle.clone();
+    let sid_for_stream = session_id.clone();
+    let output_handle = tokio::spawn(async move {
+        let mut output = String::new();
+        while let Some(token) = rx.recv().await {
+            output.push_str(&token);
+            let _ = app_for_stream.emit_all("chat-event", serde_json::json!({
+                "type": "token", "sessionId": sid_for_stream,
+                "content": output.clone(), "source": "weixin",
+            }));
+        }
+        output
+    });
 
     let result = orchestrator.send_message_stream(
         &agent.id, &session_id, &text,
         &api_key, &api_type, base_url_opt, tx, None,
     ).await;
 
-    let mut output = String::new();
-    while let Ok(t) = rx.try_recv() { output.push_str(&t); }
+    let output = output_handle.await.unwrap_or_default();
 
     let reply = match result {
         Ok(resp) => if resp.is_empty() { output } else { resp },
@@ -207,7 +261,7 @@ async fn handle_weixin_message(
     };
 
     if !reply.is_empty() {
-        send_weixin_text(token, to_user, from_user, context_token, &reply).await;
+        send_weixin_text(token, from_user, context_token, &reply, pool).await;
         log::info!("微信: 回复 [{}] {}字符", from_user, reply.len());
     }
 
@@ -233,14 +287,24 @@ fn extract_text(msg: &serde_json::Value) -> String {
 }
 
 /// 发送文本消息
-async fn send_weixin_text(token: &str, from: &str, to: &str, context_token: &str, text: &str) {
+async fn send_weixin_text(token: &str, to: &str, context_token: &str, text: &str, pool: &sqlx::SqlitePool) {
     let client = reqwest::Client::new();
+
+    // 使用保存的 base_url
+    let base_url: String = sqlx::query_scalar("SELECT value FROM settings WHERE key = 'weixin_base_url'")
+        .fetch_optional(pool).await.ok().flatten()
+        .unwrap_or_else(|| WEIXIN_BASE.to_string());
+
+    // 参考 OpenClaw: from_user_id 为空, to_user_id 为用户, 必须有 client_id 和 message_state
+    let client_id = format!("yonclaw-{}", uuid::Uuid::new_v4());
     let body = serde_json::json!({
         "msg": {
-            "from_user_id": from,
+            "from_user_id": "",
             "to_user_id": to,
+            "client_id": client_id,
             "context_token": context_token,
             "message_type": 2, // BOT
+            "message_state": 2, // FINISH
             "item_list": [{
                 "type": 1,
                 "text_item": { "text": text },
@@ -249,15 +313,24 @@ async fn send_weixin_text(token: &str, from: &str, to: &str, context_token: &str
         "base_info": { "channel_version": "yonclaw-1.0.0" },
     });
 
-    let resp = client.post(format!("{}/ilink/bot/sendmessage", WEIXIN_BASE))
+    log::info!("微信: sendMessage to={} base_url={}", &to[..to.len().min(20)], &base_url[..base_url.len().min(40)]);
+
+    match client.post(format!("{}/ilink/bot/sendmessage", base_url))
         .header("Content-Type", "application/json")
         .header("AuthorizationType", "ilink_bot_token")
         .header("Authorization", format!("Bearer {}", token))
         .json(&body)
-        .send().await;
-
-    if let Err(e) = resp {
-        log::warn!("微信: 发送消息失败: {}", e);
+        .send().await
+    {
+        Ok(resp) => {
+            let status = resp.status();
+            if let Ok(text) = resp.text().await {
+                log::info!("微信: sendMessage 响应 status={} body={}", status, &text[..text.len().min(200)]);
+            }
+        }
+        Err(e) => {
+            log::warn!("微信: 发送消息失败: {}", e);
+        }
     }
 }
 
@@ -302,26 +375,47 @@ pub async fn get_login_qrcode() -> Result<serde_json::Value, String> {
     let data: serde_json::Value = resp.json().await
         .map_err(|e| format!("解析失败: {}", e))?;
 
+    log::info!("微信: 二维码获取成功, qrcode={}, img_url={}",
+        data["qrcode"].as_str().unwrap_or("?"),
+        &data["qrcode_img_content"].as_str().unwrap_or("?")[..50.min(data["qrcode_img_content"].as_str().unwrap_or("").len())]);
+
     Ok(data)
 }
 
-/// 轮询扫码状态
+/// 轮询扫码状态（长轮询，服务器 hold 到有结果或超时）
 pub async fn poll_qrcode_status(qrcode: &str) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(40))
         .build()
         .unwrap_or_else(|_| reqwest::Client::new());
 
-    let resp = client.get(format!(
+    let url = format!(
         "{}/ilink/bot/get_qrcode_status?qrcode={}",
         WEIXIN_BASE, urlencoding::encode(qrcode)
-    ))
-    .header("iLink-App-ClientVersion", "1")
-    .send().await
-    .map_err(|e| format!("轮询状态失败: {}", e))?;
+    );
+
+    let resp = client.get(&url)
+        .header("iLink-App-ClientVersion", "1")
+        .send().await
+        .map_err(|e| {
+            // 长轮询超时是正常的
+            if e.is_timeout() {
+                return "timeout".to_string();
+            }
+            format!("轮询状态失败: {}", e)
+        })?;
 
     let data: serde_json::Value = resp.json().await
         .map_err(|e| format!("解析失败: {}", e))?;
+
+    let status = data["status"].as_str().unwrap_or("unknown");
+    log::info!("微信: 扫码状态={}, has_token={}, has_bot_id={}, baseurl={}, full_resp={}",
+        status,
+        data["bot_token"].is_string(),
+        data["ilink_bot_id"].is_string(),
+        data["baseurl"].as_str().unwrap_or("(none)"),
+        &data.to_string()[..data.to_string().len().min(500)],
+    );
 
     Ok(data)
 }

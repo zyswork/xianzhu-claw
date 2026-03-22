@@ -6,6 +6,7 @@
 
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 const TOTAL_STEPS = 4
 
@@ -25,6 +26,7 @@ const S = {
 }
 
 export default function SetupPage({ onComplete }: { onComplete: () => void }) {
+  const { t } = useI18n()
   const [step, setStep] = useState(0)
   const [setupStatus, setSetupStatus] = useState<Record<string, string>>({})
   const [skills, setSkills] = useState<{ name: string; desc: string; icon: string }[]>([])
@@ -102,18 +104,17 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
     () => (
       <div>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 12px', color: S.text }}>
-          欢迎使用 YonClaw
+          {t('setup.welcomeTitle')}
         </h1>
         <p style={{ color: S.textSub, fontSize: 15, lineHeight: 1.7, margin: '0 0 32px' }}>
-          YonClaw 是你的本地 AI 助手。所有数据存储在本地，<br />
-          不会离开你的设备。
+          {t('setup.welcomeDesc')}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[
-            { label: '环境检查', status: setupStatus.env },
-            { label: '准备 Node.js 运行时', status: setupStatus.node },
-            { label: '初始化工作区', status: setupStatus.agent },
+            { label: t('setup.stepEnvCheck'), status: setupStatus.env },
+            { label: t('setup.stepNodejs'), status: setupStatus.node },
+            { label: t('setup.stepInitWorkspace'), status: setupStatus.agent },
           ].map((item, i) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -123,7 +124,7 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
               <span style={{ fontSize: 14, color: S.text }}>{item.label}</span>
               {item.status === 'done' && <span style={{ color: S.green, fontSize: 18 }}>{'\u2705'}</span>}
               {item.status === 'running' && <span style={{ color: S.textSub, fontSize: 13 }}>...</span>}
-              {item.status === 'skip' && <span style={{ color: S.textSub, fontSize: 13 }}>跳过</span>}
+              {item.status === 'skip' && <span style={{ color: S.textSub, fontSize: 13 }}>{t('common.skip')}</span>}
               {!item.status && <span style={{ color: '#ddd', fontSize: 13 }}>{'\u25CB'}</span>}
             </div>
           ))}
@@ -135,10 +136,10 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
     () => (
       <div>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px', color: S.text }}>
-          YonClaw 拥有的技能
+          {t('setup.skillsTitle')}
         </h1>
         <p style={{ color: S.textSub, fontSize: 14, margin: '0 0 24px' }}>
-          我们为您预装了好用且安全的 Skill
+          {t('setup.skillsDesc')}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0, backgroundColor: S.card, borderRadius: 12, border: `1px solid ${S.cardBorder}`, overflow: 'hidden' }}>
@@ -171,11 +172,10 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
     () => (
       <div>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 8px', color: S.text }}>
-          配置 AI 供应商
+          {t('setup.aiConfigTitle')}
         </h1>
         <p style={{ color: S.textSub, fontSize: 14, margin: '0 0 24px', lineHeight: 1.6 }}>
-          YonClaw 需要 LLM API 才能工作。<br />
-          支持 OpenAI、Anthropic、DeepSeek 等 OpenAI 兼容接口。
+          {t('setup.aiConfigDesc')}
         </p>
 
         {providers.some(p => p.hasKey) ? (
@@ -220,13 +220,13 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
               border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer',
               opacity: apiKey.trim() ? 1 : 0.4,
             }}>
-              保存配置
+              {t('setup.btnSaveConfig')}
             </button>
           </div>
         )}
 
         <p style={{ color: S.textSub, fontSize: 12, marginTop: 16 }}>
-          也可以跳过此步骤，稍后在「设置」中配置。
+          {t('setup.hintLater')}
         </p>
       </div>
     ),
@@ -235,19 +235,18 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
     () => (
       <div>
         <h1 style={{ fontSize: 28, fontWeight: 700, margin: '0 0 12px', color: S.text }}>
-          一切就绪！
+          {t('setup.completionTitle')}
         </h1>
         <p style={{ color: S.textSub, fontSize: 15, lineHeight: 1.7, margin: '0 0 32px' }}>
-          YonClaw 已准备好为你工作。<br />
-          你可以随时通过对话管理设置、安装技能、切换模型。
+          {t('setup.completionDesc')}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[
-            { icon: '\u{1F4AC}', label: '直接对话', desc: '和 AI 助手自然交流' },
-            { icon: '/', label: '斜杠命令', desc: '输入 / 查看 21 个快捷命令' },
-            { icon: '\u{1F4CE}', label: '图片输入', desc: '粘贴或拖拽图片给 AI 分析' },
-            { icon: '\u{1F9E0}', label: '越用越聪明', desc: 'AI 自动记住你的偏好和习惯' },
+            { icon: '\u{1F4AC}', label: t('setup.tipDirectChat'), desc: t('setup.tipDirectChatDesc') },
+            { icon: '/', label: t('setup.tipSlashCommands'), desc: t('setup.tipSlashCommandsDesc') },
+            { icon: '\u{1F4CE}', label: t('setup.tipImageInput'), desc: t('setup.tipImageInputDesc') },
+            { icon: '\u{1F9E0}', label: t('setup.tipMemory'), desc: t('setup.tipMemoryDesc') },
           ].map((item, i) => (
             <div key={i} style={{
               display: 'flex', alignItems: 'center', gap: 14,
@@ -295,7 +294,7 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
             onClick={onComplete}
             style={{ background: 'none', border: 'none', color: S.textSub, fontSize: 14, cursor: 'pointer', padding: '8px 0' }}
           >
-            跳过
+            {t('common.skip')}
           </button>
           <div style={{ display: 'flex', gap: 10 }}>
             {step > 0 && (
@@ -306,7 +305,7 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
                   border: `1px solid ${S.cardBorder}`, borderRadius: 8, fontSize: 14, cursor: 'pointer',
                 }}
               >
-                上一步
+                {t('common.prev')}
               </button>
             )}
             <button
@@ -316,7 +315,7 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
                 border: 'none', borderRadius: 8, fontSize: 14, cursor: 'pointer', fontWeight: 500,
               }}
             >
-              {step < TOTAL_STEPS - 1 ? '下一步' : '开始使用'}
+              {step < TOTAL_STEPS - 1 ? t('common.next') : t('common.start')}
             </button>
           </div>
         </div>

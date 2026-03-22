@@ -3,20 +3,22 @@
  */
 
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useI18n } from '../i18n'
 
 export default function Sidebar() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { t } = useI18n()
 
   const menuItems = [
-    { label: '\u{1F4AC}  \u804A\u5929', path: '/agents' },
-    { label: '\u{1F9E9}  \u6280\u80FD', path: '/skills' },
-    { label: '\u23F0  \u5B9A\u65F6\u4EFB\u52A1', path: '/cron' },
-    { label: '\u{1F4E8}  \u9891\u9053', path: '/channels' },
-    { label: '\u{1F50C}  \u63D2\u4EF6', path: '/plugins' },
-    { label: '\u{1F4CA}  \u4EEA\u8868\u677F', path: '/dashboard' },
-    { label: '\u{1F9E0}  \u8BB0\u5FC6', path: '/memory' },
-    { label: '\u2699\uFE0F  \u8BBE\u7F6E', path: '/settings' },
+    { icon: '\u{1F4AC}', label: t('sidebar.chat'), path: '/agents' },
+    { icon: '\u{1F9E9}', label: t('sidebar.skills'), path: '/skills' },
+    { icon: '\u23F0', label: t('sidebar.cron'), path: '/cron' },
+    { icon: '\u{1F4E8}', label: t('sidebar.channels'), path: '/channels' },
+    { icon: '\u{1F50C}', label: t('sidebar.plugins'), path: '/plugins' },
+    { icon: '\u{1F4CA}', label: t('sidebar.dashboard'), path: '/dashboard' },
+    { icon: '\u{1F9E0}', label: t('sidebar.memory'), path: '/memory' },
+    { icon: '\u2699\uFE0F', label: t('sidebar.settings'), path: '/settings' },
   ]
 
   return (
@@ -81,7 +83,7 @@ export default function Sidebar() {
                 (e.currentTarget as HTMLAnchorElement).style.backgroundColor = isActive ? 'var(--sidebar-active)' : 'transparent'
               }}
             >
-              {item.label}
+              {item.icon}  {item.label}
             </a>
           )
         })}
