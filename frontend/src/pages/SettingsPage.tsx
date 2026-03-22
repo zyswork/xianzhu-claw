@@ -149,12 +149,12 @@ export default function SettingsPage() {
     if (!editForm) return
     try {
       await invoke('save_provider', { provider: editForm })
-      setMessage({ type: 'success', text: `${editForm.name} 配置已保存` })
+      setMessage({ type: 'success', text: t('settingsExtra.configSaved', { name: editForm.name }) })
       setEditingId(null)
       setEditForm(null)
       await loadProviders()
     } catch (err) {
-      setMessage({ type: 'error', text: '保存失败: ' + String(err) })
+      setMessage({ type: 'error', text: t('settingsExtra.saveFailed') + ': ' + String(err) })
     }
   }
 
@@ -162,18 +162,18 @@ export default function SettingsPage() {
     if (!confirm(t('settings.confirmDeleteProvider', { name }))) return
     try {
       await invoke('delete_provider', { providerId: id })
-      setMessage({ type: 'success', text: `${name} 已删除` })
+      setMessage({ type: 'success', text: t('settingsExtra.deleted', { name }) })
       if (editingId === id) { setEditingId(null); setEditForm(null) }
       await loadProviders()
     } catch (err) {
-      setMessage({ type: 'error', text: '删除失败: ' + String(err) })
+      setMessage({ type: 'error', text: t('settingsExtra.deleteFailed') + ': ' + String(err) })
     }
   }
 
   const handleAddPreset = async (preset: typeof PRESET_PROVIDERS[0]) => {
     // 检查是否已存在
     if (providers.some((p) => p.id === preset.id)) {
-      setMessage({ type: 'error', text: `${preset.name} 已存在` })
+      setMessage({ type: 'error', text: t('settingsExtra.alreadyExists', { name: preset.name }) })
       setShowAddMenu(false)
       return
     }
@@ -181,11 +181,11 @@ export default function SettingsPage() {
       await invoke('save_provider', {
         provider: { ...preset, apiKey: '' },
       })
-      setMessage({ type: 'success', text: `${preset.name} 已添加，请配置 API Key` })
+      setMessage({ type: 'success', text: t('settingsExtra.addedNeedKey', { name: preset.name }) })
       setShowAddMenu(false)
       await loadProviders()
     } catch (err) {
-      setMessage({ type: 'error', text: '添加失败: ' + String(err) })
+      setMessage({ type: 'error', text: t('settingsExtra.addFailed') + ': ' + String(err) })
     }
   }
 
@@ -193,7 +193,7 @@ export default function SettingsPage() {
     const customId = 'custom-' + Date.now()
     const custom: Provider = {
       id: customId,
-      name: '自定义供应商',
+      name: t('settingsExtra.customProvider'),
       apiType: 'openai',
       baseUrl: '',
       apiKey: '',
@@ -208,7 +208,7 @@ export default function SettingsPage() {
       setEditingId(customId)
       setEditForm(custom)
     } catch (err) {
-      setMessage({ type: 'error', text: '添加失败: ' + String(err) })
+      setMessage({ type: 'error', text: t('settingsExtra.addFailed') + ': ' + String(err) })
     }
   }
 
@@ -219,7 +219,7 @@ export default function SettingsPage() {
       })
       await loadProviders()
     } catch (err) {
-      setMessage({ type: 'error', text: '切换失败: ' + String(err) })
+      setMessage({ type: 'error', text: t('settingsExtra.switchFailed') + ': ' + String(err) })
     }
   }
 
@@ -300,7 +300,7 @@ export default function SettingsPage() {
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f5f5f5' }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
               >
-                + 自定义供应商 (OpenAI 兼容)
+                {t('settingsExtra.customProviderOpenai')}
               </div>
             </div>
           )}
@@ -619,7 +619,7 @@ function AdvancedSettings() {
       if (cloudKey) await invoke('set_setting', { key: 'cloud_api_key', value: cloudKey })
       alert(t('settings.successSaved'))
     } catch (e: any) {
-      alert('保存失败: ' + (e?.message || e))
+      alert(t('settingsExtra.saveFailed') + ': ' + (e?.message || e))
     }
     setSaving(false)
   }
@@ -652,19 +652,19 @@ function AdvancedSettings() {
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px' }}>
           {t('settings.hintEmbedding')}
         </p>
-        <input placeholder="Embedding API Key（如 sk-...）" value={embeddingKey} onChange={e => setEmbeddingKey(e.target.value)}
+        <input placeholder={t('settingsExtra.embeddingKeyPlaceholder')} value={embeddingKey} onChange={e => setEmbeddingKey(e.target.value)}
           style={{ width: '100%', padding: '6px', marginBottom: '6px', boxSizing: 'border-box' }} type="password" />
         <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-          <input placeholder="API URL（默认 OpenAI）" value={embeddingUrl} onChange={e => setEmbeddingUrl(e.target.value)}
+          <input placeholder={t('settingsExtra.embeddingUrlPlaceholder')} value={embeddingUrl} onChange={e => setEmbeddingUrl(e.target.value)}
             style={{ flex: 3, padding: '6px' }} />
-          <input placeholder="模型" value={embeddingModel} onChange={e => setEmbeddingModel(e.target.value)}
+          <input placeholder={t('settingsExtra.embeddingModelPlaceholder')} value={embeddingModel} onChange={e => setEmbeddingModel(e.target.value)}
             style={{ flex: 2, padding: '6px' }} />
-          <input placeholder="维度" value={embeddingDimensions} onChange={e => setEmbeddingDimensions(e.target.value)}
+          <input placeholder={t('settingsExtra.embeddingDimPlaceholder')} value={embeddingDimensions} onChange={e => setEmbeddingDimensions(e.target.value)}
             style={{ flex: 1, padding: '6px' }} type="number" />
         </div>
         <button
           onClick={async () => {
-            if (!embeddingKey || !embeddingUrl) { alert('请先填写 API Key 和 URL'); return }
+            if (!embeddingKey || !embeddingUrl) { alert(t('settingsExtra.fillKeyFirst')); return }
             try {
               const res = await fetch(embeddingUrl, {
                 method: 'POST',
@@ -673,11 +673,11 @@ function AdvancedSettings() {
               })
               const data = await res.json()
               if (data?.data?.[0]?.embedding) {
-                alert(`连接成功！维度: ${data.data[0].embedding.length}, Token: ${data.usage?.total_tokens || '?'}`)
+                alert(t('settingsExtra.connectionSuccess', { dim: String(data.data[0].embedding.length), token: String(data.usage?.total_tokens || '?') }))
               } else {
-                alert('连接失败: ' + JSON.stringify(data).substring(0, 200))
+                alert(t('settingsExtra.connectionFailed') + ': ' + JSON.stringify(data).substring(0, 200))
               }
-            } catch (e: any) { alert('连接失败: ' + (e?.message || e)) }
+            } catch (e: any) { alert(t('settingsExtra.connectionFailed') + ': ' + (e?.message || e)) }
           }}
           style={{ padding: '4px 12px', fontSize: '12px', border: '1px solid var(--border-subtle)', borderRadius: '4px', cursor: 'pointer', backgroundColor: 'var(--bg-elevated)' }}
         >
@@ -691,7 +691,7 @@ function AdvancedSettings() {
         <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 8px' }}>
           {t('settings.hintCloud')}
         </p>
-        <input placeholder="Gateway URL（如 wss://zys-openclaw.com/ws/bridge）" value={cloudUrl} onChange={e => setCloudUrl(e.target.value)}
+        <input placeholder={t('settingsExtra.gatewayPlaceholder')} value={cloudUrl} onChange={e => setCloudUrl(e.target.value)}
           style={{ width: '100%', padding: '6px', marginBottom: '6px', boxSizing: 'border-box' }} />
         <input placeholder="API Key" value={cloudKey} onChange={e => setCloudKey(e.target.value)}
           style={{ width: '100%', padding: '6px', boxSizing: 'border-box' }} type="password" />

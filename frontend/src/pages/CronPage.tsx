@@ -82,14 +82,14 @@ const defaultForm: CreateForm = {
 
 function formatTime(ts: number | null): string {
   if (!ts) return '-'
-  return new Date(ts * 1000).toLocaleString('zh-CN')
+  return new Date(ts * 1000).toLocaleString()
 }
 
-function scheduleDesc(s: CronJob['schedule']): string {
+function scheduleDesc(s: CronJob['schedule'], t: (key: string) => string): string {
   if (s.kind === 'cron') return `cron: ${s.expr}`
-  if (s.kind === 'every') return `每 ${s.secs}s`
-  if (s.kind === 'at') return `定时: ${formatTime(s.ts ?? null)}`
-  return '未知'
+  if (s.kind === 'every') return `${t('cronExtra.everyLabel')} ${s.secs}s`
+  if (s.kind === 'at') return `${t('cronExtra.atLabel')}: ${formatTime(s.ts ?? null)}`
+  return t('common.unknown')
 }
 
 export default function CronPage() {
@@ -149,7 +149,7 @@ export default function CronPage() {
       }
       loadJobs()
     } catch (e) {
-      alert(`操作失败: ${e}`)
+      alert(t('cronExtra.operationFailed') + ': ' + e)
     }
   }
 
@@ -158,7 +158,7 @@ export default function CronPage() {
       await invoke('trigger_cron_job', { jobId })
       loadJobs()
     } catch (e) {
-      alert(`触发失败: ${e}`)
+      alert(t('cronExtra.triggerFailed') + ': ' + e)
     }
   }
 
@@ -169,12 +169,12 @@ export default function CronPage() {
       if (selectedJob === jobId) setSelectedJob(null)
       loadJobs()
     } catch (e) {
-      alert(`删除失败: ${e}`)
+      alert(t('cronExtra.deleteFailed') + ': ' + e)
     }
   }
 
   const handleCreate = async () => {
-    if (!form.name.trim()) { alert('请输入任务名称'); return }
+    if (!form.name.trim()) { alert(t('cronExtra.validationName')); return }
 
     // 构建 schedule
     let schedule: any
@@ -184,22 +184,22 @@ export default function CronPage() {
       schedule = { kind: 'every', secs: form.everySecs }
     } else {
       const ts = form.atDatetime ? Math.floor(new Date(form.atDatetime).getTime() / 1000) : 0
-      if (!ts) { alert('请选择执行时间'); return }
+      if (!ts) { alert(t('cronExtra.validationTime')); return }
       schedule = { kind: 'at', ts }
     }
 
     // 构建 actionPayload
     let actionPayload: any
     if (form.jobType === 'agent') {
-      if (!form.prompt.trim()) { alert('请输入 prompt'); return }
+      if (!form.prompt.trim()) { alert(t('cronExtra.validationPrompt')); return }
       actionPayload = { type: 'agent', prompt: form.prompt, sessionStrategy: form.sessionStrategy }
     } else if (form.jobType === 'shell') {
-      if (!form.command.trim()) { alert('请输入命令'); return }
+      if (!form.command.trim()) { alert(t('cronExtra.validationCommand')); return }
       actionPayload = { type: 'shell', command: form.command }
     } else {
-      if (!form.serverName.trim() || !form.toolName.trim()) { alert('请输入 MCP 服务和工具名'); return }
+      if (!form.serverName.trim() || !form.toolName.trim()) { alert(t('cronExtra.validationMcp')); return }
       let args = {}
-      try { args = JSON.parse(form.toolArgs) } catch { alert('工具参数 JSON 格式错误'); return }
+      try { args = JSON.parse(form.toolArgs) } catch { alert(t('cronExtra.validationJson')); return }
       actionPayload = { type: 'mcp_tool', serverName: form.serverName, toolName: form.toolName, args }
     }
 
@@ -230,7 +230,7 @@ export default function CronPage() {
       setForm({ ...defaultForm })
       setShowAdvanced(false)
     } catch (e) {
-      alert(`创建失败: ${e}`)
+      alert(t('cronExtra.createFailed') + ': ' + e)
     } finally {
       setCreating(false)
     }
@@ -260,7 +260,7 @@ export default function CronPage() {
             <label style={labelStyle}>
               {t('cron.fieldName')}
               <input value={form.name} onChange={e => updateForm({ name: e.target.value })}
-                style={inputStyle} placeholder="例：每日数据备份" />
+                style={inputStyle} placeholder={t('cronExtra.namePlaceholder')} />
             </label>
             <label style={labelStyle}>
               {t('cron.fieldType')}
@@ -298,11 +298,11 @@ export default function CronPage() {
             )}
             {form.scheduleKind === 'every' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span>每</span>
+                <span>{t('cronExtra.everyLabel')}</span>
                 <input type="number" min={60} value={form.everySecs}
                   onChange={e => updateForm({ everySecs: parseInt(e.target.value) || 60 })}
                   style={{ ...inputStyle, width: 120 }} />
-                <span>秒</span>
+                <span>{t('cronExtra.secondsLabel')}</span>
               </div>
             )}
             {form.scheduleKind === 'at' && (
@@ -321,17 +321,17 @@ export default function CronPage() {
                     style={{ ...inputStyle, minHeight: 80, resize: 'vertical' }} placeholder={t('cron.promptPlaceholder')} />
                 </label>
                 <label style={{ ...labelStyle, marginTop: 8 }}>
-                  会话策略
+                  {t('cronExtra.sessionStrategy')}
                   <select value={form.sessionStrategy} onChange={e => updateForm({ sessionStrategy: e.target.value as any })} style={inputStyle}>
-                    <option value="new">每次新建会话</option>
-                    <option value="reuse">复用已有会话</option>
+                    <option value="new">{t('cronExtra.sessionNew')}</option>
+                    <option value="reuse">{t('cronExtra.sessionReuse')}</option>
                   </select>
                 </label>
               </>
             )}
             {form.jobType === 'shell' && (
               <label style={labelStyle}>
-                Shell 命令
+                {t('cronExtra.shellCommand')}
                 <input value={form.command} onChange={e => updateForm({ command: e.target.value })}
                   style={inputStyle} placeholder="例：echo hello" />
               </label>
@@ -339,17 +339,17 @@ export default function CronPage() {
             {form.jobType === 'mcp_tool' && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <label style={labelStyle}>
-                  MCP Server
+                  {t('cronExtra.mcpServer')}
                   <input value={form.serverName} onChange={e => updateForm({ serverName: e.target.value })}
                     style={inputStyle} placeholder="server_name" />
                 </label>
                 <label style={labelStyle}>
-                  Tool 名称
+                  {t('cronExtra.toolName')}
                   <input value={form.toolName} onChange={e => updateForm({ toolName: e.target.value })}
                     style={inputStyle} placeholder="tool_name" />
                 </label>
                 <label style={{ ...labelStyle, gridColumn: '1 / -1' }}>
-                  参数 (JSON)
+                  {t('cronExtra.toolArgs')}
                   <textarea value={form.toolArgs} onChange={e => updateForm({ toolArgs: e.target.value })}
                     style={{ ...inputStyle, minHeight: 60, fontFamily: 'monospace' }} />
                 </label>
@@ -386,7 +386,7 @@ export default function CronPage() {
                     onChange={e => updateForm({ maxDailyRuns: e.target.value })} style={inputStyle} placeholder={t('cron.unlimited')} />
                 </label>
                 <label style={labelStyle}>
-                  最大连续失败
+                  {t('cronExtra.maxConsecutiveFailures')}
                   <input type="number" min={1} value={form.maxConsecutiveFailures}
                     onChange={e => updateForm({ maxConsecutiveFailures: parseInt(e.target.value) || 5 })} style={inputStyle} />
                 </label>
@@ -437,7 +437,7 @@ export default function CronPage() {
               </td>
               <td style={tdStyle}>{job.name}</td>
               <td style={tdStyle}>{job.jobType}</td>
-              <td style={tdStyle}>{scheduleDesc(job.schedule)}</td>
+              <td style={tdStyle}>{scheduleDesc(job.schedule, t)}</td>
               <td style={tdStyle}>{formatTime(job.nextRunAt)}</td>
               <td style={tdStyle}>
                 {job.failStreak > 0 && (
@@ -466,11 +466,11 @@ export default function CronPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '2px solid #e0e0e0', textAlign: 'left' }}>
-                <th style={thStyle}>状态</th>
-                <th style={thStyle}>触发</th>
-                <th style={thStyle}>开始</th>
-                <th style={thStyle}>结束</th>
-                <th style={thStyle}>输出/错误</th>
+                <th style={thStyle}>{t('cronExtra.runStatus')}</th>
+                <th style={thStyle}>{t('cronExtra.runTrigger')}</th>
+                <th style={thStyle}>{t('cronExtra.runStart')}</th>
+                <th style={thStyle}>{t('cronExtra.runFinish')}</th>
+                <th style={thStyle}>{t('cronExtra.runOutput')}</th>
               </tr>
             </thead>
             <tbody>

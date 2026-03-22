@@ -11,6 +11,7 @@
 
 import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 interface McpServer {
   id: string
@@ -42,6 +43,7 @@ const STATUS_ICONS: Record<string, string> = {
 }
 
 export default function McpTab({ agentId }: McpTabProps) {
+  const { t } = useI18n()
   const [servers, setServers] = useState<McpServer[]>([])
   const [showAdd, setShowAdd] = useState(false)
   const [expandedServer, setExpandedServer] = useState<string | null>(null)
@@ -122,7 +124,7 @@ export default function McpTab({ agentId }: McpTabProps) {
       setError('')
       const imported = await invoke<McpServer[]>('import_claude_mcp_config', { agentId })
       await loadServers()
-      alert(`成功导入 ${imported.length} 个 MCP Server`)
+      alert(t('mcpTab.importSuccess', { count: imported.length }))
     } catch (e) { setError(String(e)) }
     finally { setImporting(false) }
   }
@@ -132,10 +134,10 @@ export default function McpTab({ agentId }: McpTabProps) {
       {/* 操作栏 */}
       <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
         <button onClick={() => setShowAdd(!showAdd)} style={btnStyle}>
-          {showAdd ? '取消' : '+ 添加'}
+          {showAdd ? t('mcpTab.cancelBtn') : t('mcpTab.addBtn')}
         </button>
         <button onClick={handleImport} disabled={importing} style={btnStyle}>
-          {importing ? '导入中...' : '📋 导入 Claude'}
+          {importing ? t('mcpTab.importing') : t('mcpTab.importClaude')}
         </button>
       </div>
 
@@ -145,41 +147,41 @@ export default function McpTab({ agentId }: McpTabProps) {
       {showAdd && (
         <div style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '10px', marginBottom: '10px', fontSize: '12px' }}>
           <div style={{ marginBottom: '6px' }}>
-            <label>名称</label>
+            <label>{t('mcpTab.fieldName')}</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               style={inputStyle} placeholder="my-server" />
           </div>
           <div style={{ marginBottom: '6px' }}>
-            <label>类型</label>
+            <label>{t('mcpTab.fieldType')}</label>
             <select value={form.transport} onChange={e => setForm(f => ({ ...f, transport: e.target.value as 'stdio' | 'http' }))}
               style={inputStyle}>
-              <option value="stdio">stdio (命令行)</option>
-              <option value="http">HTTP</option>
+              <option value="stdio">{t('mcpTab.typeStdio')}</option>
+              <option value="http">{t('mcpTab.typeHttp')}</option>
             </select>
           </div>
           {form.transport === 'stdio' ? (
             <>
               <div style={{ marginBottom: '6px' }}>
-                <label>命令</label>
+                <label>{t('mcpTab.fieldCommand')}</label>
                 <input value={form.command} onChange={e => setForm(f => ({ ...f, command: e.target.value }))}
                   style={inputStyle} placeholder="npx" />
               </div>
               <div style={{ marginBottom: '6px' }}>
-                <label>参数（空格分隔）</label>
+                <label>{t('mcpTab.fieldArgs')}</label>
                 <input value={form.args} onChange={e => setForm(f => ({ ...f, args: e.target.value }))}
                   style={inputStyle} placeholder="-y @modelcontextprotocol/server-filesystem /tmp" />
               </div>
             </>
           ) : (
             <div style={{ marginBottom: '6px' }}>
-              <label>URL</label>
+              <label>{t('mcpTab.fieldUrl')}</label>
               <input value={form.url} onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
                 style={inputStyle} placeholder="http://localhost:3001/mcp" />
             </div>
           )}
           {/* 环境变量 */}
           <div style={{ marginBottom: '6px' }}>
-            <label>环境变量</label>
+            <label>{t('mcpTab.fieldEnv')}</label>
             {form.envKeys.map((k, i) => (
               <div key={i} style={{ display: 'flex', gap: '4px', marginTop: '4px' }}>
                 <input value={k} onChange={e => {
@@ -200,7 +202,7 @@ export default function McpTab({ agentId }: McpTabProps) {
           </div>
           <button onClick={handleAdd} disabled={!form.name.trim()}
             style={{ ...btnStyle, backgroundColor: '#007bff', color: '#fff', width: '100%' }}>
-            添加
+            {t('mcpTab.submitAdd')}
           </button>
         </div>
       )}
@@ -208,7 +210,7 @@ export default function McpTab({ agentId }: McpTabProps) {
       {/* Server 列表 */}
       {servers.length === 0 && !showAdd && (
         <div style={{ color: '#999', fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
-          暂无 MCP Server，点击"添加"或"导入 Claude"
+          {t('mcpTab.emptyServers')}
         </div>
       )}
 
@@ -225,10 +227,10 @@ export default function McpTab({ agentId }: McpTabProps) {
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
               <input type="checkbox" checked={s.enabled}
-                onChange={e => handleToggle(s.id, e.target.checked)} title="启用/禁用" />
+                onChange={e => handleToggle(s.id, e.target.checked)} title={t('mcpTab.enableDisable')} />
               <button onClick={() => handleTest(s.id)} disabled={testing === s.id}
                 style={{ ...btnStyle, padding: '1px 6px', fontSize: '11px' }}>
-                {testing === s.id ? '...' : '测试'}
+                {testing === s.id ? t('mcpTab.testing') : t('mcpTab.testBtn')}
               </button>
               <button onClick={() => handleRemove(s.id)}
                 style={{ ...btnStyle, padding: '1px 6px', fontSize: '11px', color: 'red' }}>
@@ -241,7 +243,7 @@ export default function McpTab({ agentId }: McpTabProps) {
           {expandedServer === s.id && serverTools[s.id] && (
             <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #eee' }}>
               <div style={{ color: '#666', marginBottom: '4px' }}>
-                工具 ({serverTools[s.id].length}):
+                {t('mcpTab.tools')} ({serverTools[s.id].length}):
               </div>
               {serverTools[s.id].map(t => (
                 <div key={t.name} style={{ padding: '2px 0', color: '#444' }}>

@@ -13,6 +13,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
 import { useNavigate } from 'react-router-dom'
+import { useI18n } from '../i18n'
 import AgentConfigPanel from '../components/AgentConfigPanel'
 
 import { marked } from 'marked'
@@ -45,6 +46,7 @@ function ToolCallCard({ name, args, result, status }: {
   result?: string
   status: 'running' | 'done' | 'error'
 }) {
+  const { t } = useI18n()
   const [expanded, setExpanded] = useState(false)
   const statusColors = {
     running: { bg: '#fff8e1', border: '#ffe082', text: '#795548' },
@@ -61,13 +63,13 @@ function ToolCallCard({ name, args, result, status }: {
       <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: c.text }}>
         <span>{status === 'running' ? '⏳' : status === 'done' ? '✅' : '❌'}</span>
         <strong>{name}</strong>
-        {status === 'running' && <span style={{ color: '#999' }}>执行中...</span>}
+        {status === 'running' && <span style={{ color: '#999' }}>{t('chat.toolExecuting')}</span>}
         {(args || result) && (
           <button onClick={() => setExpanded(!expanded)} style={{
             marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer',
             fontSize: '11px', color: '#666',
           }}>
-            {expanded ? '收起' : '详情'}
+            {expanded ? t('common.collapse') : t('common.details')}
           </button>
         )}
       </div>
@@ -113,10 +115,10 @@ interface ModelItem {
 
 /** 预置 Agent 模板 */
 const TEMPLATES = [
-  { name: '通用助手', model: 'gpt-4o-mini', prompt: '你是一个有用的AI助手，擅长回答各种问题。', icon: '💬' },
-  { name: '编程助手', model: 'gpt-4o', prompt: '你是一个资深编程助手，擅长代码编写、调试和架构设计。请用简洁专业的方式回答。', icon: '👨‍💻' },
-  { name: '翻译专家', model: 'deepseek-chat', prompt: '你是一个专业翻译，擅长中英互译。保持原文风格和语气，翻译要自然流畅。', icon: '🌐' },
-  { name: '写作助手', model: 'claude-sonnet-4-20250514', prompt: '你是一个专业写作助手，擅长文章撰写、润色和创意写作。', icon: '✍️' },
+  { nameKey: 'chatPage.templateGeneral' as const, model: 'gpt-4o-mini', prompt: '你是一个有用的AI助手，擅长回答各种问题。', icon: '💬' },
+  { nameKey: 'chatPage.templateCoding' as const, model: 'gpt-4o', prompt: '你是一个资深编程助手，擅长代码编写、调试和架构设计。请用简洁专业的方式回答。', icon: '👨‍💻' },
+  { nameKey: 'chatPage.templateTranslator' as const, model: 'deepseek-chat', prompt: '你是一个专业翻译，擅长中英互译。保持原文风格和语气，翻译要自然流畅。', icon: '🌐' },
+  { nameKey: 'chatPage.templateWriter' as const, model: 'claude-sonnet-4-20250514', prompt: '你是一个专业写作助手，擅长文章撰写、润色和创意写作。', icon: '✍️' },
 ]
 
 interface Agent {
@@ -146,6 +148,7 @@ interface Message {
 }
 
 export default function ChatPage() {
+  const { t } = useI18n()
   const navigate = useNavigate()
   const [agents, setAgents] = useState<Agent[]>([])
   const [selectedAgent, setSelectedAgent] = useState<string>('')
@@ -240,7 +243,7 @@ export default function ChatPage() {
             msgs.push({
               role: 'tool',
               content: m.content || '',
-              toolName: m.name || m.tool_name || '工具',
+              toolName: m.name || m.tool_name || t('common.tools'),
               toolResult: m.content || '',
             })
           } else if (role === 'assistant' && m.tool_calls) {
@@ -251,7 +254,7 @@ export default function ChatPage() {
             // 显示每个工具调用
             const calls = Array.isArray(m.tool_calls) ? m.tool_calls : []
             for (const tc of calls) {
-              const name = tc.function?.name || tc.name || '工具'
+              const name = tc.function?.name || tc.name || t('common.tools')
               const args = tc.function?.arguments || JSON.stringify(tc.arguments || {})
               msgs.push({
                 role: 'tool',
@@ -366,7 +369,7 @@ export default function ChatPage() {
           setActiveSessionId(session.id)
           setMessages([])
         } catch (e: any) {
-          setMessages((prev) => [...prev, { role: 'system', content: '❌ 创建会话失败: ' + (e?.message || e) }])
+          setMessages((prev) => [...prev, { role: 'system', content: '❌ ' + t('chatPage.newSessionFailed') + ': ' + (e?.message || e) }])
         }
         break
       }
@@ -375,7 +378,7 @@ export default function ChatPage() {
         try {
           await invoke('clear_history', { sessionId: activeSessionId })
           setMessages([])
-          setMessages([{ role: 'system', content: '✅ 当前会话已清空' }])
+          setMessages([{ role: 'system', content: t('chatPage.clearSuccess') }])
         } catch (e: any) {
           setMessages((prev) => [...prev, { role: 'system', content: '❌ 清空失败: ' + (e?.message || e) }])
         }
@@ -383,7 +386,7 @@ export default function ChatPage() {
       }
       case '/compact': {
         if (!selectedAgent || !activeSessionId) return
-        setMessages((prev) => [...prev, { role: 'system', content: '⏳ 正在压缩上下文...' }])
+        setMessages((prev) => [...prev, { role: 'system', content: t('chatPage.compacting') }])
         try {
           const summary = await invoke<string>('compact_session', {
             agentId: selectedAgent,
@@ -391,7 +394,7 @@ export default function ChatPage() {
           })
           // 重新加载消息
           await loadHistory(selectedAgent, activeSessionId)
-          setMessages((prev) => [...prev, { role: 'system', content: '✅ 上下文已压缩。摘要:\n\n' + summary }])
+          setMessages((prev) => [...prev, { role: 'system', content: t('chatPage.compactSuccess') + summary }])
         } catch (e: any) {
           setMessages((prev) => [...prev, { role: 'system', content: '❌ 压缩失败: ' + (e?.message || e) }])
         }
@@ -399,7 +402,7 @@ export default function ChatPage() {
       }
       case '/rename': {
         if (!activeSessionId || !args.trim()) {
-          setMessages((prev) => [...prev, { role: 'system', content: '用法: /rename 新名称' }])
+          setMessages((prev) => [...prev, { role: 'system', content: t('chatPage.renameUsage') }])
           return
         }
         try {
@@ -407,15 +410,15 @@ export default function ChatPage() {
           setSessions((prev) =>
             prev.map((s) => (s.id === activeSessionId ? { ...s, title: args.trim() } : s))
           )
-          setMessages((prev) => [...prev, { role: 'system', content: '�� 会话已重命名为: ' + args.trim() }])
+          setMessages((prev) => [...prev, { role: 'system', content: t('chatPage.renamed') + args.trim() }])
         } catch (e: any) {
           setMessages((prev) => [...prev, { role: 'system', content: '❌ 重命名失败: ' + (e?.message || e) }])
         }
         break
       }
       case '/sessions': {
-        const list = sessions.map((s, i) => `${i + 1}. ${s.title}${s.id === activeSessionId ? ' (当前)' : ''}`).join('\n')
-        setMessages((prev) => [...prev, { role: 'system', content: '📋 会话列表:\n\n' + list }])
+        const list = sessions.map((s, i) => `${i + 1}. ${s.title}${s.id === activeSessionId ? ' ' + t('chatPage.sessionCurrent') : ''}`).join('\n')
+        setMessages((prev) => [...prev, { role: 'system', content: t('chatPage.sessionListTitle') + list }])
         break
       }
       case '/help': {
@@ -423,20 +426,13 @@ export default function ChatPage() {
           ...prev,
           {
             role: 'system',
-            content:
-              '可用命令:\n\n' +
-              '/new — 新建会话\n' +
-              '/clear — 清空当前会话\n' +
-              '/compact — 压缩上下文（AI 摘要）\n' +
-              '/rename <名称> — 重命名当前会话\n' +
-              '/sessions — 列出所有会话\n' +
-              '/help — 显示帮助',
+            content: t('chatPage.helpText'),
           },
         ])
         break
       }
       default:
-        setMessages((prev) => [...prev, { role: 'system', content: `未知命令: ${cmd}，输入 /help 查看可用命令` }])
+        setMessages((prev) => [...prev, { role: 'system', content: t('chatPage.unknownCommand', { cmd }) }])
     }
   }
 
@@ -459,7 +455,7 @@ export default function ChatPage() {
     }
 
     if (!activeSessionId) {
-      setMessages((prev) => [...prev, { role: 'system', content: '⚠️ 未选择会话，请先创建或选择一个会话' }])
+      setMessages((prev) => [...prev, { role: 'system', content: t('chatPage.noSessionWarning') }])
       return
     }
     setMessages((prev) => [...prev, { role: 'user', content: userMsg }])
@@ -483,20 +479,20 @@ export default function ChatPage() {
   const handleCreateFromTemplate = async (tpl: typeof TEMPLATES[0]) => {
     const modelInfo = allModels.find((m) => m.id === tpl.model)
     if (!modelInfo?.available) {
-      const providerName = modelInfo?.providerName || '对应供应商'
-      setCreateError(`需要先配置 ${providerName} 的 API Key`)
+      const providerName = modelInfo?.providerName || 'provider'
+      setCreateError(t('chatPage.needConfigKey', { provider: providerName }))
       return
     }
     try {
       const result = await invoke<Agent>('create_agent', {
-        name: tpl.name,
+        name: t(tpl.nameKey),
         systemPrompt: tpl.prompt,
         model: tpl.model,
       })
       await loadAgents()
       if (result?.id) setSelectedAgent(result.id)
     } catch (e: any) {
-      setCreateError(String(e?.message || e || '创建失败'))
+      setCreateError(String(e?.message || e || t('chatPage.createFailed')))
     }
   }
 
@@ -506,8 +502,8 @@ export default function ChatPage() {
     setCreateError('')
     const modelInfo = allModels.find((m) => m.id === agentForm.model)
     if (!modelInfo?.available) {
-      const providerName = modelInfo?.providerName || '对应供应商'
-      setCreateError(`需要先配置 ${providerName} 的 API Key`)
+      const providerName = modelInfo?.providerName || 'provider'
+      setCreateError(t('chatPage.needConfigKey', { provider: providerName }))
       return
     }
     try {
@@ -518,13 +514,13 @@ export default function ChatPage() {
       await loadAgents()
       if (result?.id) setSelectedAgent(result.id)
     } catch (e: any) {
-      setCreateError(String(e?.message || e || '创建失败'))
+      setCreateError(String(e?.message || e || t('chatPage.createFailed')))
     }
   }
 
   // 删除 Agent
   const handleDeleteAgent = async (id: string) => {
-    if (!confirm('确定删除该 Agent？')) return
+    if (!confirm(t('chatPage.confirmDeleteAgent'))) return
     try {
       await invoke('delete_agent', { agentId: id })
       if (selectedAgent === id) { setSelectedAgent(''); setMessages([]) }
@@ -547,12 +543,12 @@ export default function ChatPage() {
       {/* 左侧 Agent 列表 */}
       <div style={{ width: '220px', borderRight: '1px solid #ddd', padding: '10px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <strong>对话</strong>
+          <strong>{t('chatPage.conversation')}</strong>
           <button
             onClick={() => { setShowCreateAgent(!showCreateAgent); setCreateError('') }}
             style={{ padding: '4px 8px', fontSize: '12px', cursor: 'pointer' }}
           >
-            {showCreateAgent ? '取消' : '+ 自定义'}
+            {showCreateAgent ? t('chatPage.cancelCreate') : t('chatPage.customCreate')}
           </button>
         </div>
 
@@ -560,7 +556,7 @@ export default function ChatPage() {
         {showCreateAgent && (
           <div style={{ marginBottom: '10px', padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '13px' }}>
             <input
-              placeholder="名称"
+              placeholder={t('chatPage.fieldName')}
               value={agentForm.name}
               onChange={(e) => setAgentForm({ ...agentForm, name: e.target.value })}
               style={{ width: '100%', padding: '4px', marginBottom: '5px', boxSizing: 'border-box' }}
@@ -579,7 +575,7 @@ export default function ChatPage() {
             >
               {allModels.map((m) => (
                 <option key={`${m.provider}-${m.id}`} value={m.id} disabled={!m.available}>
-                  {m.label} ({m.providerName}) {!m.available ? '(未配置Key)' : ''}
+                  {m.label} ({m.providerName}) {!m.available ? t('chatPage.notConfiguredKey') : ''}
                 </option>
               ))}
             </select>
@@ -597,7 +593,7 @@ export default function ChatPage() {
                 opacity: !agentForm.name.trim() ? 0.6 : 1,
               }}
             >
-              创建
+              {t('chatPage.createBtn')}
             </button>
           </div>
         )}
@@ -624,7 +620,7 @@ export default function ChatPage() {
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowConfig(!showConfig) }}
                   style={{ fontSize: '12px', color: '#666', background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px' }}
-                  title="配置"
+                  title={t('chatPage.configTitle')}
                 >
                   ⚙
                 </button>
@@ -641,7 +637,7 @@ export default function ChatPage() {
 
         {agents.length === 0 && !showCreateAgent && (
           <div style={{ color: '#999', fontSize: '12px', textAlign: 'center', marginTop: '10px' }}>
-            从右侧模板快速开始 →
+            {t('chatPage.quickStartHint')}
           </div>
         )}
 
@@ -649,7 +645,7 @@ export default function ChatPage() {
         {selectedAgent && sessions.length > 0 && (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '15px', marginBottom: '6px', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-              <strong style={{ fontSize: '12px', color: '#666' }}>会话</strong>
+              <strong style={{ fontSize: '12px', color: '#666' }}>{t('chatPage.sessions')}</strong>
               <button
                 onClick={async () => {
                   try {
@@ -661,7 +657,7 @@ export default function ChatPage() {
                 }}
                 style={{ padding: '2px 6px', fontSize: '11px', cursor: 'pointer', background: 'none', border: '1px solid #ccc', borderRadius: '3px' }}
               >
-                + 新建
+                {t('common.new')}
               </button>
             </div>
             {sessions.map((s) => (
@@ -684,7 +680,7 @@ export default function ChatPage() {
                 <button
                   onClick={async (e) => {
                     e.stopPropagation()
-                    if (!confirm('确定删除该会话？')) return
+                    if (!confirm(t('chatPage.confirmDeleteSession'))) return
                     try {
                       await invoke('delete_session', { sessionId: s.id })
                       const updated = sessions.filter((x) => x.id !== s.id)
@@ -737,9 +733,9 @@ export default function ChatPage() {
           {!hasAnyKey && !selectedAgent && (
             <div style={{ maxWidth: '500px', margin: '40px auto', textAlign: 'center' }}>
               <div style={{ fontSize: '40px', marginBottom: '16px' }}>🔑</div>
-              <h3 style={{ margin: '0 0 8px' }}>配置 API Key 开始使用</h3>
+              <h3 style={{ margin: '0 0 8px' }}>{t('chatPage.guideApiKeyTitle')}</h3>
               <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
-                需要至少配置一个 LLM 供应商的 API Key 才能开始对话
+                {t('chatPage.guideApiKeyDesc')}
               </p>
               <button
                 onClick={() => navigate('/settings')}
@@ -748,7 +744,7 @@ export default function ChatPage() {
                   border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer',
                 }}
               >
-                前往设置
+                {t('chatPage.gotoSettings')}
               </button>
             </div>
           )}
@@ -756,16 +752,16 @@ export default function ChatPage() {
           {/* 有 Key 但无 Agent：显示模板 */}
           {hasAnyKey && !selectedAgent && agents.length === 0 && (
             <div style={{ maxWidth: '600px', margin: '30px auto' }}>
-              <h3 style={{ textAlign: 'center', marginBottom: '4px' }}>选择一个模板快速开始</h3>
+              <h3 style={{ textAlign: 'center', marginBottom: '4px' }}>{t('chatPage.guideTemplateTitle')}</h3>
               <p style={{ textAlign: 'center', color: '#999', fontSize: '13px', marginBottom: '20px' }}>
-                或点击左侧「+ 自定义」创建你自己的 Agent
+                {t('chatPage.guideTemplateDesc')}
               </p>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 {TEMPLATES.map((tpl) => {
                   const available = isModelAvailable(tpl.model)
                   return (
                     <div
-                      key={tpl.name}
+                      key={tpl.nameKey}
                       onClick={() => available && handleCreateFromTemplate(tpl)}
                       style={{
                         padding: '16px', border: '1px solid #e0e0e0', borderRadius: '8px',
@@ -785,10 +781,10 @@ export default function ChatPage() {
                       }}
                     >
                       <div style={{ fontSize: '24px', marginBottom: '8px' }}>{tpl.icon}</div>
-                      <div style={{ fontWeight: 600, marginBottom: '4px' }}>{tpl.name}</div>
+                      <div style={{ fontWeight: 600, marginBottom: '4px' }}>{t(tpl.nameKey)}</div>
                       <div style={{ fontSize: '12px', color: '#999' }}>
                         {allModels.find((m) => m.id === tpl.model)?.label || tpl.model}
-                        {!available && ' (需配置 Key)'}
+                        {!available && ' ' + t('chatPage.needsKey')}
                       </div>
                     </div>
                   )
@@ -805,14 +801,14 @@ export default function ChatPage() {
           {/* 有 Agent 但未选中 */}
           {hasAnyKey && !selectedAgent && agents.length > 0 && (
             <div style={{ textAlign: 'center', color: '#999', marginTop: '40px' }}>
-              ← 选择一个对话开始
+              {t('chatPage.selectAgent')}
             </div>
           )}
 
           {/* 选中 Agent 但无消息 */}
           {selectedAgent && messages.length === 0 && (
             <div style={{ textAlign: 'center', color: '#999', marginTop: '40px' }}>
-              开始对话吧
+              {t('chatPage.startChat')}
             </div>
           )}
 
@@ -838,7 +834,7 @@ export default function ChatPage() {
               return (
                 <div key={i} style={{ marginBottom: '8px', maxWidth: '80%' }}>
                   <ToolCallCard
-                    name={msg.toolName || '工具'}
+                    name={msg.toolName || t('common.tools')}
                     args={msg.toolArgs}
                     result={isRunning ? undefined : msg.toolResult}
                     status={isRunning ? 'running' : (msg.toolError ? 'error' : 'done')}
@@ -870,7 +866,7 @@ export default function ChatPage() {
           {streaming && messages[messages.length - 1]?.role !== 'assistant' && (
             <div style={{ marginBottom: '12px' }}>
               <div style={{ padding: '10px 14px', borderRadius: '12px', backgroundColor: '#f1f1f1', color: '#999' }}>
-                思考中...
+                {t('chat.statusThinking')}
               </div>
             </div>
           )}
@@ -886,7 +882,7 @@ export default function ChatPage() {
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
               }}
-              placeholder={selectedAgent ? '输入消息... (输入 / 查看命令)' : '请先选择或创建 Agent'}
+              placeholder={selectedAgent ? t('chatPage.inputPlaceholder') : t('chatPage.inputDisabled')}
               disabled={!selectedAgent || streaming}
               style={{
                 flex: 1, padding: '10px', border: '1px solid #ddd',
@@ -903,7 +899,7 @@ export default function ChatPage() {
                 opacity: !selectedAgent || streaming || !input.trim() ? 0.6 : 1,
               }}
             >
-              {streaming ? '生成中...' : '发送'}
+              {streaming ? t('agentDetail.generating') : t('common.send')}
             </button>
           </div>
         </div>

@@ -51,7 +51,7 @@ export default function Sidebar() {
             fontSize: 13, fontWeight: 500,
           }}
         >
-          + 新建聊天
+          {t('sidebar.newChat')}
         </button>
       </div>
 

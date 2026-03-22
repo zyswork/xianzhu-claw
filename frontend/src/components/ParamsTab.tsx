@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 interface ParamsTabProps {
   agentId: string
@@ -37,12 +38,18 @@ interface ModelOption {
 
 /** 温度预设 */
 const TEMP_PRESETS = [
-  { id: 'precise', label: '精确', value: 0.2 },
-  { id: 'balanced', label: '均衡', value: 0.7 },
-  { id: 'creative', label: '创造', value: 1.2 },
+  { id: 'precise', value: 0.2 },
+  { id: 'balanced', value: 0.7 },
+  { id: 'creative', value: 1.2 },
 ]
 
 export default function ParamsTab({ agentId }: ParamsTabProps) {
+  const { t } = useI18n()
+  const presetLabels: Record<string, string> = {
+    precise: t('paramsTab.precise'),
+    balanced: t('paramsTab.balanced'),
+    creative: t('paramsTab.creative'),
+  }
   const [model, setModel] = useState('')
   const [temperature, setTemperature] = useState(0.7)
   const [maxTokens, setMaxTokens] = useState(4096)
@@ -104,10 +111,10 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
     setStatus('')
     try {
       await invoke('update_agent', { agentId, model, temperature, maxTokens })
-      setStatus('已保存')
+      setStatus(t('paramsTab.saved'))
       setTimeout(() => setStatus(''), 2000)
     } catch (e) {
-      setStatus('保存失败: ' + String(e))
+      setStatus(t('paramsTab.saveFailed') + ': ' + String(e))
     } finally {
       setSaving(false)
     }
@@ -117,14 +124,14 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
   const activePreset = TEMP_PRESETS.find(p => Math.abs(p.value - temperature) < 0.05)
 
   if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>加载中...</div>
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>{t('common.loading')}</div>
   }
 
   return (
     <div style={{ padding: '8px 0' }}>
       {/* 温度预设 */}
       <div style={{ marginBottom: '14px' }}>
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>温度预设</div>
+        <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>{t('paramsTab.tempPreset')}</div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           {TEMP_PRESETS.map(p => (
             <button
@@ -138,18 +145,18 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
                 color: activePreset?.id === p.id ? 'white' : '#333',
               }}
             >
-              {p.label}
+              {presetLabels[p.id] || p.id}
             </button>
           ))}
           {!activePreset && (
-            <span style={{ fontSize: '11px', color: '#999', marginLeft: '4px' }}>自定义</span>
+            <span style={{ fontSize: '11px', color: '#999', marginLeft: '4px' }}>{t('paramsTab.custom')}</span>
           )}
         </div>
       </div>
 
       {/* 模型选择 */}
       <div style={{ marginBottom: '14px' }}>
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>模型</div>
+        <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>{t('paramsTab.selectModel')}</div>
         <select
           value={model}
           onChange={e => setModel(e.target.value)}
@@ -159,7 +166,7 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
           }}
         >
           {model && !models.some(m => m.id === model) && (
-            <option value={model}>{model} (当前)</option>
+            <option value={model}>{model} {t('paramsTab.current')}</option>
           )}
           {models.map(m => (
             <option key={`${m.provider}-${m.id}`} value={m.id}>
@@ -185,7 +192,7 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
           }}>
             ▶
           </span>
-          高级参数
+          {t('paramsTab.advancedParams')}
         </button>
 
         {showAdvanced && (
@@ -204,8 +211,8 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
                 style={{ width: '100%' }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#999' }}>
-                <span>0 精确</span>
-                <span>2 随机</span>
+                <span>{t('paramsTab.labelPrecise')}</span>
+                <span>{t('paramsTab.labelRandom')}</span>
               </div>
             </div>
 
@@ -238,13 +245,13 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
           cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
         }}
       >
-        {saving ? '保存中...' : '保存参数'}
+        {saving ? t('common.saving') : t('paramsTab.saveParams')}
       </button>
 
       {status && (
         <div style={{
           fontSize: '12px', marginTop: '6px', textAlign: 'center',
-          color: status.startsWith('保存失败') ? '#dc3545' : '#28a745',
+          color: status.startsWith(t('paramsTab.saveFailed')) ? '#dc3545' : '#28a745',
         }}>
           {status}
         </div>

@@ -8,6 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 interface SoulFileTabProps {
   agentId: string
@@ -107,6 +108,7 @@ function buildUserMd(f: FormFields): string {
 }
 
 export default function SoulFileTab({ agentId }: SoulFileTabProps) {
+  const { t } = useI18n()
   const [rawMode, setRawMode] = useState(false)
   const [form, setForm] = useState<FormFields>({ ...DEFAULT_FORM })
   const [saving, setSaving] = useState(false)
@@ -226,10 +228,10 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
       await invoke('write_soul_file', { agentId, fileName: 'IDENTITY.md', content: identityContent })
       await invoke('write_soul_file', { agentId, fileName: 'SOUL.md', content: soulContent })
       await invoke('write_soul_file', { agentId, fileName: 'USER.md', content: userContent })
-      setStatus('已保存')
+      setStatus(t('soulFile.saved'))
       setTimeout(() => setStatus(''), 2000)
     } catch (e) {
-      setStatus('保存失败: ' + String(e))
+      setStatus(t('soulFile.saveFailed') + ': ' + String(e))
     } finally {
       setSaving(false)
     }
@@ -242,14 +244,14 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
     setStatus('')
     try {
       await invoke('write_soul_file', { agentId, fileName: selectedFile, content: fileContent })
-      setStatus('已保存')
+      setStatus(t('soulFile.saved'))
       setFileSizes(prev => ({ ...prev, [selectedFile]: fileContent.length }))
       // 刷新文件列表（可能新建了文件）
       const files = await invoke<string[]>('list_soul_files', { agentId })
       setFileList(files || [])
       setTimeout(() => setStatus(''), 2000)
     } catch (e) {
-      setStatus('保存失败: ' + String(e))
+      setStatus(t('soulFile.saveFailed') + ': ' + String(e))
     } finally {
       setSaving(false)
     }
@@ -275,16 +277,16 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
               borderRadius: '3px', background: '#f8f8f8', cursor: 'pointer', color: '#666',
             }}
           >
-            原始模式
+            {t('soulFile.rawMode')}
           </button>
         </div>
 
         {/* IDENTITY 区域 */}
         <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>🎭 身份</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>{t('soulFile.sectionIdentity')}</div>
           {form.customIdentity ? (
             <div>
-              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>自定义格式（在原始模式中编辑结构）</div>
+              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>{t('soulFile.customFormatHint')}</div>
               <textarea
                 style={{ ...inputStyle, minHeight: '80px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px' }}
                 value={form.customIdentity}
@@ -294,17 +296,17 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
           ) : (
             <>
               <div style={fieldGroup}>
-                <label style={labelStyle}>名称</label>
-                <input style={inputStyle} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Agent 名称" />
+                <label style={labelStyle}>{t('soulFile.fieldName')}</label>
+                <input style={inputStyle} value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder={t('soulFile.placeholderName')} />
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <div style={{ ...fieldGroup, flex: 1 }}>
-                  <label style={labelStyle}>Emoji</label>
-                  <input style={inputStyle} value={form.emoji} onChange={e => setForm(p => ({ ...p, emoji: e.target.value }))} placeholder="🤖" />
+                  <label style={labelStyle}>{t('soulFile.fieldEmoji')}</label>
+                  <input style={inputStyle} value={form.emoji} onChange={e => setForm(p => ({ ...p, emoji: e.target.value }))} placeholder={t('soulFile.placeholderEmoji')} />
                 </div>
                 <div style={{ ...fieldGroup, flex: 1 }}>
-                  <label style={labelStyle}>类型</label>
-                  <input style={inputStyle} value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))} placeholder="assistant" />
+                  <label style={labelStyle}>{t('soulFile.fieldType')}</label>
+                  <input style={inputStyle} value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value }))} placeholder={t('soulFile.placeholderType')} />
                 </div>
               </div>
             </>
@@ -313,10 +315,10 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
 
         {/* SOUL 区域 */}
         <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>✨ 灵魂</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>{t('soulFile.sectionSoul')}</div>
           {form.customSoul ? (
             <div>
-              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>自定义格式（在原始模式中编辑结构）</div>
+              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>{t('soulFile.customFormatHint')}</div>
               <textarea
                 style={{ ...inputStyle, minHeight: '120px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px' }}
                 value={form.customSoul}
@@ -326,16 +328,16 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
           ) : (
             <>
               <div style={fieldGroup}>
-                <label style={labelStyle}>性格</label>
-                <textarea style={{ ...inputStyle, minHeight: '50px', resize: 'vertical' }} value={form.personality} onChange={e => setForm(p => ({ ...p, personality: e.target.value }))} placeholder="描述 Agent 的性格特征..." />
+                <label style={labelStyle}>{t('soulFile.fieldPersonality')}</label>
+                <textarea style={{ ...inputStyle, minHeight: '50px', resize: 'vertical' }} value={form.personality} onChange={e => setForm(p => ({ ...p, personality: e.target.value }))} placeholder={t('soulFile.placeholderPersonality')} />
               </div>
               <div style={fieldGroup}>
-                <label style={labelStyle}>风格</label>
-                <textarea style={{ ...inputStyle, minHeight: '40px', resize: 'vertical' }} value={form.style} onChange={e => setForm(p => ({ ...p, style: e.target.value }))} placeholder="回复风格..." />
+                <label style={labelStyle}>{t('soulFile.fieldStyle')}</label>
+                <textarea style={{ ...inputStyle, minHeight: '40px', resize: 'vertical' }} value={form.style} onChange={e => setForm(p => ({ ...p, style: e.target.value }))} placeholder={t('soulFile.placeholderStyle')} />
               </div>
               <div style={fieldGroup}>
-                <label style={labelStyle}>价值观</label>
-                <textarea style={{ ...inputStyle, minHeight: '40px', resize: 'vertical' }} value={form.values} onChange={e => setForm(p => ({ ...p, values: e.target.value }))} placeholder="核心价值观..." />
+                <label style={labelStyle}>{t('soulFile.fieldValues')}</label>
+                <textarea style={{ ...inputStyle, minHeight: '40px', resize: 'vertical' }} value={form.values} onChange={e => setForm(p => ({ ...p, values: e.target.value }))} placeholder={t('soulFile.placeholderValues')} />
               </div>
             </>
           )}
@@ -343,10 +345,10 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
 
         {/* USER 区域 */}
         <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>👤 用户</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>{t('soulFile.sectionUser')}</div>
           {form.customUser ? (
             <div>
-              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>自定义格式（在原始模式中编辑结构）</div>
+              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>{t('soulFile.customFormatHint')}</div>
               <textarea
                 style={{ ...inputStyle, minHeight: '80px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px' }}
                 value={form.customUser}
@@ -356,17 +358,17 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
           ) : (
             <>
               <div style={fieldGroup}>
-                <label style={labelStyle}>用户名</label>
-                <input style={inputStyle} value={form.userName} onChange={e => setForm(p => ({ ...p, userName: e.target.value }))} placeholder="你的名字" />
+                <label style={labelStyle}>{t('soulFile.fieldUsername')}</label>
+                <input style={inputStyle} value={form.userName} onChange={e => setForm(p => ({ ...p, userName: e.target.value }))} placeholder={t('soulFile.placeholderUsername')} />
               </div>
               <div style={{ display: 'flex', gap: '8px' }}>
                 <div style={{ ...fieldGroup, flex: 1 }}>
-                  <label style={labelStyle}>时区</label>
-                  <input style={inputStyle} value={form.timezone} onChange={e => setForm(p => ({ ...p, timezone: e.target.value }))} placeholder="Asia/Shanghai" />
+                  <label style={labelStyle}>{t('soulFile.fieldTimezone')}</label>
+                  <input style={inputStyle} value={form.timezone} onChange={e => setForm(p => ({ ...p, timezone: e.target.value }))} placeholder={t('soulFile.placeholderTimezone')} />
                 </div>
                 <div style={{ ...fieldGroup, flex: 1 }}>
-                  <label style={labelStyle}>语言</label>
-                  <input style={inputStyle} value={form.language} onChange={e => setForm(p => ({ ...p, language: e.target.value }))} placeholder="zh-CN" />
+                  <label style={labelStyle}>{t('soulFile.fieldLanguage')}</label>
+                  <input style={inputStyle} value={form.language} onChange={e => setForm(p => ({ ...p, language: e.target.value }))} placeholder={t('soulFile.placeholderLanguage')} />
                 </div>
               </div>
             </>
@@ -383,10 +385,10 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
             opacity: saving ? 0.6 : 1, fontSize: '13px',
           }}
         >
-          {saving ? '保存中...' : '保存灵魂文件'}
+          {saving ? t('common.saving') : t('soulFile.saveSoulFiles')}
         </button>
         {status && (
-          <div style={{ fontSize: '12px', color: status.startsWith('保存失败') ? '#dc3545' : '#28a745', marginTop: '6px', textAlign: 'center' }}>
+          <div style={{ fontSize: '12px', color: status.startsWith(t('soulFile.saveFailed')) ? '#dc3545' : '#28a745', marginTop: '6px', textAlign: 'center' }}>
             {status}
           </div>
         )}
@@ -406,7 +408,7 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
             borderRadius: '3px', background: '#f8f8f8', cursor: 'pointer', color: '#666',
           }}
         >
-          表单模式
+          {t('soulFile.formMode')}
         </button>
       </div>
 
@@ -429,7 +431,7 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
             >
               <span>{f}</span>
               <span style={{ fontSize: '10px', color: '#999' }}>
-                {exists ? `${fileSizes[f] || 0}B` : '未创建'}
+                {exists ? `${fileSizes[f] || 0}B` : t('soulFile.notCreated')}
               </span>
             </div>
           )
@@ -460,10 +462,10 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
               cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.6 : 1,
             }}
           >
-            {saving ? '保存中...' : '保存'}
+            {saving ? t('common.saving') : t('soulFile.saveBtn')}
           </button>
           {status && (
-            <div style={{ fontSize: '12px', color: status.startsWith('保存失败') ? '#dc3545' : '#28a745', marginTop: '6px', textAlign: 'center' }}>
+            <div style={{ fontSize: '12px', color: status.startsWith(t('soulFile.saveFailed')) ? '#dc3545' : '#28a745', marginTop: '6px', textAlign: 'center' }}>
               {status}
             </div>
           )}

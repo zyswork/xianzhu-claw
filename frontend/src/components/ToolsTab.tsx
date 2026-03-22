@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useI18n } from '../i18n'
 
 interface ToolsTabProps {
   agentId: string
@@ -35,21 +36,16 @@ const SAFETY_COLORS: Record<string, { bg: string; color: string }> = {
   approval: { bg: '#f8d7da', color: '#721c24' },
 }
 
-/** 安全等级中文标签 */
-const SAFETY_LABELS: Record<string, string> = {
-  safe: '安全',
-  guarded: '受限',
-  sandboxed: '沙箱',
-  approval: '审批',
-}
-
-const PROFILES = [
-  { id: 'basic', label: '基础' },
-  { id: 'coding', label: '编程' },
-  { id: 'full', label: '完整' },
-]
+const PROFILE_IDS = ['basic', 'coding', 'full'] as const
 
 export default function ToolsTab({ agentId }: ToolsTabProps) {
+  const { t } = useI18n()
+
+  const PROFILES = PROFILE_IDS.map(id => ({
+    id,
+    label: t(`toolsTab.profile${id.charAt(0).toUpperCase() + id.slice(1)}` as 'toolsTab.profileBasic'),
+  }))
+
   const [profile, setProfile] = useState('')
   const [tools, setTools] = useState<ToolInfo[]>([])
   const [loading, setLoading] = useState(true)
@@ -76,11 +72,11 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
   const handleSetProfile = async (newProfile: string) => {
     try {
       await invoke('set_agent_tool_profile', { agentId, profile: newProfile })
-      setStatus('已切换')
+      setStatus(t('toolsTab.switched'))
       setTimeout(() => setStatus(''), 1500)
       await loadTools()
     } catch (e) {
-      setStatus('切换失败: ' + String(e))
+      setStatus(t('toolsTab.switchFailed') + ': ' + String(e))
     }
   }
 
@@ -93,7 +89,7 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
     } catch (e) {
       // 回滚
       setTools(prev => prev.map(t => t.name === toolName ? { ...t, enabled: !enabled } : t))
-      setStatus('操作失败: ' + String(e))
+      setStatus(t('toolsTab.operationFailed') + ': ' + String(e))
     }
   }
 
@@ -102,14 +98,14 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
   const isCustom = !PROFILES.some(p => p.id === profile)
 
   if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>加载中...</div>
+    return <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>{t('common.loading')}</div>
   }
 
   return (
     <div style={{ padding: '8px 0' }}>
       {/* 配置文件选择 */}
       <div style={{ marginBottom: '12px' }}>
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>工具配置</div>
+        <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>{t('toolsTab.toolConfig')}</div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           {PROFILES.map(p => (
             <button
@@ -127,7 +123,7 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
             </button>
           ))}
           {isCustom && (
-            <span style={{ fontSize: '11px', color: '#999', marginLeft: '4px' }}>自定义</span>
+            <span style={{ fontSize: '11px', color: '#999', marginLeft: '4px' }}>{t('toolsTab.custom')}</span>
           )}
         </div>
       </div>
@@ -135,7 +131,7 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
       {status && (
         <div style={{
           fontSize: '12px', marginBottom: '8px', textAlign: 'center',
-          color: status.includes('失败') ? '#dc3545' : '#28a745',
+          color: (status.includes(t('toolsTab.switchFailed')) || status.includes(t('toolsTab.operationFailed'))) ? '#dc3545' : '#28a745',
         }}>
           {status}
         </div>
@@ -145,7 +141,7 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
       {builtinTools.length > 0 && (
         <div style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>
-            内置工具 ({builtinTools.length})
+            {t('toolsTab.builtinTools')} ({builtinTools.length})
           </div>
           {builtinTools.map(tool => (
             <ToolRow key={tool.name} tool={tool} onToggle={handleToggleTool} />
@@ -157,7 +153,7 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
       {mcpTools.length > 0 && (
         <div>
           <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>
-            MCP 工具 ({mcpTools.length})
+            {t('toolsTab.mcpTools')} ({mcpTools.length})
           </div>
           {mcpTools.map(tool => (
             <ToolRow key={tool.name} tool={tool} onToggle={handleToggleTool} />
@@ -167,7 +163,7 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
 
       {tools.length === 0 && (
         <div style={{ textAlign: 'center', color: '#999', fontSize: '13px', padding: '20px 0' }}>
-          暂无可用工具
+          {t('toolsTab.noTools')}
         </div>
       )}
     </div>
@@ -176,9 +172,16 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
 
 /** 单个工具行组件 */
 function ToolRow({ tool, onToggle }: { tool: ToolInfo; onToggle: (name: string, enabled: boolean) => void }) {
+  const { t } = useI18n()
   const safetyKey = tool.safety?.toLowerCase() || 'safe'
   const colors = SAFETY_COLORS[safetyKey] || SAFETY_COLORS.safe
-  const label = SAFETY_LABELS[safetyKey] || tool.safety
+  const safetyLabels: Record<string, string> = {
+    safe: t('toolsTab.safetySafe'),
+    guarded: t('toolsTab.safetyGuarded'),
+    sandboxed: t('toolsTab.safetySandboxed'),
+    approval: t('toolsTab.safetyApproval'),
+  }
+  const label = safetyLabels[safetyKey] || tool.safety
 
   return (
     <div style={{

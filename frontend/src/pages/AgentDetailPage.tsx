@@ -100,10 +100,10 @@ interface CronJob {
   lastRunAt: number | null
 }
 
-function formatSchedule(s: CronJob['schedule']): string {
+function formatSchedule(s: CronJob['schedule'], t: (key: string, params?: Record<string, any>) => string): string {
   if (typeof s === 'string') return s
   if (s.kind === 'cron') return `cron: ${s.expr || ''}`
-  if (s.kind === 'every') return `每 ${(s.secs || 0) / 60} 分钟`
+  if (s.kind === 'every') return t('agentDetailSub.everyNMin', { n: (s.secs || 0) / 60 })
   return JSON.stringify(s)
 }
 
@@ -245,7 +245,7 @@ function SessionItem({ s, activeSession, onSelect, onDelete, renamingSession, re
         style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: '0 4px', flexShrink: 0 }}
         onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#ef4444' }}
         onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#d1d5db' }}
-        title="删除"
+        title={useI18n.getState().t('agentDetailSub.deleteTitle')}
       >×</button>
     </div>
   )
@@ -509,6 +509,8 @@ function ChatTab({ agentId }: { agentId: string }) {
   useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
   const loadSessionsRef = useRef(loadSessions)
   useEffect(() => { loadSessionsRef.current = loadSessions }, [loadSessions])
+  const loadMessagesRef = useRef(loadMessages)
+  useEffect(() => { loadMessagesRef.current = loadMessages }, [loadMessages])
 
   // 统一事件监听（参考 OpenClaw：事件直接携带消息内容，带 sessionId 过滤）
   useEffect(() => {
@@ -596,7 +598,7 @@ function ChatTab({ agentId }: { agentId: string }) {
     try {
       const session = await invoke<Session>('create_session', {
         agentId,
-        title: `对话 ${sessions.length + 1}`,
+        title: t('agentDetailSub.conversationN', { n: sessions.length + 1 }),
       })
       setSessions((prev) => [session, ...prev])
       setActiveSession(session.id)
@@ -683,7 +685,7 @@ function ChatTab({ agentId }: { agentId: string }) {
         return t('agentDetail.errorNoSession')
 
       case 'rename': {
-        if (!args.trim()) return '用法: /rename <新名称>'
+        if (!args.trim()) return t('chatPage.renameUsage')
         if (activeSession) {
           await invoke('rename_session', { sessionId: activeSession, title: args.trim() })
           setSessions((prev) => prev.map((s) => s.id === activeSession ? { ...s, title: args.trim() } : s))
@@ -846,7 +848,7 @@ function ChatTab({ agentId }: { agentId: string }) {
       }
 
       default:
-        return `未知命令: /${cmd}\n输入 /help 查看所有可用命令`
+        return t('chatPage.unknownCommand', { cmd: `/${cmd}` })
     }
   }
 
@@ -880,7 +882,7 @@ function ChatTab({ agentId }: { agentId: string }) {
 
     // 前端显示不含 base64（防止渲染卡死），只显示文字 + 图片标记
     const displayMsg = pendingImages.length > 0
-      ? (userMsg ? `${userMsg}\n[图片 x ${pendingImages.length}]` : `[图片 x ${pendingImages.length}]`)
+      ? (userMsg ? `${userMsg}\n[${t('agentDetailSub.imageCount', { n: pendingImages.length })}]` : `[${t('agentDetailSub.imageCount', { n: pendingImages.length })}]`)
       : userMsg
     setMessages((prev) => [...prev, { role: 'user', content: displayMsg }])
     setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
@@ -946,21 +948,21 @@ function ChatTab({ agentId }: { agentId: string }) {
                 }}
               >
                 <span style={{ fontSize: 10 }}>{showSystemSessions ? '▼' : '▶'}</span>
-                系统会话 ({sessions.filter(s => isSystemSession(s.title)).length})
+                {t('agentDetailSub.systemSessions')} ({sessions.filter(s => isSystemSession(s.title)).length})
                 <span style={{ flex: 1 }} />
                 <button
                   onClick={async (e) => {
                     e.stopPropagation()
-                    if (!confirm('清理 7 天前的系统会话？')) return
+                    if (!confirm(t('agentDetailSub.cleanupConfirm'))) return
                     try {
                       const r = await invoke<any>('cleanup_system_sessions', { agentId, keepDays: 7 })
-                      alert(`已清理 ${r.deletedSessions} 个会话, ${r.deletedMessages} 条消息`)
+                      alert(t('agentDetailSub.cleanupDone', { sessions: r.deletedSessions, messages: r.deletedMessages }))
                       loadSessions()
                     } catch (err) { alert('清理失败: ' + err) }
                   }}
                   style={{ fontSize: 10, padding: '1px 6px', border: '1px solid var(--border-subtle)', borderRadius: 3, background: 'var(--bg-elevated)', cursor: 'pointer', color: 'var(--text-muted)' }}
                 >
-                  清理
+                  {t('agentDetailSub.cleanupBtn')}
                 </button>
               </div>
               {showSystemSessions && sessions.filter(s => isSystemSession(s.title)).map((s) => (
@@ -1011,7 +1013,7 @@ function ChatTab({ agentId }: { agentId: string }) {
                       >
                         <span style={{ flexShrink: 0, fontSize: 11, color: '#bbb' }}>{isExpanded ? '\u25BC' : '\u25B6'}</span>
                         <span style={{ flexShrink: 0 }}>{'\u{1F527}'}</span>
-                        <strong style={{ flexShrink: 0 }}>{msg.toolName || '工具'}</strong>
+                        <strong style={{ flexShrink: 0 }}>{msg.toolName || t('common.tools')}</strong>
                         {!isExpanded && msg.content && (
                           <span style={{ color: 'var(--text-muted)', fontSize: 12, marginLeft: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                             {msg.content.slice(0, 80)}
@@ -1187,7 +1189,7 @@ function ChatTab({ agentId }: { agentId: string }) {
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   disabled={streaming}
-                  title="添加图片"
+                  title={t('agentDetailSub.addImage')}
                   style={{
                     padding: '8px', backgroundColor: 'transparent', border: '1px solid #d1d5db',
                     borderRadius: 6, cursor: 'pointer', fontSize: 16, lineHeight: 1, color: 'var(--text-secondary)', flexShrink: 0,
@@ -1233,6 +1235,7 @@ function ChatTab({ agentId }: { agentId: string }) {
 // ─── Skills Tab ──────────────────────────────────────────────
 
 function SkillsTab({ agentId }: { agentId: string }) {
+  const { t } = useI18n()
   const [skills, setSkills] = useState<Skill[]>([])
   const [installUrl, setInstallUrl] = useState('')
   const [loading, setLoading] = useState(false)
@@ -1275,14 +1278,14 @@ function SkillsTab({ agentId }: { agentId: string }) {
 
   return (
     <div style={{ padding: 20, maxWidth: 600 }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>Skills 管理</h3>
+      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>{t('agentDetailSub.skillsTitle')}</h3>
       {error && <div style={{ padding: 8, backgroundColor: 'var(--error-bg)', color: 'var(--error)', borderRadius: 6, marginBottom: 12, fontSize: 13 }}>{error}</div>}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         <input
           value={installUrl}
           onChange={(e) => setInstallUrl(e.target.value)}
-          placeholder="输入 Skill URL 或路径..."
+          placeholder={t('agentDetailSub.skillsPlaceholder')}
           style={{ flex: 1, padding: '8px 12px', border: '1px solid var(--border-subtle)', borderRadius: 6, fontSize: 13 }}
         />
         <button
@@ -1294,12 +1297,12 @@ function SkillsTab({ agentId }: { agentId: string }) {
             opacity: loading || !installUrl.trim() ? 0.6 : 1,
           }}
         >
-          {loading ? '安装中...' : '安装'}
+          {loading ? t('agentDetailSub.skillsInstalling') : t('agentDetailSub.skillsInstall')}
         </button>
       </div>
 
       {skills.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>暂无已安装的 Skill</div>
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>{t('agentDetailSub.skillsEmpty')}</div>
       ) : (
         skills.map((skill) => (
           <div key={skill.name} style={{
@@ -1319,7 +1322,7 @@ function SkillsTab({ agentId }: { agentId: string }) {
                   color: skill.enabled ? '#16a34a' : '#666',
                 }}
               >
-                {skill.enabled ? '已启用' : '已禁用'}
+                {skill.enabled ? t('agentDetailSub.skillsEnabled') : t('agentDetailSub.skillsDisabled')}
               </button>
               <button
                 onClick={() => handleRemove(skill.name)}
@@ -1328,7 +1331,7 @@ function SkillsTab({ agentId }: { agentId: string }) {
                   border: '1px solid #fecaca', backgroundColor: 'var(--error-bg)', color: 'var(--error)',
                 }}
               >
-                删除
+                {t('common.delete')}
               </button>
             </div>
           </div>
@@ -1341,6 +1344,7 @@ function SkillsTab({ agentId }: { agentId: string }) {
 // ─── Cron Tab ────────────────────────────────────────────────
 
 function CronTab({ agentId }: { agentId: string }) {
+  const { t } = useI18n()
   const [jobs, setJobs] = useState<CronJob[]>([])
   const [error, setError] = useState('')
 
@@ -1382,27 +1386,27 @@ function CronTab({ agentId }: { agentId: string }) {
 
   return (
     <div style={{ padding: 20, maxWidth: 800 }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>定时任务</h3>
+      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>{t('agentDetailSub.cronTitle')}</h3>
       {error && <div style={{ padding: 8, backgroundColor: 'var(--error-bg)', color: 'var(--error)', borderRadius: 6, marginBottom: 12, fontSize: 13 }}>{error}</div>}
 
       {jobs.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>该 Agent 暂无定时任务</div>
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>{t('agentDetailSub.cronEmpty')}</div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-              <th style={{ textAlign: 'left', padding: '8px 12px' }}>名称</th>
-              <th style={{ textAlign: 'left', padding: '8px 12px' }}>计划</th>
-              <th style={{ textAlign: 'left', padding: '8px 12px' }}>下次执行</th>
-              <th style={{ textAlign: 'left', padding: '8px 12px' }}>状态</th>
-              <th style={{ textAlign: 'right', padding: '8px 12px' }}>操作</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.cronName')}</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.cronPlan')}</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.cronNextRun')}</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.cronStatus')}</th>
+              <th style={{ textAlign: 'right', padding: '8px 12px' }}>{t('agentDetailSub.cronActions')}</th>
             </tr>
           </thead>
           <tbody>
             {jobs.map((job) => (
               <tr key={job.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={{ padding: '10px 12px' }}>{job.name}</td>
-                <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: 12 }}>{formatSchedule(job.schedule)}</td>
+                <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: 12 }}>{formatSchedule(job.schedule, t)}</td>
                 <td style={{ padding: '10px 12px', fontSize: 12 }}>{formatTime(job.nextRunAt ?? (job as any).next_run_at)}</td>
                 <td style={{ padding: '10px 12px' }}>
                   <span style={{
@@ -1410,14 +1414,14 @@ function CronTab({ agentId }: { agentId: string }) {
                     backgroundColor: job.enabled ? '#dcfce7' : '#f3f4f6',
                     color: job.enabled ? '#16a34a' : '#666',
                   }}>
-                    {job.enabled ? '运行中' : '已暂停'}
+                    {job.enabled ? t('agentDetailSub.cronRunning') : t('agentDetailSub.cronPaused')}
                   </span>
                 </td>
                 <td style={{ padding: '10px 12px', textAlign: 'right' }}>
                   <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                    <button onClick={() => handleTrigger(job.id)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border-subtle)', borderRadius: 4, cursor: 'pointer', backgroundColor: 'white' }}>触发</button>
-                    <button onClick={() => handleToggle(job.id, job.enabled)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border-subtle)', borderRadius: 4, cursor: 'pointer', backgroundColor: 'white' }}>{job.enabled ? '暂停' : '恢复'}</button>
-                    <button onClick={() => handleDelete(job.id)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid #fecaca', borderRadius: 4, cursor: 'pointer', backgroundColor: 'var(--error-bg)', color: 'var(--error)' }}>删除</button>
+                    <button onClick={() => handleTrigger(job.id)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border-subtle)', borderRadius: 4, cursor: 'pointer', backgroundColor: 'white' }}>{t('agentDetailSub.cronTrigger')}</button>
+                    <button onClick={() => handleToggle(job.id, job.enabled)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border-subtle)', borderRadius: 4, cursor: 'pointer', backgroundColor: 'white' }}>{job.enabled ? t('agentDetailSub.cronPause') : t('agentDetailSub.cronResume')}</button>
+                    <button onClick={() => handleDelete(job.id)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid #fecaca', borderRadius: 4, cursor: 'pointer', backgroundColor: 'var(--error-bg)', color: 'var(--error)' }}>{t('common.delete')}</button>
                   </div>
                 </td>
               </tr>
@@ -1489,19 +1493,19 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
 
   return (
     <div style={{ padding: 20, maxWidth: 500 }}>
-      <h3 style={{ margin: '0 0 20px', fontSize: 16 }}>Agent 设置</h3>
+      <h3 style={{ margin: '0 0 20px', fontSize: 16 }}>{t('agentDetailSub.settingsTitle')}</h3>
 
       {msg && <div style={{ padding: 8, backgroundColor: msg === t('settings.successSaved') ? '#dcfce7' : '#fef2f2', color: msg === t('settings.successSaved') ? '#16a34a' : '#dc2626', borderRadius: 6, marginBottom: 16, fontSize: 13 }}>{msg}</div>}
 
       {/* 名称 */}
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>名称</label>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>{t('common.name')}</label>
         <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-subtle)', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }} />
       </div>
 
       {/* 模型 */}
       <div style={{ marginBottom: 16 }}>
-        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>模型</label>
+        <label style={{ display: 'block', fontSize: 13, fontWeight: 500, marginBottom: 4 }}>{t('common.model')}</label>
         <select value={model} onChange={(e) => setModel(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border-subtle)', borderRadius: 6, fontSize: 14, boxSizing: 'border-box' }}>
           {models.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
           {!models.find((m) => m.id === model) && <option value={model}>{model}</option>}
@@ -1534,14 +1538,14 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
 
       {/* 危险区域 */}
       <div style={{ borderTop: '1px solid #fecaca', paddingTop: 20 }}>
-        <h4 style={{ margin: '0 0 8px', fontSize: 14, color: 'var(--error)' }}>危险操作</h4>
-        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>删除 Agent 将同时删除所有对话记录、记忆和工作区文件。</p>
+        <h4 style={{ margin: '0 0 8px', fontSize: 14, color: 'var(--error)' }}>{t('agentDetailSub.dangerZone')}</h4>
+        <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>{t('agentDetailSub.dangerDesc')}</p>
         {!deleteConfirm ? (
           <button onClick={() => setDeleteConfirm(true)} style={{
             padding: '8px 16px', backgroundColor: 'white', color: 'var(--error)',
             border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 13,
           }}>
-            删除此 Agent
+            {t('agentDetailSub.deleteAgent')}
           </button>
         ) : (
           <div style={{ display: 'flex', gap: 8 }}>
@@ -1579,6 +1583,7 @@ interface AuditEntry {
 }
 
 function AuditTab({ agentId }: { agentId: string }) {
+  const { t } = useI18n()
   const [entries, setEntries] = useState<AuditEntry[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -1592,22 +1597,22 @@ function AuditTab({ agentId }: { agentId: string }) {
     })()
   }, [agentId])
 
-  if (loading) return <div style={{ padding: 20, color: 'var(--text-muted)' }}>加载中...</div>
+  if (loading) return <div style={{ padding: 20, color: 'var(--text-muted)' }}>{t('common.loading')}</div>
 
   return (
     <div style={{ padding: 20, maxWidth: 900 }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>工具调用审计日志</h3>
+      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>{t('agentDetailSub.auditTitle')}</h3>
       {entries.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>暂无审计记录</div>
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>{t('agentDetailSub.auditEmpty')}</div>
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-              <th style={{ textAlign: 'left', padding: '8px 12px' }}>时间</th>
-              <th style={{ textAlign: 'left', padding: '8px 12px' }}>工具</th>
-              <th style={{ textAlign: 'left', padding: '8px 12px' }}>策略</th>
-              <th style={{ textAlign: 'left', padding: '8px 12px' }}>结果</th>
-              <th style={{ textAlign: 'right', padding: '8px 12px' }}>耗时</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.auditTime')}</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.auditTool')}</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.auditPolicy')}</th>
+              <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.auditResult')}</th>
+              <th style={{ textAlign: 'right', padding: '8px 12px' }}>{t('agentDetailSub.auditDuration')}</th>
             </tr>
           </thead>
           <tbody>
@@ -1633,7 +1638,7 @@ function AuditTab({ agentId }: { agentId: string }) {
                     backgroundColor: entry.success ? '#dcfce7' : '#fef2f2',
                     color: entry.success ? '#16a34a' : '#dc2626',
                   }}>
-                    {entry.success ? '成功' : '失败'}
+                    {entry.success ? t('agentDetailSub.auditSuccess') : t('agentDetailSub.auditFailed')}
                   </span>
                 </td>
                 <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'monospace' }}>
@@ -1663,6 +1668,7 @@ interface SubagentRecord {
 }
 
 function SubagentsTab({ agentId }: { agentId: string }) {
+  const { t } = useI18n()
   const [subagents, setSubagents] = useState<SubagentRecord[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -1692,17 +1698,17 @@ function SubagentsTab({ agentId }: { agentId: string }) {
     return { bg: '#f3f4f6', color: 'var(--text-secondary)' }
   }
 
-  if (loading) return <div style={{ padding: 20, color: 'var(--text-muted)' }}>加载中...</div>
+  if (loading) return <div style={{ padding: 20, color: 'var(--text-muted)' }}>{t('common.loading')}</div>
 
   return (
     <div style={{ padding: 20, maxWidth: 800 }}>
-      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>子 Agent 管理</h3>
+      <h3 style={{ margin: '0 0 16px', fontSize: 16 }}>{t('agentDetailSub.subagentsTitle')}</h3>
       <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16 }}>
-        主 Agent 在对话中可通过 agent_spawn 工具创建子 Agent 执行子任务
+        {t('agentDetailSub.subagentsDesc')}
       </p>
 
       {subagents.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>暂无子 Agent</div>
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>{t('agentDetailSub.subagentsEmpty')}</div>
       ) : (
         subagents.map((sa) => {
           const sc = statusColor(sa.status)
@@ -1727,7 +1733,7 @@ function SubagentsTab({ agentId }: { agentId: string }) {
                         border: '1px solid #fecaca', backgroundColor: 'var(--error-bg)', color: 'var(--error)',
                       }}
                     >
-                      取消
+                      {t('agentDetailSub.subagentsCancel')}
                     </button>
                   )}
                 </div>
@@ -1742,8 +1748,8 @@ function SubagentsTab({ agentId }: { agentId: string }) {
                 </div>
               )}
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 8 }}>
-                创建: {new Date(sa.createdAt).toLocaleString('zh-CN')}
-                {sa.finishedAt && ` · 完成: ${new Date(sa.finishedAt).toLocaleString('zh-CN')}`}
+                {t('agentDetailSub.subagentsCreated')}: {new Date(sa.createdAt).toLocaleString('zh-CN')}
+                {sa.finishedAt && ` · ${t('agentDetailSub.subagentsFinished')}: ${new Date(sa.finishedAt).toLocaleString('zh-CN')}`}
               </div>
             </div>
           )
@@ -1775,7 +1781,7 @@ function PluginsTab() {
     })()
   }, [])
 
-  if (loading) return <div style={{ padding: 20, color: 'var(--text-muted)' }}>加载中...</div>
+  if (loading) return <div style={{ padding: 20, color: 'var(--text-muted)' }}>{t('common.loading')}</div>
 
   // 按类型分组
   const grouped: Record<string, SystemPlugin[]> = {}
@@ -1802,7 +1808,7 @@ function PluginsTab() {
               <span style={{ fontSize: 18 }}>{p.icon || '\u{1F9E9}'}</span>
               <div style={{ flex: 1 }}>
                 <span style={{ fontSize: 13, fontWeight: 500 }}>{p.name}</span>
-                {p.builtin && <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, backgroundColor: '#6366F1', color: '#fff' }}>内置</span>}
+                {p.builtin && <span style={{ fontSize: 10, marginLeft: 6, padding: '1px 5px', borderRadius: 3, backgroundColor: '#6366F1', color: '#fff' }}>{t('agentDetailSub.builtinLabel')}</span>}
               </div>
               <div style={{
                 width: 8, height: 8, borderRadius: '50%',
@@ -1823,20 +1829,27 @@ interface AutonomyConfigData {
   overrides: Record<string, string>
 }
 
-const LEVEL_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  L1Confirm: { label: 'L1 需确认', color: 'var(--error)', bg: '#fef2f2' },
-  L2Notify: { label: 'L2 自主+通知', color: '#d97706', bg: '#fef3c7' },
-  L3Autonomous: { label: 'L3 完全自主', color: 'var(--success)', bg: '#dcfce7' },
+const LEVEL_COLORS: Record<string, { color: string; bg: string }> = {
+  L1Confirm: { color: 'var(--error)', bg: '#fef2f2' },
+  L2Notify: { color: '#d97706', bg: '#fef3c7' },
+  L3Autonomous: { color: 'var(--success)', bg: '#dcfce7' },
 }
 
-const TOOL_GROUPS = [
-  { label: '安全操作', tools: ['calculator', 'datetime', 'memory_read'] },
-  { label: '读取操作', tools: ['file_read', 'file_list', 'code_search', 'web_search', 'web_fetch'] },
-  { label: '写入操作', tools: ['file_write', 'file_edit', 'diff_edit', 'memory_write'] },
-  { label: '执行操作', tools: ['bash_exec'] },
+const TOOL_GROUP_TOOLS = [
+  { key: 'groupSafe', tools: ['calculator', 'datetime', 'memory_read'] },
+  { key: 'groupRead', tools: ['file_read', 'file_list', 'code_search', 'web_search', 'web_fetch'] },
+  { key: 'groupWrite', tools: ['file_write', 'file_edit', 'diff_edit', 'memory_write'] },
+  { key: 'groupExec', tools: ['bash_exec'] },
 ]
 
+const LEVEL_KEYS: Record<string, string> = {
+  L1Confirm: 'agentDetailSub.levelL1',
+  L2Notify: 'agentDetailSub.levelL2',
+  L3Autonomous: 'agentDetailSub.levelL3',
+}
+
 function AutonomyTab({ agentId }: { agentId: string }) {
+  const { t } = useI18n()
   const [config, setConfig] = useState<AutonomyConfigData | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -1860,21 +1873,21 @@ function AutonomyTab({ agentId }: { agentId: string }) {
     finally { setSaving(false) }
   }
 
-  if (!config) return <div style={{ padding: 20, color: 'var(--text-muted)' }}>加载中...</div>
+  if (!config) return <div style={{ padding: 20, color: 'var(--text-muted)' }}>{t('common.loading')}</div>
 
   return (
     <div style={{ padding: 20, maxWidth: 700 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <h3 style={{ margin: 0, fontSize: 16 }}>自治等级配置</h3>
-        {saving && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>保存中...</span>}
+        <h3 style={{ margin: 0, fontSize: 16 }}>{t('agentDetailSub.autonomyTitle')}</h3>
+        {saving && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('common.saving')}</span>}
       </div>
       <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 20 }}>
-        控制 Agent 执行各类操作时���自主程度
+        {t('agentDetailSub.autonomyDesc')}
       </p>
 
-      {TOOL_GROUPS.map((group) => (
-        <div key={group.label} style={{ marginBottom: 20 }}>
-          <h4 style={{ margin: '0 0 8px', fontSize: 14, color: '#374151' }}>{group.label}</h4>
+      {TOOL_GROUP_TOOLS.map((group) => (
+        <div key={group.key} style={{ marginBottom: 20 }}>
+          <h4 style={{ margin: '0 0 8px', fontSize: 14, color: '#374151' }}>{t(`agentDetailSub.${group.key}`)}</h4>
           {group.tools.map((tool) => {
             const current = config.overrides[tool] || config.default_level || 'L1Confirm'
             return (
@@ -1884,7 +1897,7 @@ function AutonomyTab({ agentId }: { agentId: string }) {
               }}>
                 <span style={{ fontSize: 13, fontFamily: 'monospace' }}>{tool}</span>
                 <div style={{ display: 'flex', gap: 4 }}>
-                  {Object.entries(LEVEL_LABELS).map(([key, val]) => (
+                  {Object.entries(LEVEL_COLORS).map(([key, val]) => (
                     <button
                       key={key}
                       onClick={() => handleLevelChange(tool, key)}
@@ -1896,7 +1909,7 @@ function AutonomyTab({ agentId }: { agentId: string }) {
                         fontWeight: current === key ? 600 : 400,
                       }}
                     >
-                      {val.label}
+                      {t(LEVEL_KEYS[key])}
                     </button>
                   ))}
                 </div>
