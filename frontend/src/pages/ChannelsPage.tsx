@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/tauri'
 import { QRCodeSVG } from 'qrcode.react'
 import { useI18n } from '../i18n'
 import { toast } from '../hooks/useToast'
+import { useConfirm } from '../hooks/useConfirm'
 
 async function cloudApi(method: string, path: string, body?: any): Promise<any> {
   return invoke('cloud_api_proxy', { method, path, body: body || null })
@@ -37,6 +38,7 @@ const DESC_KEYS: Record<string, string> = {
 
 export default function ChannelsPage() {
   const { t } = useI18n()
+  const confirm = useConfirm()
   const buildChannels = (): ChannelInfo[] => CHANNEL_DEFS.map(ch => ({ ...ch, desc: t(DESC_KEYS[ch.id] || '') }))
   const [channels, setChannels] = useState<ChannelInfo[]>(() => buildChannels())
   const [configuring, setConfiguring] = useState<string | null>(null)
@@ -182,7 +184,7 @@ export default function ChannelsPage() {
   }
 
   const handleDisconnect = async (channelId: string) => {
-    if (!confirm(t('channels.confirmDisconnect'))) return
+    if (!await confirm(t('channels.confirmDisconnect'))) return
     try { await cloudApi('POST', `/api/v1/channels/${channelId}/disconnect`); checkStatuses() } catch {}
   }
 

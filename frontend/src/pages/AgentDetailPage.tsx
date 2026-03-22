@@ -13,6 +13,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { useI18n } from '../i18n'
 import { toast } from '../hooks/useToast'
+import { useConfirm, showConfirm } from '../hooks/useConfirm'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -370,6 +371,7 @@ const isSystemSession = (title: string) =>
 
 function ChatTab({ agentId }: { agentId: string }) {
   const { t } = useI18n()
+  const confirm = useConfirm()
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSession, setActiveSession] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
@@ -454,22 +456,33 @@ function ChatTab({ agentId }: { agentId: string }) {
   }
   const streamBuf = useRef('')
 
+  // 序列计数器：防止快速切换会话/session 时旧请求覆盖新数据
+  const sessionLoadSeqRef = useRef(0)
+  const messageLoadSeqRef = useRef(0)
+
   const loadSessions = useCallback(async () => {
+    const seq = ++sessionLoadSeqRef.current
     try {
       const result = await invoke<Session[]>('list_sessions', { agentId })
+      if (sessionLoadSeqRef.current !== seq) return // 过期响应，丢弃
       setSessions(result)
       if (result.length > 0 && !activeSession) {
         setActiveSession(result[0].id)
       }
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      if (sessionLoadSeqRef.current !== seq) return
+      console.error(e)
+    }
   }, [agentId, activeSession])
 
   useEffect(() => { loadSessions() }, [loadSessions])
 
   const loadMessages = useCallback(async () => {
     if (!activeSession) return
+    const seq = ++messageLoadSeqRef.current
     try {
       const structured = await invoke<any[]>('load_structured_messages', { sessionId: activeSession, limit: 50 })
+      if (messageLoadSeqRef.current !== seq) return // 过期响应，丢弃
       if (structured && structured.length > 0) {
         const parsed: Message[] = []
         for (const m of structured) {
@@ -488,9 +501,13 @@ function ChatTab({ agentId }: { agentId: string }) {
         setMessages(parsed)
       } else {
         const msgs = await invoke<Message[]>('get_session_messages', { agentId, sessionId: activeSession })
+        if (messageLoadSeqRef.current !== seq) return // 二次检查（fallback 路径）
         setMessages(msgs)
       }
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      if (messageLoadSeqRef.current !== seq) return
+      console.error(e)
+    }
   }, [agentId, activeSession])
 
   useEffect(() => { loadMessages() }, [loadMessages])
@@ -628,7 +645,7 @@ function ChatTab({ agentId }: { agentId: string }) {
   }
 
   const deleteSession = async (sessionId: string) => {
-    if (!confirm(t('agentDetail.confirmDeleteSession'))) return
+    if (!await confirm(t('agentDetail.confirmDeleteSession'))) return
     try {
       await invoke('delete_session', { sessionId })
       setSessions((prev) => prev.filter((s) => s.id !== sessionId))
@@ -935,7 +952,7 @@ function ChatTab({ agentId }: { agentId: string }) {
                 <button
                   onClick={async (e) => {
                     e.stopPropagation()
-                    if (!confirm(t('agentDetailSub.cleanupConfirm'))) return
+                    if (!await showConfirm(t('agentDetailSub.cleanupConfirm'))) return
                     try {
                       const r = await invoke<any>('cleanup_system_sessions', { agentId, keepDays: 7 })
                       toast.success(t('agentDetailSub.cleanupDone', { sessions: r.deletedSessions, messages: r.deletedMessages }))

@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useI18n } from '../i18n'
 import { toast } from '../hooks/useToast'
+import { useConfirm } from '../hooks/useConfirm'
 
 interface MarketplaceSkill {
   name: string
@@ -89,6 +90,7 @@ const CATEGORY_I18N: Record<string, string> = {
 
 export default function SkillsPage() {
   const { t } = useI18n()
+  const confirm = useConfirm()
   const [marketplace, setMarketplace] = useState<MarketplaceSkill[]>([])
   const [installed, setInstalled] = useState<InstalledSkill[]>([])
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
@@ -184,7 +186,7 @@ export default function SkillsPage() {
   }
 
   const handleUninstall = async (skillName: string) => {
-    if (!confirm(`${t('skills.btnUninstall')} ${skillName}?`)) return
+    if (!await confirm(`${t('skills.btnUninstall')} ${skillName}?`)) return
     setOperating(skillName)
     try {
       await invoke('uninstall_skill_from_agent', { agentId: selectedAgent, skillName })

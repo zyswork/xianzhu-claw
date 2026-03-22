@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useI18n } from '../i18n'
 import { toast } from '../hooks/useToast'
+import { useConfirm } from '../hooks/useConfirm'
 
 // Tauri invoke
 const invoke = (window as any).__TAURI__?.invoke || (async () => {})
@@ -95,6 +96,7 @@ function scheduleDesc(s: CronJob['schedule'], t: (key: string) => string): strin
 
 export default function CronPage() {
   const { t } = useI18n()
+  const confirm = useConfirm()
   const [jobs, setJobs] = useState<CronJob[]>([])
   const [selectedJob, setSelectedJob] = useState<string | null>(null)
   const [runs, setRuns] = useState<CronRun[]>([])
@@ -164,7 +166,7 @@ export default function CronPage() {
   }
 
   const handleDelete = async (jobId: string) => {
-    if (!confirm(t('cron.confirmDelete'))) return
+    if (!await confirm(t('cron.confirmDelete'))) return
     try {
       await invoke('delete_cron_job', { jobId })
       if (selectedJob === jobId) setSelectedJob(null)

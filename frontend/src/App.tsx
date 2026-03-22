@@ -5,6 +5,7 @@ import { useBackendConnection } from './hooks/useBackendConnection'
 import { useI18n } from './i18n'
 import SplashScreen from './components/SplashScreen'
 import { ToastContainer } from './hooks/useToast'
+import { ConfirmDialog } from './hooks/useConfirm'
 import SetupPage from './pages/SetupPage'
 import Layout from './components/Layout'
 
@@ -86,6 +87,7 @@ export default function App() {
   return (
     <HashRouter>
       <ToastContainer />
+      <ConfirmDialog />
       <Routes>
         <Route path="/" element={<Navigate to="/agents" replace />} />
         <Route path="/agents" element={<ProtectedPage><AgentListPage /></ProtectedPage>} />

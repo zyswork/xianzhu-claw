@@ -7,6 +7,7 @@
 
 import React from 'react'
 import { useI18n } from './store'
+import { showConfirm } from '../hooks/useConfirm'
 
 // ─── 核心：通用翻译组件 ───
 
@@ -206,9 +207,9 @@ export function TabBar({ tabs, active, onChange }: TabBarProps) {
 // ─── 确认对话框 ───
 
 /** i18n 确认对话框 */
-export function confirmI18n(key: string, params?: Record<string, string | number>): boolean {
+export async function confirmI18n(key: string, params?: Record<string, string | number>): Promise<boolean> {
   const { t } = useI18n.getState()
-  return confirm(t(key, params))
+  return showConfirm(t(key, params))
 }
 
 /** i18n 提示框 */

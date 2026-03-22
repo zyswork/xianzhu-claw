@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useI18n } from '../i18n'
+import { useConfirm } from '../hooks/useConfirm'
 
 interface Memory {
   id: string
@@ -28,6 +29,7 @@ interface AgentStats {
 
 export default function MemoryPage() {
   const { t } = useI18n()
+  const confirm = useConfirm()
   const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
   const [selectedAgent, setSelectedAgent] = useState('')
   const [memories, setMemories] = useState<Memory[]>([])
@@ -69,7 +71,7 @@ export default function MemoryPage() {
   }
 
   const handleExtract = async () => {
-    if (!confirm(t('memory.confirmExtract'))) return
+    if (!await confirm(t('memory.confirmExtract'))) return
     setActionLoading(true)
     try {
       const result = (await invoke('extract_memories_from_history', { agentId: selectedAgent })) as any
@@ -93,7 +95,7 @@ export default function MemoryPage() {
   }
 
   const handleHygiene = async () => {
-    if (!confirm(t('memory.confirmHygiene'))) return
+    if (!await confirm(t('memory.confirmHygiene'))) return
     setActionLoading(true)
     try {
       const result = (await invoke('run_memory_hygiene', { agentId: selectedAgent })) as string
