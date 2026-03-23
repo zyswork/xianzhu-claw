@@ -61,7 +61,9 @@ impl Tool for DelegateTaskTool {
                             },
                             "required": ["goal"]
                         }
-                    }
+                    },
+                    "model": { "type": "string", "description": "指定子代理使用的模型（可选，如 gpt-4o-mini），不填则用默认" },
+                    "thinking": { "type": "string", "description": "推理级别（可选）：off/minimal/low/medium/high" }
                 },
                 "required": ["tasks"]
             }),
@@ -86,30 +88,15 @@ impl Tool for DelegateTaskTool {
         }
 
         // 获取 LLM 配置
-        let providers_json: Option<String> = sqlx::query_scalar(
-            "SELECT value FROM settings WHERE key = 'providers'"
-        ).fetch_optional(&self.pool).await.ok().flatten();
-
-        let (api_type, api_key, base_url, model) = match providers_json.and_then(|pj| {
-            let providers: Vec<serde_json::Value> = serde_json::from_str(&pj).ok()?;
-            for p in &providers {
-                if p["enabled"].as_bool() != Some(true) { continue; }
-                let key = p["apiKey"].as_str().unwrap_or("").to_string();
-                if key.is_empty() { continue; }
-                let api_type = p["apiType"].as_str().unwrap_or("openai").to_string();
-                let base_url = p["baseUrl"].as_str().unwrap_or("").to_string();
-                let model = p["models"].as_array()
-                    .and_then(|models| models.first())
-                    .and_then(|m| m["id"].as_str())
-                    .unwrap_or("gpt-4o-mini")
-                    .to_string();
-                return Some((api_type, key, base_url, model));
-            }
-            None
-        }) {
-            Some(info) => info,
-            None => return Err("未配置 LLM Provider，无法创建子代理".to_string()),
-        };
+        let model_str = arguments["model"].as_str().unwrap_or("gpt-4o-mini").to_string();
+        let thinking_override = arguments["thinking"].as_str().map(|s| s.to_string());
+        let (api_type, api_key, base_url) = crate::channels::find_provider(&self.pool, &model_str)
+            .await
+            .ok_or("未配置 LLM Provider，无法创建子代理")?;
+        let model = model_str;
+        if model != "gpt-4o-mini" {
+            log::info!("delegate_task: 子代理使用模型 {}", model);
+        }
 
         log::info!("delegate_task: 收到 {} 个子任务，开始并行执行", tasks.len());
 
@@ -128,6 +115,7 @@ impl Tool for DelegateTaskTool {
             let api_key = api_key.clone();
             let base_url = base_url.clone();
             let model = model.clone();
+            let thinking_ref = thinking_override.clone();
 
             let handle = tokio::spawn(async move {
                 let _permit = sem.acquire().await.unwrap();
@@ -140,6 +128,8 @@ impl Tool for DelegateTaskTool {
                     if context.is_empty() { String::new() } else { format!("\n背景：{}", context) }
                 );
 
+                let thinking_level = thinking_ref.as_ref()
+                    .map(|t| super::llm::ThinkingLevel::from_str(t));
                 let config = LlmConfig {
                     provider: api_type,
                     model,
@@ -147,7 +137,7 @@ impl Tool for DelegateTaskTool {
                     base_url: if base_url.is_empty() { None } else { Some(base_url) },
                     temperature: Some(0.3),
                     max_tokens: Some(2000),
-                    thinking_level: None,
+                    thinking_level,
                 };
 
                 let (tx, mut rx) = mpsc::unbounded_channel::<String>();
