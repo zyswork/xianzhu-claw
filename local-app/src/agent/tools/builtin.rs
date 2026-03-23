@@ -2116,3 +2116,129 @@ impl ImageGenerateTool {
         Err("未找到支持图片生成的 Provider（需要 OpenAI 或兼容 API）".to_string())
     }
 }
+
+/// TTS 语音合成工具 — 通过 OpenAI TTS API 生成语音
+pub struct TtsTool {
+    pool: sqlx::SqlitePool,
+}
+
+impl TtsTool {
+    pub fn new(pool: sqlx::SqlitePool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait]
+impl Tool for TtsTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "tts".to_string(),
+            description: "文字转语音。将文本转换为语音文件，返回音频文件路径。支持多种声音。".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "text": {
+                        "type": "string",
+                        "description": "要转换为语音的文本"
+                    },
+                    "voice": {
+                        "type": "string",
+                        "description": "声音（可选）：alloy/echo/fable/onyx/nova/shimmer",
+                        "default": "alloy"
+                    },
+                    "speed": {
+                        "type": "number",
+                        "description": "语速（可选，0.25-4.0，默认1.0）",
+                        "default": 1.0
+                    }
+                },
+                "required": ["text"]
+            }),
+        }
+    }
+
+    fn safety_level(&self) -> ToolSafetyLevel {
+        ToolSafetyLevel::Guarded
+    }
+
+    async fn execute(&self, arguments: serde_json::Value) -> Result<String, String> {
+        let text = arguments.get("text")
+            .and_then(|t| t.as_str())
+            .ok_or("缺少 text 参数")?;
+        let voice = arguments.get("voice").and_then(|v| v.as_str()).unwrap_or("alloy");
+        let speed = arguments.get("speed").and_then(|s| s.as_f64()).unwrap_or(1.0);
+
+        if text.len() > 4096 {
+            return Err("文本过长（最多 4096 字符）".to_string());
+        }
+
+        log::info!("TTS: {} 字符, voice={}, speed={}", text.len(), voice, speed);
+
+        // 查找 OpenAI provider
+        let (api_key, base_url) = self.find_tts_provider().await?;
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| format!("创建客户端失败: {}", e))?;
+
+        let url = format!("{}/audio/speech", base_url.trim_end_matches('/'));
+        let body = serde_json::json!({
+            "model": "tts-1",
+            "input": text,
+            "voice": voice,
+            "speed": speed,
+        });
+
+        let resp = client.post(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .header("Content-Type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("TTS 请求失败: {}", e))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("TTS 失败 (HTTP {}): {}", status, &text[..text.len().min(200)]));
+        }
+
+        // 保存音频文件到临时目录
+        let bytes = resp.bytes().await.map_err(|e| format!("读取音频失败: {}", e))?;
+        let filename = format!("tts_{}.mp3", chrono::Utc::now().timestamp_millis());
+        let output_dir = dirs::home_dir()
+            .ok_or("无法获取 home 目录")?
+            .join(".yonclaw/tts");
+        let _ = std::fs::create_dir_all(&output_dir);
+        let output_path = output_dir.join(&filename);
+        std::fs::write(&output_path, &bytes)
+            .map_err(|e| format!("保存音频失败: {}", e))?;
+
+        Ok(format!("语音已生成: {} ({} 字节)\n文件: {}", filename, bytes.len(), output_path.display()))
+    }
+}
+
+impl TtsTool {
+    async fn find_tts_provider(&self) -> Result<(String, String), String> {
+        let json_str: Option<String> = sqlx::query_scalar(
+            "SELECT value FROM settings WHERE key = 'providers'"
+        ).fetch_optional(&self.pool).await.ok().flatten();
+
+        let providers: Vec<serde_json::Value> = json_str
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
+
+        for p in &providers {
+            if p["enabled"].as_bool() != Some(true) { continue; }
+            let key = p["apiKey"].as_str().unwrap_or("");
+            if key.is_empty() { continue; }
+            if p["apiType"].as_str() == Some("openai") {
+                let base_url = p["baseUrl"].as_str().unwrap_or("https://api.openai.com/v1");
+                return Ok((key.to_string(), base_url.to_string()));
+            }
+        }
+
+        Err("未找到支持 TTS 的 Provider（需要 OpenAI 兼容 API）".to_string())
+    }
+}

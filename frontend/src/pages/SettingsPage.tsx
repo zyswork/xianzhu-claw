@@ -635,6 +635,9 @@ export DEEPSEEK_API_KEY="sk-..."`}
       {/* 心跳自治 */}
       <HeartbeatSettings />
 
+      {/* 搜索引擎 */}
+      <SearchSettings />
+
       {/* 高级设置 */}
       <AdvancedSettings />
     </div>
@@ -725,6 +728,62 @@ function HeartbeatSettings() {
             {t('settings.heartbeatSuppressOk')}
           </label>
         </>)}
+      </div>
+    </div>
+  )
+}
+
+/** 搜索引擎设置 */
+function SearchSettings() {
+  const { t } = useI18n()
+  const [provider, setProvider] = useState('auto')
+  const [loaded, setLoaded] = useState(false)
+
+  useEffect(() => {
+    invoke<string>('get_setting', { key: 'web_search_provider' }).then(v => {
+      if (v) setProvider(v)
+      setLoaded(true)
+    }).catch(() => setLoaded(true))
+  }, [])
+
+  const save = async (v: string) => {
+    setProvider(v)
+    try {
+      await invoke('set_setting', { key: 'web_search_provider', value: v })
+      toast.success(t('common.saved'))
+    } catch (e) { toast.error(String(e)) }
+  }
+
+  if (!loaded) return null
+
+  const options = [
+    { value: 'auto', label: t('settings.searchAuto'), desc: 'Serper → Tavily → DuckDuckGo' },
+    { value: 'serper', label: 'Serper (Google)', desc: t('settings.searchNeedsKey') + ': SERPER_API_KEY' },
+    { value: 'tavily', label: 'Tavily AI', desc: t('settings.searchNeedsKey') + ': TAVILY_API_KEY' },
+    { value: 'duckduckgo', label: 'DuckDuckGo', desc: t('settings.searchFree') },
+  ]
+
+  return (
+    <div style={{ marginTop: 24, padding: '16px 20px', borderRadius: 12, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-elevated)' }}>
+      <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 600 }}>
+        {'\u{1F50D}'} {t('settings.sectionSearch')}
+      </h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {options.map(opt => (
+          <label key={opt.value} style={{
+            display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px',
+            borderRadius: 8, cursor: 'pointer',
+            border: provider === opt.value ? '2px solid var(--accent)' : '1px solid var(--border-subtle)',
+            backgroundColor: provider === opt.value ? 'var(--accent-bg)' : 'transparent',
+          }}>
+            <input type="radio" name="search" checked={provider === opt.value}
+              onChange={() => save(opt.value)} style={{ margin: 0 }} />
+            <div>
+              <div style={{ fontSize: 13, fontWeight: provider === opt.value ? 600 : 400 }}>{opt.label}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{opt.desc}</div>
+            </div>
+          </label>
+        ))}
       </div>
     </div>
   )

@@ -108,6 +108,13 @@ pub async fn run_agent_loop(
         // 每轮执行 ContextGuard（防止工具调用累积导致上下文爆炸）
         if round > 0 {
             let guard_config = super::context_guard::ContextGuardConfig::for_model(&config.model);
+            // Hook: BeforeCompaction
+            deps.lifecycle.notify(super::lifecycle::HookPoint::BeforeCompaction, &super::lifecycle::HookEvent {
+                point: "before_compaction".to_string(),
+                agent_id: agent_id.to_string(), session_id: session_id.to_string(),
+                payload: serde_json::json!({ "message_count": messages.len(), "round": round }),
+            }).await;
+
             // 先尝试智能摘要压缩（用 LLM 生成中间对话摘要）
             let guard_config_clone = guard_config.clone();
             if let Some(summary) = super::context_guard::compress_with_summary(
@@ -115,6 +122,8 @@ pub async fn run_agent_loop(
             ).await {
                 log::info!("智能压缩(round {}): 已生成摘要（{}字符），消息数={}",
                     round + 1, summary.len(), messages.len());
+                // 通知前端压缩正在进行
+                let _ = tx.send("\n[上下文已压缩，对话继续...]\n".to_string());
             }
             // 摘要后仍超预算则用传统方式截断
             let guard_result = super::context_guard::enforce(&guard_config, &mut messages);
@@ -122,6 +131,21 @@ pub async fn run_agent_loop(
                 log::info!("ContextGuard(round {}): {}→{} tokens, removed={}, compacted={}",
                     round + 1, guard_result.tokens_before, guard_result.tokens_after,
                     guard_result.removed, guard_result.compacted);
+                deps.event_broadcaster.emit(super::observer::AgentEvent::ContextCompact {
+                    original_count: guard_result.tokens_before,
+                    compacted_count: guard_result.tokens_after,
+                    tier: format!("round_{}", round + 1),
+                });
+                // Hook: AfterCompaction
+                deps.lifecycle.notify(super::lifecycle::HookPoint::AfterCompaction, &super::lifecycle::HookEvent {
+                    point: "after_compaction".to_string(),
+                    agent_id: agent_id.to_string(), session_id: session_id.to_string(),
+                    payload: serde_json::json!({
+                        "tokens_before": guard_result.tokens_before,
+                        "tokens_after": guard_result.tokens_after,
+                        "removed": guard_result.removed,
+                    }),
+                }).await;
             }
         }
         log::info!("Agent loop 第 {} 轮, messages 数量: {}", round + 1, messages.len());

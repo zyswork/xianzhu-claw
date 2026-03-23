@@ -412,6 +412,8 @@ function ChatTab({ agentId }: { agentId: string }) {
   const [pendingImages, setPendingImages] = useState<string[]>([]) // base64 data URLs
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [showSystemSessions, setShowSystemSessions] = useState(false)
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set())
+  const [selectMode, setSelectMode] = useState(false)
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set())
   const toggleTool = (idx: number) => setExpandedTools(prev => {
     const next = new Set(prev)
@@ -678,6 +680,32 @@ function ChatTab({ agentId }: { agentId: string }) {
     } catch (e) { console.error(e) }
   }
 
+  const batchDeleteSessions = async () => {
+    if (selectedSessions.size === 0) return
+    if (!await confirm(t('agentDetail.confirmBatchDelete', { count: selectedSessions.size }))) return
+    try {
+      for (const sid of selectedSessions) {
+        await invoke('delete_session', { sessionId: sid })
+      }
+      setSessions(prev => prev.filter(s => !selectedSessions.has(s.id)))
+      if (selectedSessions.has(activeSession)) {
+        setActiveSession('')
+        setMessages([])
+      }
+      setSelectedSessions(new Set())
+      setSelectMode(false)
+      toast.success(t('agentDetail.batchDeleteDone', { count: selectedSessions.size }))
+    } catch (e) { toast.error(String(e)) }
+  }
+
+  const toggleSessionSelect = (sid: string) => {
+    setSelectedSessions(prev => {
+      const next = new Set(prev)
+      if (next.has(sid)) next.delete(sid); else next.add(sid)
+      return next
+    })
+  }
+
   // ─── 斜杠命令处理 ─────────────────────────────
   const handleSlashCommand = async (cmd: string, args: string): Promise<string | null> => {
     switch (cmd) {
@@ -936,26 +964,48 @@ function ChatTab({ agentId }: { agentId: string }) {
     <div style={{ display: 'flex', height: '100%', minHeight: 0 }}>
       {/* 会话列表 */}
       <div style={{ width: 200, minWidth: 200, flexShrink: 0, borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: 8 }}>
+        <div style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
           <button onClick={createSession} style={{
             width: '100%', padding: '8px', backgroundColor: 'var(--accent)', color: 'white',
             border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13,
           }}>
             {t('agentDetail.newSession')}
           </button>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={() => { setSelectMode(!selectMode); setSelectedSessions(new Set()) }}
+              style={{ flex: 1, padding: '4px', fontSize: 10, border: '1px solid var(--border-subtle)', borderRadius: 3, cursor: 'pointer', backgroundColor: selectMode ? 'var(--accent-bg)' : 'transparent', color: 'var(--text-muted)' }}>
+              {selectMode ? t('agentDetail.cancelSelect') : t('agentDetail.batchSelect')}
+            </button>
+            {selectMode && selectedSessions.size > 0 && (
+              <button onClick={batchDeleteSessions}
+                style={{ flex: 1, padding: '4px', fontSize: 10, border: 'none', borderRadius: 3, cursor: 'pointer', backgroundColor: 'var(--error)', color: '#fff' }}>
+                {t('agentDetail.batchDeleteBtn', { count: selectedSessions.size })}
+              </button>
+            )}
+          </div>
         </div>
         <div style={{ flex: 1, overflowY: 'auto' }}>
           {/* 用户对话 */}
           {sessions.filter(s => !isSystemSession(s.title)).map((s) => (
-            <SessionItem key={s.id} s={s} activeSession={activeSession}
-              onSelect={() => { setActiveSession(s.id); setMessages([]) }}
-              onDelete={() => deleteSession(s.id)}
-              renamingSession={renamingSession} renameValue={renameValue}
-              setRenameValue={setRenameValue}
-              onStartRename={() => { setRenamingSession(s.id); setRenameValue(s.title) }}
-              onFinishRename={(v: string) => renameSession(s.id, v)}
-              onCancelRename={() => setRenamingSession('')}
-            />
+            <div key={s.id} style={{ display: 'flex', alignItems: 'center' }}>
+              {selectMode && (
+                <input type="checkbox" checked={selectedSessions.has(s.id)}
+                  onChange={() => toggleSessionSelect(s.id)}
+                  style={{ margin: '0 4px 0 8px', cursor: 'pointer' }}
+                />
+              )}
+              <div style={{ flex: 1 }}>
+                <SessionItem s={s} activeSession={activeSession}
+                  onSelect={() => { if (!selectMode) { setActiveSession(s.id); setMessages([]) } else { toggleSessionSelect(s.id) } }}
+                  onDelete={() => deleteSession(s.id)}
+                  renamingSession={renamingSession} renameValue={renameValue}
+                  setRenameValue={setRenameValue}
+                  onStartRename={() => { setRenamingSession(s.id); setRenameValue(s.title) }}
+                  onFinishRename={(v: string) => renameSession(s.id, v)}
+                  onCancelRename={() => setRenamingSession('')}
+                />
+              </div>
+            </div>
           ))}
 
           {/* 系统对话（cron/heartbeat）折叠区 */}
