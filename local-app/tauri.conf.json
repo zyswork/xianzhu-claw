@@ -15,6 +15,10 @@
         "all": true,
         "request": true,
         "scope": ["http://**", "https://**"]
+      },
+      "protocol": {
+        "asset": true,
+        "assetScope": ["**"]
       }
     },
     "windows": [
@@ -28,7 +32,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: tauri: asset: https://asset.localhost; img-src 'self' data: blob: asset: https://asset.localhost https://*.weixin.qq.com https://*.qq.com"
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: tauri: asset: https://asset.localhost; img-src 'self' data: blob: asset: https://asset.localhost https://*.weixin.qq.com https://*.qq.com https://*; media-src 'self' data: blob: asset: https://asset.localhost"
     },
     "bundle": {
       "active": true,

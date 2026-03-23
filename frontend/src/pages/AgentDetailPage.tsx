@@ -24,7 +24,72 @@ function renderMd(text: string) {
     ALLOWED_TAGS: ['a','b','blockquote','br','code','del','div','em','h1','h2','h3','h4','hr','i','li','ol','p','pre','span','strong','table','tbody','td','th','thead','tr','ul','img'],
     ALLOWED_ATTR: ['class','href','rel','target','title','src','alt','start'],
   })
-  return <div className="markdown-body" dangerouslySetInnerHTML={{ __html: clean }} />
+  // 检测多媒体内容（音频/图片路径）
+  const mediaElements = extractMediaFromText(text)
+  return (
+    <div>
+      <div className="markdown-body" dangerouslySetInnerHTML={{ __html: clean }} />
+      {mediaElements}
+    </div>
+  )
+}
+
+/** 从文本中检测音频/图片文件路径，返回内嵌播放器/图片 */
+function extractMediaFromText(text: string): React.ReactNode[] {
+  const elements: React.ReactNode[] = []
+
+  // 检测音频文件路径：~/.yonclaw/tts/tts_xxx.mp3 或 .aiff 或 .wav
+  const audioRegex = /(\/[^\s]+\.(mp3|aiff|wav|ogg|m4a))/gi
+  const audioMatches = text.match(audioRegex)
+  if (audioMatches) {
+    const seen = new Set<string>()
+    audioMatches.forEach((path, i) => {
+      if (seen.has(path)) return
+      seen.add(path)
+      const src = convertLocalPath(path.trim())
+      elements.push(
+        <div key={`audio-${i}`} style={{
+          marginTop: 8, padding: '10px 14px', borderRadius: 10,
+          backgroundColor: 'var(--bg-glass)', border: '1px solid var(--border-subtle)',
+          display: 'flex', alignItems: 'center', gap: 10,
+        }}>
+          <span style={{ fontSize: 20 }}>{'\u{1F50A}'}</span>
+          <audio controls preload="metadata" style={{ flex: 1, height: 36 }}>
+            <source src={src} />
+          </audio>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            {path.split('/').pop()}
+          </span>
+        </div>
+      )
+    })
+  }
+
+  // 检测远程图片 URL（非 markdown 格式的裸 URL）
+  const imgUrlRegex = /(https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp|svg)(\?[^\s]*)?)/gi
+  const imgMatches = text.match(imgUrlRegex)
+  if (imgMatches) {
+    // 只渲染不在 markdown ![](url) 中的裸 URL
+    const mdImgRegex = /!\[[^\]]*\]\([^)]+\)/g
+    const mdImgs = text.match(mdImgRegex)?.map(m => {
+      const urlMatch = m.match(/\(([^)]+)\)/)
+      return urlMatch?.[1] || ''
+    }) || []
+
+    const seen = new Set<string>()
+    imgMatches.forEach((url, i) => {
+      if (seen.has(url) || mdImgs.includes(url)) return
+      seen.add(url)
+      elements.push(
+        <img key={`img-${i}`} src={url} alt=""
+          style={{ maxWidth: '100%', maxHeight: 400, borderRadius: 8, marginTop: 8, display: 'block' }}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+      )
+    })
+  }
+
+  return elements
 }
 /** 思考中动画 */
 function ThinkingIndicator() {
