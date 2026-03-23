@@ -30,6 +30,70 @@ fn build_anthropic_url(base_url: Option<&str>) -> String {
     }
 }
 
+/// 将 OpenAI 格式的 tool 消息转为 Anthropic 兼容格式
+/// - role: "tool" → role: "user" + tool_result content block
+/// - role: "system" → 移除（Anthropic 用顶层 system 字段）
+fn sanitize_messages_for_anthropic(messages: &[serde_json::Value]) -> Vec<serde_json::Value> {
+    let mut result = Vec::with_capacity(messages.len());
+    for msg in messages {
+        let role = msg["role"].as_str().unwrap_or("");
+        match role {
+            "tool" => {
+                // OpenAI tool result → Anthropic user + tool_result
+                let tool_call_id = msg["tool_call_id"].as_str().unwrap_or("");
+                let content = msg["content"].as_str().unwrap_or("");
+                result.push(serde_json::json!({
+                    "role": "user",
+                    "content": [{
+                        "type": "tool_result",
+                        "tool_use_id": if tool_call_id.is_empty() { "unknown" } else { tool_call_id },
+                        "content": content
+                    }]
+                }));
+            }
+            "system" => {
+                // 跳过 system 消息（Anthropic 用顶层 system 字段）
+                continue;
+            }
+            _ => {
+                result.push(msg.clone());
+            }
+        }
+    }
+    // Anthropic 要求消息交替 user/assistant，合并连续同 role 消息
+    merge_consecutive_roles(&mut result);
+    result
+}
+
+/// 合并连续同 role 的消息（Anthropic 要求 user/assistant 交替）
+fn merge_consecutive_roles(messages: &mut Vec<serde_json::Value>) {
+    if messages.len() < 2 { return; }
+    let mut i = 0;
+    while i + 1 < messages.len() {
+        let role_a = messages[i]["role"].as_str().unwrap_or("").to_string();
+        let role_b = messages[i + 1]["role"].as_str().unwrap_or("").to_string();
+        if role_a == role_b {
+            // 合并 content
+            let content_b = messages[i + 1]["content"].clone();
+            let content_a = &mut messages[i]["content"];
+            if let Some(arr_a) = content_a.as_array_mut() {
+                if let Some(arr_b) = content_b.as_array() {
+                    arr_a.extend(arr_b.iter().cloned());
+                } else if let Some(text) = content_b.as_str() {
+                    arr_a.push(serde_json::json!({"type": "text", "text": text}));
+                }
+            } else if let Some(text_a) = content_a.as_str().map(|s| s.to_string()) {
+                if let Some(text_b) = content_b.as_str() {
+                    *content_a = serde_json::Value::String(format!("{}\n{}", text_a, text_b));
+                }
+            }
+            messages.remove(i + 1);
+        } else {
+            i += 1;
+        }
+    }
+}
+
 /// LLM 提供商
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LlmProvider {
@@ -266,8 +330,10 @@ impl LlmClient {
             "anthropic" => {
                 let url = build_anthropic_url(config.base_url.as_deref());
                 let resolved_max_tokens = config.max_tokens.unwrap_or_else(|| default_max_tokens(&config.provider, &config.model));
+                // 转换 OpenAI 格式的 tool 消息为 Anthropic 格式
+                let clean_messages = sanitize_messages_for_anthropic(messages);
                 let mut body = serde_json::json!({
-                    "model": config.model, "messages": messages, "stream": true,
+                    "model": config.model, "messages": clean_messages, "stream": true,
                     "temperature": config.temperature.unwrap_or(1.0),
                     "max_tokens": resolved_max_tokens,
                 });
