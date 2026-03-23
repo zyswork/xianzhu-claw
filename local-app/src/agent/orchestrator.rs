@@ -8,7 +8,7 @@ use super::skill_tool::SkillTool;
 use super::media::MediaProvider; // 导入 trait 使 describe_image 可用
 use super::skills::SkillManager;
 use super::soul::{SoulEngine, SectionBudget};
-use super::tools::{ToolManager, CalculatorTool, DateTimeTool, FileReadTool, FileWriteTool, FileListTool, FileEditTool, DiffEditTool, BashExecTool, CodeSearchTool, WebFetchTool, MemoryReadTool, MemoryWriteTool, SettingsTool, ProviderTool, AgentSelfConfigTool, Tool};
+use super::tools::{ToolManager, CalculatorTool, DateTimeTool, FileReadTool, FileWriteTool, FileListTool, FileEditTool, DiffEditTool, BashExecTool, CodeSearchTool, WebFetchTool, MemoryReadTool, MemoryWriteTool, SettingsTool, ProviderTool, AgentSelfConfigTool, SkillManageTool, CronManageTool, PluginManageTool, Tool};
 use super::tools::{parse_tools_config, is_tool_enabled};
 use super::workspace::AgentWorkspace;
 use super::subagent::SubagentRegistry;
@@ -96,6 +96,9 @@ impl Orchestrator {
         tool_manager.register_tool(Box::new(SettingsTool::new(pool.clone())));
         tool_manager.register_tool(Box::new(ProviderTool::new(pool.clone())));
         tool_manager.register_tool(Box::new(AgentSelfConfigTool::new(pool.clone())));
+        tool_manager.register_tool(Box::new(SkillManageTool::new(pool.clone())));
+        tool_manager.register_tool(Box::new(CronManageTool::new(pool.clone())));
+        tool_manager.register_tool(Box::new(PluginManageTool::new(pool.clone())));
         tool_manager.register_tool(Box::new(super::delegate::DelegateTaskTool::new(pool.clone())));
         let mcp_manager = McpManager::new(pool.clone());
         // 初始化钩子运行器（注册默认日志钩子）

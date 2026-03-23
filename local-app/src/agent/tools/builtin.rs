@@ -1444,3 +1444,285 @@ impl Tool for AgentSelfConfigTool {
         }
     }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// skill_manage — 对话中管理技能（安装/卸载/搜索）
+// ═══════════════════════════════════════════════════════════════
+
+pub struct SkillManageTool {
+    pool: sqlx::SqlitePool,
+}
+
+impl SkillManageTool {
+    pub fn new(pool: sqlx::SqlitePool) -> Self { Self { pool } }
+}
+
+#[async_trait]
+impl Tool for SkillManageTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "skill_manage".to_string(),
+            description: "管理 Agent 技能：列出已安装技能、查看可安装技能、安装、卸载、搜索在线技能市场。用户说「帮我装个邮件技能」时使用此工具。".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "操作类型",
+                        "enum": ["list_installed", "list_marketplace", "install", "uninstall", "search_online"]
+                    },
+                    "agent_id": { "type": "string", "description": "Agent ID" },
+                    "skill_name": { "type": "string", "description": "技能名称（install/uninstall 时必填）" },
+                    "query": { "type": "string", "description": "搜索关键词（search_online 时使用）" }
+                },
+                "required": ["action", "agent_id"]
+            }),
+        }
+    }
+    fn safety_level(&self) -> ToolSafetyLevel { ToolSafetyLevel::Guarded }
+
+    async fn execute(&self, args: serde_json::Value) -> Result<String, String> {
+        let action = args["action"].as_str().ok_or("缺少 action")?;
+        let agent_id = args["agent_id"].as_str().ok_or("缺少 agent_id")?;
+        let home = dirs::home_dir().unwrap_or_default();
+
+        match action {
+            "list_installed" => {
+                let workspace = home.join(".yonclaw").join("agents").join(agent_id).join("skills");
+                if !workspace.exists() {
+                    return Ok("当前 Agent 暂无已安装技能。可用 action=list_marketplace 查看可安装技能。".into());
+                }
+                let mut skills = Vec::new();
+                if let Ok(entries) = std::fs::read_dir(&workspace) {
+                    for entry in entries.flatten() {
+                        if entry.path().is_dir() {
+                            skills.push(entry.file_name().to_string_lossy().to_string());
+                        }
+                    }
+                }
+                if skills.is_empty() {
+                    Ok("当前 Agent 暂无已安装技能。".into())
+                } else {
+                    Ok(format!("已安装技能 ({} 个): {}", skills.len(), skills.join(", ")))
+                }
+            }
+            "list_marketplace" => {
+                let mp_dir = home.join(".yonclaw").join("marketplace");
+                if !mp_dir.exists() { return Ok("本地技能市场为空。用 action=search_online 从在线市场搜索。".into()); }
+                let mut skills = Vec::new();
+                if let Ok(entries) = std::fs::read_dir(&mp_dir) {
+                    for entry in entries.flatten() {
+                        if entry.path().is_dir() {
+                            skills.push(entry.file_name().to_string_lossy().to_string());
+                        }
+                    }
+                }
+                if skills.is_empty() { Ok("本地市场为空。".into()) }
+                else { Ok(format!("可安装技能 ({} 个): {}\n\n用 action=install, skill_name=<名称> 安装。", skills.len(), skills.join(", "))) }
+            }
+            "install" => {
+                let skill_name = args["skill_name"].as_str().ok_or("缺少 skill_name")?;
+                let src = home.join(".yonclaw").join("marketplace").join(skill_name);
+                if !src.exists() { return Err(format!("技能 {} 不在本地市场。先用 search_online 下载。", skill_name)); }
+                let dst = home.join(".yonclaw").join("agents").join(agent_id).join("skills").join(skill_name);
+                if dst.exists() { return Ok(format!("技能 {} 已安装。", skill_name)); }
+                let _ = std::fs::create_dir_all(dst.parent().unwrap());
+                copy_dir_recursive(&src, &dst).map_err(|e| format!("安装失败: {}", e))?;
+                Ok(format!("✅ 技能 {} 已安装！后续对话中会自动使用。", skill_name))
+            }
+            "uninstall" => {
+                let skill_name = args["skill_name"].as_str().ok_or("缺少 skill_name")?;
+                let target = home.join(".yonclaw").join("agents").join(agent_id).join("skills").join(skill_name);
+                if !target.exists() { return Err(format!("技能 {} 未安装。", skill_name)); }
+                std::fs::remove_dir_all(&target).map_err(|e| format!("卸载失败: {}", e))?;
+                Ok(format!("✅ 技能 {} 已卸载。", skill_name))
+            }
+            "search_online" => {
+                let query = args["query"].as_str().unwrap_or("");
+                let url = if query.is_empty() {
+                    "https://zys-openclaw.com/api/v1/skill-hub/search".to_string()
+                } else {
+                    format!("https://zys-openclaw.com/api/v1/skill-hub/search?q={}", urlencoding::encode(query))
+                };
+                let resp = reqwest::Client::new().get(&url).send().await.map_err(|e| format!("搜索失败: {}", e))?;
+                let data: serde_json::Value = resp.json().await.map_err(|e| format!("解析失败: {}", e))?;
+                match data["skills"].as_array() {
+                    Some(arr) if !arr.is_empty() => {
+                        let list: Vec<String> = arr.iter().take(10).map(|s| {
+                            format!("- {} (v{}) — {}", s["name"].as_str().unwrap_or(""), s["version"].as_str().unwrap_or(""), s["description"].as_str().unwrap_or(""))
+                        }).collect();
+                        Ok(format!("在线技能 ({} 个):\n{}", arr.len(), list.join("\n")))
+                    }
+                    _ => Ok("在线市场没有找到匹配的技能。".into()),
+                }
+            }
+            _ => Err(format!("未知操作: {}", action)),
+        }
+    }
+}
+
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let s = entry.path();
+        let d = dst.join(entry.file_name());
+        if s.is_dir() { copy_dir_recursive(&s, &d)?; } else { std::fs::copy(&s, &d)?; }
+    }
+    Ok(())
+}
+
+// ═══════════════════════════════════════════════════════════════
+// cron_manage — 对话中管理定时任务
+// ═══════════════════════════════════════════════════════════════
+
+pub struct CronManageTool {
+    pool: sqlx::SqlitePool,
+}
+impl CronManageTool {
+    pub fn new(pool: sqlx::SqlitePool) -> Self { Self { pool } }
+}
+
+#[async_trait]
+impl Tool for CronManageTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "cron_manage".to_string(),
+            description: "管理定时任务：创建、列出、暂停、恢复、删除。用户说「每天早上9点帮我查邮件」时使用。".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "action": { "type": "string", "enum": ["list", "create", "pause", "resume", "delete", "trigger"] },
+                    "agent_id": { "type": "string", "description": "Agent ID" },
+                    "job_id": { "type": "string", "description": "任务 ID（pause/resume/delete/trigger 用，支持前缀匹配）" },
+                    "name": { "type": "string", "description": "任务名称（create 必填）" },
+                    "cron_expr": { "type": "string", "description": "Cron 表达式（create 必填），如 '0 9 * * *'" },
+                    "prompt": { "type": "string", "description": "AI 执行指令（create 必填）" },
+                    "timezone": { "type": "string", "description": "时区，默认 Asia/Shanghai" }
+                },
+                "required": ["action", "agent_id"]
+            }),
+        }
+    }
+    fn safety_level(&self) -> ToolSafetyLevel { ToolSafetyLevel::Guarded }
+
+    async fn execute(&self, args: serde_json::Value) -> Result<String, String> {
+        let action = args["action"].as_str().ok_or("缺少 action")?;
+        let agent_id = args["agent_id"].as_str().ok_or("缺少 agent_id")?;
+
+        match action {
+            "list" => {
+                let rows = sqlx::query_as::<_, (String, String, String, bool)>(
+                    "SELECT id, name, schedule, enabled FROM cron_jobs WHERE agent_id = ? OR agent_id IS NULL ORDER BY created_at DESC"
+                ).bind(agent_id).fetch_all(&self.pool).await.map_err(|e| e.to_string())?;
+                if rows.is_empty() { return Ok("暂无定时任务。用 action=create 创建。".into()); }
+                let list: Vec<String> = rows.iter().map(|(id, name, sched, enabled)| {
+                    format!("{} {} | {} | id:{}", if *enabled {"▶️"} else {"⏸️"}, name, sched, &id[..id.len().min(8)])
+                }).collect();
+                Ok(format!("定时任务 ({} 个):\n{}", rows.len(), list.join("\n")))
+            }
+            "create" => {
+                let name = args["name"].as_str().ok_or("缺少 name")?;
+                let cron_expr = args["cron_expr"].as_str().ok_or("缺少 cron_expr")?;
+                let prompt = args["prompt"].as_str().ok_or("缺少 prompt")?;
+                let tz = args["timezone"].as_str().unwrap_or("Asia/Shanghai");
+                let id = uuid::Uuid::new_v4().to_string();
+                let now = chrono::Utc::now().timestamp_millis();
+                let schedule = serde_json::json!({"kind":"cron","expr":cron_expr,"tz":tz}).to_string();
+                let payload = serde_json::json!({"type":"agent","prompt":prompt,"sessionStrategy":"new"}).to_string();
+                sqlx::query("INSERT INTO cron_jobs (id, agent_id, name, job_type, schedule, action_payload, enabled, timeout_secs, created_at, updated_at) VALUES (?,?,?,'agent',?,?,1,300,?,?)")
+                    .bind(&id).bind(agent_id).bind(name).bind(&schedule).bind(&payload).bind(now).bind(now)
+                    .execute(&self.pool).await.map_err(|e| format!("创建失败: {}", e))?;
+                Ok(format!("✅ 定时任务已创建: {} | {} ({}) | {}", name, cron_expr, tz, &id[..8]))
+            }
+            "pause" => {
+                let jid = args["job_id"].as_str().ok_or("缺少 job_id")?;
+                sqlx::query("UPDATE cron_jobs SET enabled=0,updated_at=? WHERE id LIKE ?||'%'")
+                    .bind(chrono::Utc::now().timestamp_millis()).bind(jid)
+                    .execute(&self.pool).await.map_err(|e| e.to_string())?;
+                Ok(format!("⏸️ 任务 {} 已暂停", jid))
+            }
+            "resume" => {
+                let jid = args["job_id"].as_str().ok_or("缺少 job_id")?;
+                sqlx::query("UPDATE cron_jobs SET enabled=1,updated_at=? WHERE id LIKE ?||'%'")
+                    .bind(chrono::Utc::now().timestamp_millis()).bind(jid)
+                    .execute(&self.pool).await.map_err(|e| e.to_string())?;
+                Ok(format!("▶️ 任务 {} 已恢复", jid))
+            }
+            "delete" => {
+                let jid = args["job_id"].as_str().ok_or("缺少 job_id")?;
+                sqlx::query("DELETE FROM cron_jobs WHERE id LIKE ?||'%'").bind(jid)
+                    .execute(&self.pool).await.map_err(|e| e.to_string())?;
+                Ok(format!("🗑️ 任务 {} 已删除", jid))
+            }
+            "trigger" => {
+                let jid = args["job_id"].as_str().ok_or("缺少 job_id")?;
+                sqlx::query("UPDATE cron_jobs SET fail_streak=-1,updated_at=? WHERE id LIKE ?||'%'")
+                    .bind(chrono::Utc::now().timestamp_millis()).bind(jid)
+                    .execute(&self.pool).await.map_err(|e| e.to_string())?;
+                Ok(format!("⚡ 任务 {} 已触发", jid))
+            }
+            _ => Err(format!("未知操作: {}", action)),
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// plugin_manage — 对话中管理插件
+// ═══════════════════════════════════════════════════════════════
+
+pub struct PluginManageTool {
+    pool: sqlx::SqlitePool,
+}
+impl PluginManageTool {
+    pub fn new(pool: sqlx::SqlitePool) -> Self { Self { pool } }
+}
+
+#[async_trait]
+impl Tool for PluginManageTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "plugin_manage".to_string(),
+            description: "管理系统插件：列出、启用、禁用。用户说「启用 Anthropic」或「看看有哪些插件」时使用。".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "action": { "type": "string", "enum": ["list", "enable", "disable"] },
+                    "plugin_id": { "type": "string", "description": "插件 ID（enable/disable 时必填）" }
+                },
+                "required": ["action"]
+            }),
+        }
+    }
+    fn safety_level(&self) -> ToolSafetyLevel { ToolSafetyLevel::Guarded }
+
+    async fn execute(&self, args: serde_json::Value) -> Result<String, String> {
+        let action = args["action"].as_str().ok_or("缺少 action")?;
+        match action {
+            "list" => {
+                Ok("系统插件:\n\
+                    \n**模型提供商:** openai, anthropic, deepseek, qwen, zhipu, moonshot, ollama, vllm\
+                    \n**渠道:** telegram-channel, feishu-channel, weixin-channel, discord-channel, slack-channel\
+                    \n**记忆:** sqlite-memory, lancedb-vector\
+                    \n**嵌入:** openai-embedding\
+                    \n\n使用 action=enable/disable, plugin_id=<id> 来管理。\
+                    \n模型供应商的详细配置请使用 provider_manage 工具。".to_string())
+            }
+            "enable" => {
+                let pid = args["plugin_id"].as_str().ok_or("缺少 plugin_id")?;
+                let now = chrono::Utc::now().timestamp_millis();
+                let _ = sqlx::query("INSERT OR REPLACE INTO plugin_states (plugin_id, enabled, updated_at) VALUES (?, 1, ?)")
+                    .bind(pid).bind(now).execute(&self.pool).await;
+                Ok(format!("✅ 插件 {} 已启用", pid))
+            }
+            "disable" => {
+                let pid = args["plugin_id"].as_str().ok_or("缺少 plugin_id")?;
+                let now = chrono::Utc::now().timestamp_millis();
+                let _ = sqlx::query("INSERT OR REPLACE INTO plugin_states (plugin_id, enabled, updated_at) VALUES (?, 0, ?)")
+                    .bind(pid).bind(now).execute(&self.pool).await;
+                Ok(format!("❌ 插件 {} 已禁用", pid))
+            }
+            _ => Err(format!("未知操作: {}", action)),
+        }
+    }
+}
