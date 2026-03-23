@@ -128,12 +128,25 @@ fn merge_consecutive_roles(messages: &mut Vec<serde_json::Value>) {
         let role_a = messages[i]["role"].as_str().unwrap_or("").to_string();
         let role_b = messages[i + 1]["role"].as_str().unwrap_or("").to_string();
         if role_a == role_b {
-            // 合并 content
             let content_b = messages[i + 1]["content"].clone();
             let content_a = &mut messages[i]["content"];
             if let Some(arr_a) = content_a.as_array_mut() {
                 if let Some(arr_b) = content_b.as_array() {
-                    arr_a.extend(arr_b.iter().cloned());
+                    // 合并时去重 tool_result（同一个 tool_use_id 只保留第一个）
+                    let existing_ids: std::collections::HashSet<String> = arr_a.iter()
+                        .filter_map(|b| b["tool_use_id"].as_str().map(|s| s.to_string()))
+                        .collect();
+                    for block in arr_b {
+                        if let Some(tid) = block["tool_use_id"].as_str() {
+                            if existing_ids.contains(tid) { continue; } // 跳过重复
+                        }
+                        // 跳过空内容的 tool_result
+                        if block["type"].as_str() == Some("tool_result") {
+                            let content = block["content"].as_str().unwrap_or("");
+                            if content.is_empty() || content == "[context compacted]" { continue; }
+                        }
+                        arr_a.push(block.clone());
+                    }
                 } else if let Some(text) = content_b.as_str() {
                     arr_a.push(serde_json::json!({"type": "text", "text": text}));
                 }
@@ -368,7 +381,7 @@ impl LlmClient {
         let (url, body) = match config.provider.as_str() {
             "openai" => {
                 let url = format!("{}/chat/completions", config.base_url.as_deref().unwrap_or("https://api.openai.com/v1"));
-                let resolved_max_tokens = config.max_tokens.unwrap_or_else(|| default_max_tokens(&config.provider, &config.model));
+                let resolved_max_tokens = config.max_tokens.filter(|&t| t > 0).unwrap_or_else(|| default_max_tokens(&config.provider, &config.model));
                 let mut body = serde_json::json!({
                     "model": config.model, "messages": messages, "stream": true,
                     "temperature": config.temperature.unwrap_or(0.7),
@@ -384,20 +397,25 @@ impl LlmClient {
             }
             "anthropic" => {
                 let url = build_anthropic_url(config.base_url.as_deref());
-                let resolved_max_tokens = config.max_tokens.unwrap_or_else(|| default_max_tokens(&config.provider, &config.model));
+                let resolved_max_tokens = config.max_tokens.filter(|&t| t > 0).unwrap_or_else(|| default_max_tokens(&config.provider, &config.model));
                 // 转换 OpenAI 格式的 tool 消息为 Anthropic 格式
                 let clean_messages = sanitize_messages_for_anthropic(messages);
-                // 调试：检查是否还有非数组 content
+                // 调试：打印每条消息的结构
                 for (i, m) in clean_messages.iter().enumerate() {
-                    if !m["content"].is_array() {
-                        log::warn!("Anthropic 消息 [{}] content 不是数组: role={}, content={}", i, m["role"], &m["content"].to_string()[..m["content"].to_string().len().min(100)]);
-                    }
+                    let role = m["role"].as_str().unwrap_or("?");
+                    let content_type = if m["content"].is_array() { "array" } else if m["content"].is_string() { "STRING(!)" } else { "other(!)" };
+                    let has_tool_calls = m.get("tool_calls").is_some();
+                    let preview = &m["content"].to_string()[..m["content"].to_string().len().min(80)];
+                    log::info!("Anthropic msg[{}]: role={}, content={}, tool_calls={}, preview={}", i, role, content_type, has_tool_calls, preview);
                 }
                 let mut body = serde_json::json!({
                     "model": config.model, "messages": clean_messages, "stream": true,
                     "temperature": config.temperature.unwrap_or(1.0),
                     "max_tokens": resolved_max_tokens,
                 });
+                // 调试：保存请求 body 到文件（临时）
+                let _ = std::fs::write("/tmp/anthropic-debug.json", serde_json::to_string_pretty(&body).unwrap_or_default());
+                log::info!("Anthropic 请求 body 已保存到 /tmp/anthropic-debug.json");
                 if let Some(sp) = system_prompt { body["system"] = Self::build_anthropic_system_blocks(sp); }
                 if let Some(t) = tools { if !t.is_empty() { body["tools"] = Self::build_anthropic_tools(t); } }
                 (url, body)
