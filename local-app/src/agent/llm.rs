@@ -38,15 +38,49 @@ fn build_anthropic_url(base_url: Option<&str>) -> String {
 fn sanitize_messages_for_anthropic(messages: &[serde_json::Value]) -> Vec<serde_json::Value> {
     let mut result = Vec::with_capacity(messages.len());
 
+    // 预构建 tool ID 映射（确保全局一致性，参考 OpenClaw transformMessages）
+    let mut tool_id_map: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for msg in messages {
+        if let Some(arr) = msg["content"].as_array() {
+            for block in arr {
+                if block["type"].as_str() == Some("tool_use") {
+                    if let Some(raw_id) = block["id"].as_str() {
+                        let clean = sanitize_tool_id(raw_id);
+                        if clean != raw_id { tool_id_map.insert(raw_id.to_string(), clean); }
+                    }
+                }
+            }
+        }
+        if let Some(calls) = msg["tool_calls"].as_array() {
+            for tc in calls {
+                if let Some(raw_id) = tc["id"].as_str() {
+                    let clean = sanitize_tool_id(raw_id);
+                    if clean != raw_id { tool_id_map.insert(raw_id.to_string(), clean); }
+                }
+            }
+        }
+    }
+
     // 第一步：转换消息格式
     for msg in messages {
         let role = msg["role"].as_str().unwrap_or("");
+
+        // 跳过 error/aborted 的 assistant 消息（参考 OpenClaw transformMessages:109）
+        if role == "assistant" {
+            if let Some(stop) = msg["stop_reason"].as_str() {
+                if stop == "error" || stop == "aborted" {
+                    log::debug!("跳过 error/aborted assistant 消息");
+                    continue;
+                }
+            }
+        }
+
         match role {
-            "system" => continue, // Anthropic 用顶层 system 字段
+            "system" => continue,
             "tool" => {
                 // OpenAI tool result → Anthropic user + tool_result
                 let raw_id = msg["tool_call_id"].as_str().unwrap_or("unknown");
-                let id = sanitize_tool_id(raw_id);
+                let id = tool_id_map.get(raw_id).cloned().unwrap_or_else(|| sanitize_tool_id(raw_id));
                 let content = msg["content"].as_str().unwrap_or("");
                 result.push(serde_json::json!({
                     "role": "user",
