@@ -356,7 +356,8 @@ impl Orchestrator {
             }
         }
 
-        // 1. 获取 agent 信息（缓存，60 秒 TTL）
+        // 1. 获取 agent 信息（每次重新读取，确保模型切换等配置立即生效）
+        self.agent_store.invalidate_cache(agent_id);
         let agent = self.get_agent_cached(agent_id).await?;
 
         // 2. 构建 system prompt（从 Soul 文件组装）

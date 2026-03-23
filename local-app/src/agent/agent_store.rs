@@ -77,7 +77,7 @@ impl AgentStore {
         {
             if let Ok(cache) = self.cache.lock() {
                 if let Some((agent, fetched_at)) = cache.get(agent_id) {
-                    if fetched_at.elapsed().as_secs() < 60 {
+                    if fetched_at.elapsed().as_secs() < 5 {
                         return Ok(agent.clone());
                     }
                 }
