@@ -61,6 +61,11 @@ fn sanitize_messages_for_anthropic(messages: &[serde_json::Value]) -> Vec<serde_
             }
             "assistant" => {
                 let mut m = msg.clone();
+                // 如果 content 已经是数组（Anthropic 格式），直接用
+                if msg["content"].is_array() {
+                    result.push(m);
+                    continue;
+                }
                 // 转换 assistant 的 tool_calls（OpenAI 格式 → Anthropic content 数组）
                 if let Some(tool_calls) = msg["tool_calls"].as_array() {
                     let mut content_blocks = Vec::new();
@@ -100,8 +105,11 @@ fn sanitize_messages_for_anthropic(messages: &[serde_json::Value]) -> Vec<serde_
             }
             _ => {
                 let mut m = msg.clone();
-                if let Some(text) = m["content"].as_str().map(|s| s.to_string()) {
-                    m["content"] = serde_json::json!([{"type": "text", "text": text}]);
+                // 已经是数组格式则保留
+                if !m["content"].is_array() {
+                    if let Some(text) = m["content"].as_str().map(|s| s.to_string()) {
+                        m["content"] = serde_json::json!([{"type": "text", "text": text}]);
+                    }
                 }
                 result.push(m);
             }
