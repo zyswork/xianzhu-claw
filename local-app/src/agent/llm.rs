@@ -123,10 +123,13 @@ fn sanitize_messages_for_anthropic(messages: &[serde_json::Value]) -> Vec<serde_
         }
     }
 
-    // 第二步：确保每个 tool_use 都有对应的 tool_result（参考 OpenClaw transformMessages）
+    // 第二步：去掉重复/空的 tool_result
+    deduplicate_tool_results(&mut result);
+
+    // 第三步：确保每个 tool_use 都有对应的 tool_result
     ensure_tool_use_result_pairing(&mut result);
 
-    // 第三步：合并连续同 role 消息
+    // 第四步：合并连续同 role 消息
     merge_consecutive_roles(&mut result);
 
     // 第四步：确保第一条消息是 user（Anthropic 要求）
@@ -137,6 +140,42 @@ fn sanitize_messages_for_anthropic(messages: &[serde_json::Value]) -> Vec<serde_
     }
 
     result
+}
+
+/// 去掉重复和空的 tool_result（同一 tool_use_id 只保留第一个有内容的）
+fn deduplicate_tool_results(messages: &mut Vec<serde_json::Value>) {
+    for msg in messages.iter_mut() {
+        if let Some(arr) = msg["content"].as_array_mut() {
+            let mut seen_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+            arr.retain(|block| {
+                if block["type"].as_str() == Some("tool_result") {
+                    let tid = block["tool_use_id"].as_str().unwrap_or("").to_string();
+                    let content = block["content"].as_str().unwrap_or("");
+                    // 跳过空内容或 [context compacted]
+                    if content.is_empty() || content == "[context compacted]" {
+                        // 如果还没见过这个 id，保留（但标记为已见）
+                        if !seen_ids.contains(&tid) {
+                            // 不保留空的，等下面有内容的来
+                            return false;
+                        }
+                        return false;
+                    }
+                    // 有内容的：去重
+                    if !seen_ids.insert(tid) { return false; }
+                }
+                true
+            });
+            // 如果去重后数组为空，需要特殊处理
+        }
+    }
+    // 移除 content 数组为空的消息
+    messages.retain(|msg| {
+        if let Some(arr) = msg["content"].as_array() {
+            !arr.is_empty()
+        } else {
+            true
+        }
+    });
 }
 
 /// 确保每个 tool_use 都有对应的 tool_result
