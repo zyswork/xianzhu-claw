@@ -281,7 +281,11 @@ pub async fn run_agent_loop(
                 continue;
             }
 
-            let final_msg = serde_json::json!({"role": "assistant", "content": &llm_response.content});
+            let final_msg = serde_json::json!({
+                "role": "assistant", "content": &llm_response.content,
+                "provider": config.provider, "model": config.model,
+                "stop_reason": &llm_response.stop_reason,
+            });
             let _ = memory::conversation::save_chat_message(deps.pool, session_id, agent_id, &final_msg).await;
             break;
         }
@@ -296,7 +300,10 @@ pub async fn run_agent_loop(
             let asst_msg = serde_json::json!({
                 "role": "assistant",
                 "content": if llm_response.content.is_empty() { serde_json::Value::Null } else { serde_json::json!(&llm_response.content) },
-                "tool_calls": tool_calls_json
+                "tool_calls": tool_calls_json,
+                "provider": config.provider,
+                "model": config.model,
+                "stop_reason": &llm_response.stop_reason,
             });
             let _ = memory::conversation::save_chat_message(deps.pool, session_id, agent_id, &asst_msg).await;
         }

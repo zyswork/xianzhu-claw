@@ -35,7 +35,8 @@ fn build_anthropic_url(base_url: Option<&str>) -> String {
 /// - role: "system" → 移除（Anthropic 用顶层 system 字段）
 /// 清理 Anthropic 消息：确保 tool_use/tool_result 配对，格式正确
 /// 参考 OpenClaw 的 transformMessages + convertMessages
-fn sanitize_messages_for_anthropic(messages: &[serde_json::Value]) -> Vec<serde_json::Value> {
+/// current_provider/current_model: 当前请求使用的 provider 和 model（用于模型感知转换）
+fn sanitize_messages_for_anthropic(messages: &[serde_json::Value], current_provider: &str, current_model: &str) -> Vec<serde_json::Value> {
     let mut result = Vec::with_capacity(messages.len());
 
     // 预构建 tool ID 映射（确保全局一致性，参考 OpenClaw transformMessages）
@@ -109,9 +110,28 @@ fn sanitize_messages_for_anthropic(messages: &[serde_json::Value]) -> Vec<serde_
                                 Some(block)
                             }
                             Some("thinking") => {
-                                // 剥离 thinking 块（参考 OpenClaw dropThinkingBlocks）
-                                // Anthropic 要求后续请求不能包含之前的 thinking 签名
-                                None
+                                // 模型感知转换（参考 OpenClaw transformMessages:30-43）
+                                let msg_provider = msg.get("provider").and_then(|v| v.as_str()).unwrap_or("");
+                                let msg_model = msg.get("model").and_then(|v| v.as_str()).unwrap_or("");
+                                let is_same_model = msg_provider == current_provider && msg_model == current_model;
+
+                                if is_same_model {
+                                    // 同模型：保留带签名的 thinking（可 replay）
+                                    let has_signature = b.get("signature").and_then(|s| s.as_str()).map_or(false, |s| !s.is_empty());
+                                    if has_signature {
+                                        Some(b.clone())
+                                    } else {
+                                        // 无签名的 thinking：转为文本或跳过
+                                        let thinking_text = b["thinking"].as_str().unwrap_or("");
+                                        if thinking_text.is_empty() { None }
+                                        else { Some(serde_json::json!({"type": "text", "text": thinking_text})) }
+                                    }
+                                } else {
+                                    // 异模型：转为文本（不能跨模型 replay thinking 签名）
+                                    let thinking_text = b["thinking"].as_str().unwrap_or("");
+                                    if thinking_text.is_empty() { None }
+                                    else { Some(serde_json::json!({"type": "text", "text": thinking_text})) }
+                                }
                             }
                             _ => Some(b.clone()),
                         }
@@ -700,7 +720,7 @@ impl LlmClient {
                 let url = build_anthropic_url(config.base_url.as_deref());
                 let resolved_max_tokens = config.max_tokens.filter(|&t| t > 0).unwrap_or_else(|| default_max_tokens(&config.provider, &config.model));
                 // 转换 OpenAI 格式的 tool 消息为 Anthropic 格式
-                let clean_messages = sanitize_messages_for_anthropic(messages);
+                let clean_messages = sanitize_messages_for_anthropic(messages, &config.provider, &config.model);
                 log::info!("sanitize 完成: {} 条消息", clean_messages.len());
                 // 调试：打印每条消息的结构
                 for (i, m) in clean_messages.iter().enumerate() {
