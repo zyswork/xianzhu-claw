@@ -545,7 +545,20 @@ async fn execute_builtin_tool(
                         return (msg, false, "user_denied", 0);
                     }
                     _ => {
-                        return ("审批超时（60秒），自动拒绝".to_string(), false, "approval_timeout", 0);
+                        // 审批超时 → 升级通知
+                        log::warn!("工具 {} 审批超时，检查是否有上级 Agent 可升级", name);
+                        deps.event_broadcaster.emit(super::observer::AgentEvent::ToolBlocked {
+                            tool_name: name.to_string(),
+                            reason: "审批超时，已自动拒绝".to_string(),
+                            agent_id: agent_id.to_string(),
+                        });
+                        // 记录审计
+                        let _ = crate::db::audit::log_tool_call(
+                            deps.pool, agent_id, session_id, name,
+                            &args.to_string(), Some("审批超时"), false,
+                            "timeout_escalation", "approval", 0,
+                        ).await;
+                        return ("审批超时（60秒），已记录并通知。如需执行请重新发起。".to_string(), false, "approval_timeout", 0);
                     }
                 }
             } else {

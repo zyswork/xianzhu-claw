@@ -23,6 +23,7 @@ const AuditLogPage = lazy(() => import('./pages/AuditLogPage'))
 const TokenMonitoringPage = lazy(() => import('./pages/TokenMonitoringPage'))
 const ChannelsPage = lazy(() => import('./pages/ChannelsPage'))
 const PluginsPage = lazy(() => import('./pages/PluginsPage'))
+const PlazaPage = lazy(() => import('./pages/PlazaPage'))
 
 function PageLoader() {
   const { t } = useI18n()
@@ -129,6 +130,7 @@ export default function App() {
         <Route path="/token-monitoring" element={<ProtectedPage><TokenMonitoringPage /></ProtectedPage>} />
         <Route path="/channels" element={<ProtectedPage><ChannelsPage /></ProtectedPage>} />
         <Route path="/plugins" element={<ProtectedPage><PluginsPage /></ProtectedPage>} />
+        <Route path="/plaza" element={<ProtectedPage><PlazaPage /></ProtectedPage>} />
         <Route path="/settings" element={<ProtectedPage><SettingsPage /></ProtectedPage>} />
         <Route path="*" element={<Navigate to="/agents" replace />} />
       </Routes>

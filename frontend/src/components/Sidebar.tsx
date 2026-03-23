@@ -32,6 +32,7 @@ export default function Sidebar() {
     { icon: '\u23F0', label: t('sidebar.cron'), path: '/cron' },
     { icon: '\u{1F4E8}', label: t('sidebar.channels'), path: '/channels' },
     { icon: '\u{1F50C}', label: t('sidebar.plugins'), path: '/plugins' },
+    { icon: '\u{1F3DB}\uFE0F', label: t('sidebar.plaza'), path: '/plaza' },
     { icon: '\u{1F4CA}', label: t('sidebar.dashboard'), path: '/dashboard' },
     { icon: '\u{1F9E0}', label: t('sidebar.memory'), path: '/memory' },
     { icon: '\u2699\uFE0F', label: t('sidebar.settings'), path: '/settings' },

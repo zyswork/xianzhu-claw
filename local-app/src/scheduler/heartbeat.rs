@@ -68,17 +68,24 @@ pub async fn llm_heartbeat(
     // 获取当前健康报告
     let report = health_check(pool, app_handle).await;
 
-    // 构造 prompt
+    // 构造 prompt（引导 Agent 执行外部动作）
     let prompt = format!(
-        "你是系统健康检查助手。以下是当前系统状态和检查清单。\n\
-         请逐项检查并报告需要关注的问题。\n\
-         如果一切正常，仅回复 HEARTBEAT_OK。\n\n\
+        "你正在执行定期心跳检查。以下是当前系统状态和你的检查清单。\n\n\
          ## 系统状态\n\
          - 调度器: {}\n\
          - 最近1h失败率: {:.1}%\n\
          - 连续失败任务: {}\n\
          - 自动禁用任务: {}\n\n\
-         ## 检查清单\n{}",
+         ## 你的检查清单\n{}\n\n\
+         ## 你可以执行的操作\n\
+         1. **检查并报告** — 逐项检查清单，报告异常\n\
+         2. **搜索信息** — 如果清单要求关注某个主题，使用 web_search 获取最新信息\n\
+         3. **通知协作者** — 如果发现重要问题，可以通过 delegate_task 通知相关 Agent\n\
+         4. **记录发现** — 将重要发现写入记忆 (memory_write)\n\n\
+         ## 规则\n\
+         - 如果一切正常，仅回复 HEARTBEAT_OK\n\
+         - 如果发现问题，简洁描述并执行对应操作\n\
+         - 最多执行 3 个工具调用，避免过度消耗",
         if report.scheduler_alive { "运行中" } else { "异常" },
         report.recent_failure_rate * 100.0,
         if report.high_fail_jobs.is_empty() { "无".to_string() }

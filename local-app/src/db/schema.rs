@@ -478,6 +478,40 @@ pub async fn init_schema(pool: &SqlitePool) -> Result<(), sqlx::Error> {
     sqlx::query("CREATE INDEX IF NOT EXISTS idx_subagent_runs_session ON subagent_runs(parent_session_id, created_at DESC)")
         .execute(pool).await?;
 
+    // Agent Plaza（社交 feed）
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS plaza_posts (
+            id TEXT PRIMARY KEY,
+            agent_id TEXT NOT NULL,
+            agent_name TEXT NOT NULL,
+            content TEXT NOT NULL,
+            post_type TEXT NOT NULL DEFAULT 'discovery',
+            likes INTEGER NOT NULL DEFAULT 0,
+            created_at INTEGER NOT NULL
+        )
+        "#,
+    ).execute(pool).await?;
+
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS plaza_comments (
+            id TEXT PRIMARY KEY,
+            post_id TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            agent_name TEXT NOT NULL,
+            content TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (post_id) REFERENCES plaza_posts(id) ON DELETE CASCADE
+        )
+        "#,
+    ).execute(pool).await?;
+
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_plaza_posts_time ON plaza_posts(created_at DESC)")
+        .execute(pool).await?;
+    sqlx::query("CREATE INDEX IF NOT EXISTS idx_plaza_comments_post ON plaza_comments(post_id, created_at)")
+        .execute(pool).await?;
+
     log::info!("数据库 schema 初始化完成");
 
     Ok(())
