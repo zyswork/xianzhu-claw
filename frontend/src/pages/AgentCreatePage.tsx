@@ -205,9 +205,9 @@ export default function AgentCreatePage() {
             onClick={() => setMode(m)}
             style={{
               padding: '8px 20px', borderRadius: 8, cursor: 'pointer', fontSize: 14, fontWeight: 500,
-              border: mode === m ? '2px solid var(--accent)' : '2px solid #e5e7eb',
-              backgroundColor: mode === m ? '#e8f0fe' : 'white',
-              color: mode === m ? 'var(--accent)' : '#666',
+              border: mode === m ? '2px solid var(--accent)' : '2px solid var(--border-subtle)',
+              backgroundColor: mode === m ? 'var(--accent-bg)' : 'var(--bg-elevated)',
+              color: mode === m ? 'var(--accent)' : 'var(--text-secondary)',
             }}
           >
             {m === 'manual' ? t('agentCreate.modeManual') : t('agentCreate.modeAi')}
@@ -265,8 +265,8 @@ export default function AgentCreatePage() {
                 justifyContent: 'center',
                 fontSize: 14,
                 fontWeight: 600,
-                color: i <= step ? '#fff' : '#999',
-                backgroundColor: i < step ? 'var(--success)' : i === step ? 'var(--accent)' : '#e9ecef',
+                color: i <= step ? '#fff' : 'var(--text-muted)',
+                backgroundColor: i < step ? 'var(--success)' : i === step ? 'var(--accent)' : 'var(--bg-glass)',
                 transition: 'background-color 0.2s',
               }}
             >
@@ -277,7 +277,7 @@ export default function AgentCreatePage() {
                 marginLeft: 8,
                 fontSize: 13,
                 fontWeight: i === step ? 600 : 400,
-                color: i <= step ? '#333' : '#999',
+                color: i <= step ? 'var(--text-primary)' : 'var(--text-muted)',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -289,7 +289,7 @@ export default function AgentCreatePage() {
                   flex: 1,
                   height: 2,
                   margin: '0 12px',
-                  backgroundColor: i < step ? 'var(--success)' : '#e9ecef',
+                  backgroundColor: i < step ? 'var(--success)' : 'var(--bg-glass)',
                   transition: 'background-color 0.2s',
                 }}
               />
@@ -315,9 +315,9 @@ export default function AgentCreatePage() {
                   onClick={() => applyTemplate(tpl)}
                   style={{
                     padding: '10px 12px',
-                    border: name === t(tpl.nameKey) ? '2px solid var(--accent)' : '1px solid #ddd',
+                    border: name === t(tpl.nameKey) ? '2px solid var(--accent)' : '1px solid var(--border-subtle)',
                     borderRadius: 8,
-                    backgroundColor: name === t(tpl.nameKey) ? '#e7f1ff' : '#fff',
+                    backgroundColor: name === t(tpl.nameKey) ? 'var(--accent-bg)' : 'var(--bg-elevated)',
                     cursor: 'pointer',
                     textAlign: 'left',
                     fontSize: 13,
@@ -389,7 +389,7 @@ export default function AgentCreatePage() {
               {t('agentCreate.fieldModel')}
             </label>
             {allModels.length === 0 ? (
-              <div style={{ padding: 12, backgroundColor: '#fff3cd', borderRadius: 6, fontSize: 13, color: '#856404' }}>
+              <div style={{ padding: 12, backgroundColor: 'var(--warning-bg)', borderRadius: 6, fontSize: 13, color: 'var(--warning)' }}>
                 {t('agentCreate.warningNoModels')}
               </div>
             ) : (
@@ -429,10 +429,10 @@ export default function AgentCreatePage() {
                     padding: '4px 14px',
                     fontSize: 12,
                     border: '1px solid',
-                    borderColor: activePreset?.id === p.id ? 'var(--accent)' : '#ddd',
+                    borderColor: activePreset?.id === p.id ? 'var(--accent)' : 'var(--border-subtle)',
                     borderRadius: 4,
-                    backgroundColor: activePreset?.id === p.id ? '#e7f1ff' : '#fff',
-                    color: activePreset?.id === p.id ? 'var(--accent)' : '#333',
+                    backgroundColor: activePreset?.id === p.id ? 'var(--accent-bg)' : 'var(--bg-elevated)',
+                    color: activePreset?.id === p.id ? 'var(--accent)' : 'var(--text-primary)',
                     cursor: 'pointer',
                   }}
                 >
@@ -484,19 +484,19 @@ export default function AgentCreatePage() {
 
           <div
             style={{
-              border: '1px solid #e9ecef',
+              border: '1px solid var(--border-subtle)',
               borderRadius: 8,
               overflow: 'hidden',
             }}
           >
             {/* 名称 */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #e9ecef' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('common.name')}</div>
               <div style={{ fontSize: 15, fontWeight: 600 }}>{name}</div>
             </div>
 
             {/* 系统提示词 */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #e9ecef' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('agentCreate.fieldSystemPrompt')}</div>
               <div
                 style={{
@@ -512,7 +512,7 @@ export default function AgentCreatePage() {
             </div>
 
             {/* 模型 */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #e9ecef' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border-subtle)' }}>
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{t('common.model')}</div>
               <div style={{ fontSize: 14 }}>
                 {modelInfo?.label || selectedModel}
@@ -550,7 +550,7 @@ export default function AgentCreatePage() {
                 marginTop: 16,
                 padding: '10px 14px',
                 backgroundColor: 'var(--error-bg)',
-                color: '#842029',
+                color: 'var(--error)',
                 borderRadius: 6,
                 fontSize: 13,
               }}
@@ -568,7 +568,7 @@ export default function AgentCreatePage() {
           justifyContent: 'space-between',
           marginTop: 32,
           paddingTop: 20,
-          borderTop: '1px solid #e9ecef',
+          borderTop: '1px solid var(--border-subtle)',
         }}
       >
         <button
@@ -596,7 +596,7 @@ export default function AgentCreatePage() {
               fontSize: 14,
               border: 'none',
               borderRadius: 6,
-              backgroundColor: canNext() ? 'var(--accent)' : '#ccc',
+              backgroundColor: canNext() ? 'var(--accent)' : 'var(--border-subtle)',
               color: '#fff',
               cursor: canNext() ? 'pointer' : 'not-allowed',
               fontWeight: 500,
@@ -613,7 +613,7 @@ export default function AgentCreatePage() {
               fontSize: 14,
               border: 'none',
               borderRadius: 6,
-              backgroundColor: creating ? '#6c757d' : 'var(--success)',
+              backgroundColor: creating ? 'var(--text-secondary)' : 'var(--success)',
               color: '#fff',
               cursor: creating ? 'not-allowed' : 'pointer',
               fontWeight: 600,

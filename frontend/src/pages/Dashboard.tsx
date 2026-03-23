@@ -94,7 +94,7 @@ export default function Dashboard() {
     )
   }
 
-  const statusColor = health?.status === 'healthy' ? '#22c55e' : '#ef4444'
+  const statusColor = health?.status === 'healthy' ? 'var(--success)' : 'var(--error)'
   const statusLabel = health?.status === 'healthy' ? t('dashboard.statusHealthy') : t('dashboard.statusUnhealthy')
 
   return (
@@ -200,7 +200,7 @@ export default function Dashboard() {
                   e.currentTarget.style.boxShadow = '0 2px 8px rgba(59,130,246,0.1)'
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#e5e7eb'
+                  e.currentTarget.style.borderColor = 'var(--border-subtle)'
                   e.currentTarget.style.boxShadow = 'none'
                 }}
               >
@@ -225,12 +225,12 @@ export default function Dashboard() {
         <h2 style={{ margin: '0 0 12px', fontSize: '16px', fontWeight: 600 }}>{t('dashboard.quickActions')}</h2>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px' }}>
           {[
-            { to: '/agents/new', label: t('dashboard.createAgent'), color: 'var(--text-accent)', bg: '#eff6ff' },
-            { to: '/skills', label: t('dashboard.skillManagement'), color: '#8b5cf6', bg: '#f5f3ff' },
-            { to: '/memory', label: t('dashboard.memoryManagement'), color: '#f59e0b', bg: '#fffbeb' },
-            { to: '/cron', label: t('dashboard.cronJobs'), color: '#06b6d4', bg: '#ecfeff' },
+            { to: '/agents/new', label: t('dashboard.createAgent'), color: 'var(--text-accent)', bg: 'var(--accent-bg)' },
+            { to: '/skills', label: t('dashboard.skillManagement'), color: '#8b5cf6', bg: 'var(--bg-glass)' },
+            { to: '/memory', label: t('dashboard.memoryManagement'), color: '#f59e0b', bg: 'var(--bg-glass)' },
+            { to: '/cron', label: t('dashboard.cronJobs'), color: '#06b6d4', bg: 'var(--bg-glass)' },
             { to: '/token-monitoring', label: t('dashboard.tokenMonitoring'), color: 'var(--error)', bg: 'var(--error-bg)' },
-            { to: '/settings', label: t('dashboard.systemSettings'), color: 'var(--text-secondary)', bg: '#f9fafb' },
+            { to: '/settings', label: t('dashboard.systemSettings'), color: 'var(--text-secondary)', bg: 'var(--bg-glass)' },
           ].map((item) => (
             <Link
               key={item.to}

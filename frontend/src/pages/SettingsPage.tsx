@@ -333,7 +333,7 @@ export default function SettingsPage() {
                     padding: '8px 16px', cursor: 'pointer', fontSize: '13px',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f5f5f5' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-glass)' }}
                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
                 >
                   <span>{preset.name}</span>
@@ -341,12 +341,12 @@ export default function SettingsPage() {
                 </div>
               ))}
               {availablePresets.length > 0 && (
-                <div style={{ borderTop: '1px solid #eee', margin: '4px 0' }} />
+                <div style={{ borderTop: '1px solid var(--border-subtle)', margin: '4px 0' }} />
               )}
               <div
                 onClick={handleAddCustom}
                 style={{ padding: '8px 16px', cursor: 'pointer', fontSize: '13px', color: 'var(--accent)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f5f5f5' }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-glass)' }}
                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
               >
                 {t('settingsExtra.customProviderOpenai')}
@@ -378,9 +378,9 @@ export default function SettingsPage() {
             key={p.id}
             style={{
               marginBottom: '12px', padding: '16px',
-              border: `1px solid ${p.enabled && (hasKey || isOllama) ? '#c3e6cb' : '#e0e0e0'}`,
+              border: `1px solid ${p.enabled && (hasKey || isOllama) ? '#c3e6cb' : 'var(--border-subtle)'}`,
               borderRadius: '8px',
-              backgroundColor: !p.enabled ? '#fafafa' : (hasKey || isOllama) ? '#f8fff8' : '#fff',
+              backgroundColor: !p.enabled ? 'var(--bg-glass)' : (hasKey || isOllama) ? 'var(--success-bg)' : 'var(--bg-elevated)',
               opacity: p.enabled ? 1 : 0.6,
             }}
           >
@@ -399,7 +399,7 @@ export default function SettingsPage() {
                 <span style={{
                   fontSize: '11px', padding: '2px 6px', borderRadius: '3px',
                   backgroundColor: hasKey || isOllama ? 'var(--success)' : '#ffc107',
-                  color: hasKey || isOllama ? 'white' : '#333',
+                  color: hasKey || isOllama ? '#fff' : 'var(--text-primary)',
                 }}>
                   {isOllama ? t('settings.labelLocal') : hasKey ? t('settings.labelConfigured') : t('settings.labelNoKey')}
                 </span>
@@ -445,7 +445,7 @@ export default function SettingsPage() {
                 {p.models?.map((m) => (
                   <span key={m.id} style={{
                     fontSize: '11px', padding: '2px 8px', borderRadius: '10px',
-                    backgroundColor: '#e9ecef', color: '#495057',
+                    backgroundColor: 'var(--bg-glass)', color: 'var(--text-secondary)',
                   }}>
                     {m.name || m.id}
                   </span>
@@ -522,7 +522,7 @@ export default function SettingsPage() {
                     {editForm.models.map((m) => (
                       <span key={m.id} style={{
                         fontSize: '12px', padding: '3px 8px', borderRadius: '4px',
-                        backgroundColor: '#e9ecef', display: 'flex', alignItems: 'center', gap: '4px',
+                        backgroundColor: 'var(--bg-glass)', display: 'flex', alignItems: 'center', gap: '4px',
                       }}>
                         {m.name || m.id}
                         <span
@@ -554,7 +554,7 @@ export default function SettingsPage() {
                       disabled={!newModelId.trim()}
                       style={{
                         padding: '5px 10px', fontSize: '12px', cursor: newModelId.trim() ? 'pointer' : 'not-allowed',
-                        border: '1px solid var(--border-subtle)', borderRadius: '4px', backgroundColor: newModelId.trim() ? '#e9ecef' : '#f5f5f5',
+                        border: '1px solid var(--border-subtle)', borderRadius: '4px', backgroundColor: newModelId.trim() ? 'var(--bg-glass)' : 'var(--bg-glass)',
                       }}
                     >
                       {t('common.add')}
@@ -602,7 +602,7 @@ export default function SettingsPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}>
           <div style={{
-            backgroundColor: 'white', borderRadius: 12, padding: 24,
+            backgroundColor: 'var(--bg-elevated)', borderRadius: 12, padding: 24,
             maxWidth: 400, width: '90%',
           }}>
             <h3 style={{ margin: '0 0 8px' }}>{t('agents.confirmDeleteTitle')}</h3>
@@ -614,7 +614,7 @@ export default function SettingsPage() {
                 onClick={() => setDeleteConfirm(null)}
                 style={{
                   padding: '8px 16px', border: '1px solid var(--border-subtle)', borderRadius: 6,
-                  backgroundColor: 'white', cursor: 'pointer', fontSize: 13,
+                  backgroundColor: 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13,
                 }}
               >
                 {t('common.cancel')}
@@ -635,12 +635,12 @@ export default function SettingsPage() {
 
       {/* 环境变量提示 */}
       <div style={{
-        marginTop: '20px', padding: '12px', backgroundColor: '#f8f9fa',
+        marginTop: '20px', padding: '12px', backgroundColor: 'var(--bg-glass)',
         borderRadius: '6px', fontSize: '13px', color: 'var(--text-secondary)',
       }}>
         <strong>{t('settings.hintEnvVars')}</strong>
         <pre style={{
-          margin: '8px 0 0', padding: '8px', backgroundColor: '#e9ecef',
+          margin: '8px 0 0', padding: '8px', backgroundColor: 'var(--bg-glass)',
           borderRadius: '4px', fontSize: '12px', overflow: 'auto',
         }}>
 {`export OPENAI_API_KEY="sk-..."
@@ -871,7 +871,7 @@ function AdvancedSettings() {
     return (
       <div style={{ marginTop: '20px', textAlign: 'center' }}>
         <button onClick={() => setExpanded(true)} style={{
-          padding: '8px 20px', background: 'none', border: '1px solid #ccc',
+          padding: '8px 20px', background: 'none', border: '1px solid var(--border-subtle)',
           borderRadius: '4px', cursor: 'pointer', color: 'var(--text-secondary)',
         }}>
           {t('settings.sectionAdvanced')}
@@ -881,7 +881,7 @@ function AdvancedSettings() {
   }
 
   return (
-    <div style={{ marginTop: '20px', padding: '16px', border: '1px solid #e0e0e0', borderRadius: '8px' }}>
+    <div style={{ marginTop: '20px', padding: '16px', border: '1px solid var(--border-subtle)', borderRadius: '8px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h3 style={{ margin: 0 }}>{t('settings.sectionAdvanced')}</h3>
         <button onClick={() => setExpanded(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px' }}>×</button>
@@ -955,7 +955,7 @@ function AdvancedSettings() {
 
       {/* 系统状态 */}
       {health && (
-        <div style={{ marginTop: '12px', padding: '12px', backgroundColor: '#f8f9fa', borderRadius: '6px', fontSize: '13px' }}>
+        <div style={{ marginTop: '12px', padding: '12px', backgroundColor: 'var(--bg-glass)', borderRadius: '6px', fontSize: '13px' }}>
           <h4 style={{ margin: '0 0 8px' }}>{t('settings.sectionSystemStatus')}</h4>
           <div>{t('settings.labelDatabase')}: {health.db ? t('common.healthy') : t('common.error')} | {t('settings.labelAgents')}: {health.agents} | {t('settings.labelMemories')}: {health.memories} | {t('settings.labelTodayTokens')}: {health.today_tokens?.toLocaleString()}</div>
           {cacheStats && (

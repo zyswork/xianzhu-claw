@@ -142,11 +142,11 @@ export default function McpTab({ agentId }: McpTabProps) {
         </button>
       </div>
 
-      {error && <div style={{ color: 'red', fontSize: '12px', marginBottom: '8px' }}>{error}</div>}
+      {error && <div style={{ color: 'var(--error)', fontSize: '12px', marginBottom: '8px' }}>{error}</div>}
 
       {/* 添加表单 */}
       {showAdd && (
-        <div style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '10px', marginBottom: '10px', fontSize: '12px' }}>
+        <div style={{ border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '10px', marginBottom: '10px', fontSize: '12px' }}>
           <div style={{ marginBottom: '6px' }}>
             <label>{t('mcpTab.fieldName')}</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
@@ -210,21 +210,21 @@ export default function McpTab({ agentId }: McpTabProps) {
 
       {/* Server 列表 */}
       {servers.length === 0 && !showAdd && (
-        <div style={{ color: '#999', fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center', padding: '20px 0' }}>
           {t('mcpTab.emptyServers')}
         </div>
       )}
 
       {servers.map(s => (
         <div key={s.id} style={{
-          border: '1px solid #eee', borderRadius: '6px', padding: '8px',
+          border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '8px',
           marginBottom: '6px', fontSize: '12px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>{STATUS_ICONS[s.status] || '⚪'}</span>
               <span style={{ fontWeight: 600 }}>{s.name}</span>
-              <span style={{ color: '#999', fontSize: '11px' }}>{s.transport}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{s.transport}</span>
             </div>
             <div style={{ display: 'flex', gap: '4px' }}>
               <input type="checkbox" checked={s.enabled}
@@ -234,7 +234,7 @@ export default function McpTab({ agentId }: McpTabProps) {
                 {testing === s.id ? t('mcpTab.testing') : t('mcpTab.testBtn')}
               </button>
               <button onClick={() => handleRemove(s.id)}
-                style={{ ...btnStyle, padding: '1px 6px', fontSize: '11px', color: 'red' }}>
+                style={{ ...btnStyle, padding: '1px 6px', fontSize: '11px', color: 'var(--error)' }}>
                 ✕
               </button>
             </div>
@@ -242,14 +242,14 @@ export default function McpTab({ agentId }: McpTabProps) {
 
           {/* 展开工具列表 */}
           {expandedServer === s.id && serverTools[s.id] && (
-            <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid #eee' }}>
-              <div style={{ color: '#666', marginBottom: '4px' }}>
+            <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px solid var(--border-subtle)' }}>
+              <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>
                 {t('mcpTab.tools')} ({serverTools[s.id].length}):
               </div>
               {serverTools[s.id].map(t => (
-                <div key={t.name} style={{ padding: '2px 0', color: '#444' }}>
+                <div key={t.name} style={{ padding: '2px 0', color: 'var(--text-primary)' }}>
                   <span style={{ fontWeight: 500 }}>{t.name}</span>
-                  <span style={{ color: '#999', marginLeft: '6px' }}>{t.description}</span>
+                  <span style={{ color: 'var(--text-muted)', marginLeft: '6px' }}>{t.description}</span>
                 </div>
               ))}
             </div>
@@ -261,11 +261,11 @@ export default function McpTab({ agentId }: McpTabProps) {
 }
 
 const btnStyle: React.CSSProperties = {
-  padding: '4px 10px', border: '1px solid #ddd', borderRadius: '4px',
-  backgroundColor: '#fff', cursor: 'pointer', fontSize: '12px',
+  padding: '4px 10px', border: '1px solid var(--border-subtle)', borderRadius: '4px',
+  backgroundColor: 'var(--bg-elevated)', cursor: 'pointer', fontSize: '12px',
 }
 
 const inputStyle: React.CSSProperties = {
-  width: '100%', padding: '4px 8px', border: '1px solid #ddd',
+  width: '100%', padding: '4px 8px', border: '1px solid var(--border-subtle)',
   borderRadius: '4px', fontSize: '12px', boxSizing: 'border-box',
 }

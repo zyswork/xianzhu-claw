@@ -258,10 +258,10 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
   }
 
   const inputStyle = {
-    width: '100%', padding: '6px 8px', border: '1px solid #ddd',
+    width: '100%', padding: '6px 8px', border: '1px solid var(--border-subtle)',
     borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box' as const,
   }
-  const labelStyle = { fontSize: '12px', color: '#666', marginBottom: '3px', display: 'block' }
+  const labelStyle = { fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '3px', display: 'block' }
   const fieldGroup = { marginBottom: '10px' }
 
   // 表单模式
@@ -273,8 +273,8 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
           <button
             onClick={() => setRawMode(true)}
             style={{
-              fontSize: '11px', padding: '3px 8px', border: '1px solid #ddd',
-              borderRadius: '3px', background: '#f8f8f8', cursor: 'pointer', color: '#666',
+              fontSize: '11px', padding: '3px 8px', border: '1px solid var(--border-subtle)',
+              borderRadius: '3px', background: 'var(--bg-glass)', cursor: 'pointer', color: 'var(--text-secondary)',
             }}
           >
             {t('soulFile.rawMode')}
@@ -283,10 +283,10 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
 
         {/* IDENTITY 区域 */}
         <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>{t('soulFile.sectionIdentity')}</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>{t('soulFile.sectionIdentity')}</div>
           {form.customIdentity ? (
             <div>
-              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>{t('soulFile.customFormatHint')}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('soulFile.customFormatHint')}</div>
               <textarea
                 style={{ ...inputStyle, minHeight: '80px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px' }}
                 value={form.customIdentity}
@@ -315,10 +315,10 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
 
         {/* SOUL 区域 */}
         <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>{t('soulFile.sectionSoul')}</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>{t('soulFile.sectionSoul')}</div>
           {form.customSoul ? (
             <div>
-              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>{t('soulFile.customFormatHint')}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('soulFile.customFormatHint')}</div>
               <textarea
                 style={{ ...inputStyle, minHeight: '120px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px' }}
                 value={form.customSoul}
@@ -345,10 +345,10 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
 
         {/* USER 区域 */}
         <div style={{ marginBottom: '14px' }}>
-          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: '#333' }}>{t('soulFile.sectionUser')}</div>
+          <div style={{ fontSize: '13px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)' }}>{t('soulFile.sectionUser')}</div>
           {form.customUser ? (
             <div>
-              <div style={{ fontSize: '11px', color: '#999', marginBottom: '4px' }}>{t('soulFile.customFormatHint')}</div>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>{t('soulFile.customFormatHint')}</div>
               <textarea
                 style={{ ...inputStyle, minHeight: '80px', resize: 'vertical', fontFamily: 'monospace', fontSize: '11px' }}
                 value={form.customUser}
@@ -404,8 +404,8 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
         <button
           onClick={() => { setRawMode(false); setSelectedFile('') }}
           style={{
-            fontSize: '11px', padding: '3px 8px', border: '1px solid #ddd',
-            borderRadius: '3px', background: '#f8f8f8', cursor: 'pointer', color: '#666',
+            fontSize: '11px', padding: '3px 8px', border: '1px solid var(--border-subtle)',
+            borderRadius: '3px', background: 'var(--bg-glass)', cursor: 'pointer', color: 'var(--text-secondary)',
           }}
         >
           {t('soulFile.formMode')}
@@ -424,13 +424,13 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
               style={{
                 padding: '6px 8px', marginBottom: '2px', borderRadius: '3px',
                 cursor: 'pointer', fontSize: '12px',
-                backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
-                color: exists ? '#333' : '#bbb',
+                backgroundColor: isSelected ? 'var(--accent-bg)' : 'transparent',
+                color: exists ? 'var(--text-primary)' : 'var(--text-muted)',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}
             >
               <span>{f}</span>
-              <span style={{ fontSize: '10px', color: '#999' }}>
+              <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
                 {exists ? `${fileSizes[f] || 0}B` : t('soulFile.notCreated')}
               </span>
             </div>
@@ -441,14 +441,14 @@ export default function SoulFileTab({ agentId }: SoulFileTabProps) {
       {/* 文件编辑器 */}
       {selectedFile && (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', color: '#333' }}>
+          <div style={{ fontSize: '12px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}>
             {selectedFile}
           </div>
           <textarea
             value={fileContent}
             onChange={e => setFileContent(e.target.value)}
             style={{
-              flex: 1, minHeight: '150px', padding: '8px', border: '1px solid #ddd',
+              flex: 1, minHeight: '150px', padding: '8px', border: '1px solid var(--border-subtle)',
               borderRadius: '4px', fontSize: '12px', fontFamily: 'monospace',
               resize: 'vertical', boxSizing: 'border-box', width: '100%',
             }}

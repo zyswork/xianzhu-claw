@@ -73,7 +73,7 @@ export default function AgentListPage() {
     if (model.includes('claude')) return '#d97706'
     if (model.includes('deepseek')) return '#6366f1'
     if (model.includes('qwen')) return '#0ea5e9'
-    return '#6b7280'
+    return 'var(--text-secondary)'
   }
 
   if (loading) {
@@ -117,7 +117,7 @@ export default function AgentListPage() {
       {agents.length === 0 ? (
         <div style={{
           textAlign: 'center', padding: '60px 20px',
-          backgroundColor: 'var(--bg-glass)', borderRadius: 12, border: '2px dashed #e5e7eb',
+          backgroundColor: 'var(--bg-glass)', borderRadius: 12, border: '2px dashed var(--border-subtle)',
         }}>
           <div style={{ fontSize: 48, marginBottom: 16 }}>🤖</div>
           <h3 style={{ margin: '0 0 8px', color: 'var(--text-primary)' }}>{t('agents.emptyTitle')}</h3>
@@ -142,7 +142,7 @@ export default function AgentListPage() {
             <div
               key={agent.id}
               style={{
-                backgroundColor: 'white',
+                backgroundColor: 'var(--bg-elevated)',
                 border: '1px solid var(--border-subtle)',
                 borderRadius: 12,
                 padding: 20,
@@ -156,7 +156,7 @@ export default function AgentListPage() {
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.boxShadow = 'none'
-                e.currentTarget.style.borderColor = '#e5e7eb'
+                e.currentTarget.style.borderColor = 'var(--border-subtle)'
               }}
             >
               {/* 卡片头部 */}
@@ -206,7 +206,7 @@ export default function AgentListPage() {
                     title={t('agents.actionChat')}
                     style={{
                       padding: '4px 8px', border: '1px solid var(--border-subtle)', borderRadius: 6,
-                      backgroundColor: 'white', cursor: 'pointer', fontSize: 14,
+                      backgroundColor: 'var(--bg-elevated)', cursor: 'pointer', fontSize: 14,
                     }}
                   >
                     💬
@@ -216,7 +216,7 @@ export default function AgentListPage() {
                     title={t('agents.actionSettings')}
                     style={{
                       padding: '4px 8px', border: '1px solid var(--border-subtle)', borderRadius: 6,
-                      backgroundColor: 'white', cursor: 'pointer', fontSize: 14,
+                      backgroundColor: 'var(--bg-elevated)', cursor: 'pointer', fontSize: 14,
                     }}
                   >
                     ⚙️
@@ -225,8 +225,8 @@ export default function AgentListPage() {
                     onClick={() => setDeleteConfirm(agent.id)}
                     title={t('agents.actionDelete')}
                     style={{
-                      padding: '4px 8px', border: '1px solid #fecaca', borderRadius: 6,
-                      backgroundColor: 'white', cursor: 'pointer', fontSize: 14,
+                      padding: '4px 8px', border: '1px solid var(--error-bg)', borderRadius: 6,
+                      backgroundColor: 'var(--bg-elevated)', cursor: 'pointer', fontSize: 14,
                     }}
                   >
                     🗑️
@@ -245,7 +245,7 @@ export default function AgentListPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
         }}>
           <div style={{
-            backgroundColor: 'white', borderRadius: 12, padding: 24,
+            backgroundColor: 'var(--bg-elevated)', borderRadius: 12, padding: 24,
             maxWidth: 400, width: '90%',
           }}>
             <h3 style={{ margin: '0 0 8px' }}>{t('agents.confirmDeleteTitle')}</h3>
@@ -257,7 +257,7 @@ export default function AgentListPage() {
                 onClick={() => setDeleteConfirm(null)}
                 style={{
                   padding: '8px 16px', border: '1px solid var(--border-subtle)', borderRadius: 6,
-                  backgroundColor: 'white', cursor: 'pointer',
+                  backgroundColor: 'var(--bg-elevated)', cursor: 'pointer',
                 }}
               >
                 {t('common.cancel')}

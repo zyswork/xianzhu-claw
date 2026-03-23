@@ -124,14 +124,14 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
   const activePreset = TEMP_PRESETS.find(p => Math.abs(p.value - temperature) < 0.05)
 
   if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>{t('common.loading')}</div>
+    return <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>{t('common.loading')}</div>
   }
 
   return (
     <div style={{ padding: '8px 0' }}>
       {/* 温度预设 */}
       <div style={{ marginBottom: '14px' }}>
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>{t('paramsTab.tempPreset')}</div>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>{t('paramsTab.tempPreset')}</div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           {TEMP_PRESETS.map(p => (
             <button
@@ -139,29 +139,29 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
               onClick={() => setTemperature(p.value)}
               style={{
                 padding: '4px 12px', fontSize: '12px', border: '1px solid',
-                borderColor: activePreset?.id === p.id ? 'var(--accent)' : '#ddd',
+                borderColor: activePreset?.id === p.id ? 'var(--accent)' : 'var(--border-subtle)',
                 borderRadius: '4px', cursor: 'pointer',
-                backgroundColor: activePreset?.id === p.id ? 'var(--accent)' : 'white',
-                color: activePreset?.id === p.id ? 'white' : '#333',
+                backgroundColor: activePreset?.id === p.id ? 'var(--accent)' : 'var(--bg-elevated)',
+                color: activePreset?.id === p.id ? 'white' : 'var(--text-primary)',
               }}
             >
               {presetLabels[p.id] || p.id}
             </button>
           ))}
           {!activePreset && (
-            <span style={{ fontSize: '11px', color: '#999', marginLeft: '4px' }}>{t('paramsTab.custom')}</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '4px' }}>{t('paramsTab.custom')}</span>
           )}
         </div>
       </div>
 
       {/* 模型选择 */}
       <div style={{ marginBottom: '14px' }}>
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>{t('paramsTab.selectModel')}</div>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>{t('paramsTab.selectModel')}</div>
         <select
           value={model}
           onChange={e => setModel(e.target.value)}
           style={{
-            width: '100%', padding: '6px 8px', border: '1px solid #ddd',
+            width: '100%', padding: '6px 8px', border: '1px solid var(--border-subtle)',
             borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box',
           }}
         >
@@ -182,7 +182,7 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
           onClick={() => setShowAdvanced(!showAdvanced)}
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
-            fontSize: '12px', color: '#666', padding: '4px 0',
+            fontSize: '12px', color: 'var(--text-secondary)', padding: '4px 0',
             display: 'flex', alignItems: 'center', gap: '4px',
           }}
         >
@@ -196,12 +196,12 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
         </button>
 
         {showAdvanced && (
-          <div style={{ marginTop: '8px', padding: '8px', backgroundColor: '#fafafa', borderRadius: '4px' }}>
+          <div style={{ marginTop: '8px', padding: '8px', backgroundColor: 'var(--bg-glass)', borderRadius: '4px' }}>
             {/* 温度滑块 */}
             <div style={{ marginBottom: '12px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <label style={{ fontSize: '12px', color: '#666' }}>Temperature</label>
-                <span style={{ fontSize: '12px', color: '#333', fontWeight: 500 }}>{temperature.toFixed(1)}</span>
+                <label style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Temperature</label>
+                <span style={{ fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500 }}>{temperature.toFixed(1)}</span>
               </div>
               <input
                 type="range"
@@ -210,7 +210,7 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
                 onChange={e => setTemperature(parseFloat(e.target.value))}
                 style={{ width: '100%' }}
               />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#999' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-muted)' }}>
                 <span>{t('paramsTab.labelPrecise')}</span>
                 <span>{t('paramsTab.labelRandom')}</span>
               </div>
@@ -218,7 +218,7 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
 
             {/* Max Tokens */}
             <div>
-              <label style={{ fontSize: '12px', color: '#666', display: 'block', marginBottom: '4px' }}>Max Tokens</label>
+              <label style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>Max Tokens</label>
               <input
                 type="number"
                 value={maxTokens}
@@ -226,7 +226,7 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
                 min={1}
                 max={128000}
                 style={{
-                  width: '100%', padding: '6px 8px', border: '1px solid #ddd',
+                  width: '100%', padding: '6px 8px', border: '1px solid var(--border-subtle)',
                   borderRadius: '4px', fontSize: '13px', boxSizing: 'border-box',
                 }}
               />

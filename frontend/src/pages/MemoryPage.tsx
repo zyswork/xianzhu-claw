@@ -164,7 +164,7 @@ export default function MemoryPage() {
             onClick={handleHygiene}
             disabled={actionLoading}
             style={{
-              padding: '8px 16px', fontSize: '13px', backgroundColor: '#D97706',
+              padding: '8px 16px', fontSize: '13px', backgroundColor: 'var(--warning)',
               color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer',
               opacity: actionLoading ? 0.6 : 1,
             }}
@@ -197,8 +197,8 @@ export default function MemoryPage() {
       {message && (
         <div style={{
           padding: '10px 14px', borderRadius: '6px', marginBottom: '12px', fontSize: '13px',
-          backgroundColor: message.type === 'success' ? '#f0fdf4' : 'var(--error-bg)',
-          color: message.type === 'success' ? '#22c55e' : '#ef4444',
+          backgroundColor: message.type === 'success' ? 'var(--success-bg)' : 'var(--error-bg)',
+          color: message.type === 'success' ? 'var(--success)' : 'var(--error)',
         }}>
           {message.text}
         </div>

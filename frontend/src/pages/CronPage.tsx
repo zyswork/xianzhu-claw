@@ -249,7 +249,7 @@ export default function CronPage() {
         <h2 style={{ margin: 0, fontSize: 20 }}>{t('cron.title')}</h2>
         <button
           onClick={() => setShowCreate(!showCreate)}
-          style={{ ...btnStyle, padding: '6px 16px', fontSize: 13, background: showCreate ? '#eee' : 'var(--accent)', color: showCreate ? '#333' : '#fff', border: 'none' }}
+          style={{ ...btnStyle, padding: '6px 16px', fontSize: 13, background: showCreate ? 'var(--bg-glass)' : 'var(--accent)', color: showCreate ? 'var(--text-primary)' : '#fff', border: 'none' }}
         >
           {showCreate ? t('common.cancel') : t('cron.btnCreate')}
         </button>
@@ -257,7 +257,7 @@ export default function CronPage() {
 
       {/* 创建表单 */}
       {showCreate && (
-        <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 16, marginBottom: 20, background: '#fafafa' }}>
+        <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 16, marginBottom: 20, background: 'var(--bg-glass)' }}>
           {/* 基础字段 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
             <label style={labelStyle}>
@@ -407,7 +407,7 @@ export default function CronPage() {
       {/* 任务列表 */}
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
         <thead>
-          <tr style={{ borderBottom: '2px solid #e0e0e0', textAlign: 'left' }}>
+          <tr style={{ borderBottom: '2px solid var(--border-subtle)', textAlign: 'left' }}>
             <th style={thStyle}>{t('cron.columnStatus')}</th>
             <th style={thStyle}>{t('cron.columnName')}</th>
             <th style={thStyle}>{t('cron.columnType')}</th>
@@ -427,15 +427,15 @@ export default function CronPage() {
               key={job.id}
               onClick={() => setSelectedJob(job.id)}
               style={{
-                borderBottom: '1px solid #eee',
+                borderBottom: '1px solid var(--border-subtle)',
                 cursor: 'pointer',
-                backgroundColor: selectedJob === job.id ? '#e8f0fe' : 'transparent',
+                backgroundColor: selectedJob === job.id ? 'var(--accent-bg)' : 'transparent',
               }}
             >
               <td style={tdStyle}>
                 <span style={{
                   display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
-                  backgroundColor: job.enabled ? '#4caf50' : '#999',
+                  backgroundColor: job.enabled ? '#4caf50' : 'var(--text-muted)',
                 }} />
               </td>
               <td style={tdStyle}>{job.name}</td>
@@ -468,7 +468,7 @@ export default function CronPage() {
           </h3>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
-              <tr style={{ borderBottom: '2px solid #e0e0e0', textAlign: 'left' }}>
+              <tr style={{ borderBottom: '2px solid var(--border-subtle)', textAlign: 'left' }}>
                 <th style={thStyle}>{t('cronExtra.runStatus')}</th>
                 <th style={thStyle}>{t('cronExtra.runTrigger')}</th>
                 <th style={thStyle}>{t('cronExtra.runStart')}</th>
@@ -480,7 +480,7 @@ export default function CronPage() {
               {runs.length === 0 ? (
                 <tr><td colSpan={5} style={{ padding: 12, color: 'var(--text-muted)' }}>{t('common.noRecords')}</td></tr>
               ) : runs.map(run => (
-                <tr key={run.id} style={{ borderBottom: '1px solid #eee' }}>
+                <tr key={run.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                   <td style={tdStyle}>
                     <span style={{ color: statusColor(run.status) }}>{run.status}</span>
                   </td>
@@ -504,13 +504,13 @@ const thStyle: React.CSSProperties = { padding: '8px 12px', fontWeight: 600 }
 const tdStyle: React.CSSProperties = { padding: '8px 12px' }
 const btnStyle: React.CSSProperties = {
   padding: '4px 8px', marginRight: 4, border: '1px solid var(--border-subtle)',
-  borderRadius: 4, background: '#fff', cursor: 'pointer', fontSize: 12,
+  borderRadius: 4, background: 'var(--bg-elevated)', cursor: 'pointer', fontSize: 12,
 }
 const labelStyle: React.CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13, color: 'var(--text-secondary)',
 }
 const inputStyle: React.CSSProperties = {
-  padding: '6px 10px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13,
+  padding: '6px 10px', border: '1px solid var(--border-subtle)', borderRadius: 4, fontSize: 13,
   fontFamily: 'inherit', width: '100%', boxSizing: 'border-box',
 }
 
@@ -520,7 +520,7 @@ function statusColor(status: string): string {
     case 'failed': return '#f44336'
     case 'timeout': return '#ff9800'
     case 'running': return '#2196f3'
-    case 'cancelled': return '#999'
-    default: return '#333'
+    case 'cancelled': return 'var(--text-muted)'
+    default: return 'var(--text-primary)'
   }
 }

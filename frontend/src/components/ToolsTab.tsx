@@ -98,14 +98,14 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
   const isCustom = !PROFILES.some(p => p.id === profile)
 
   if (loading) {
-    return <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>{t('common.loading')}</div>
+    return <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>{t('common.loading')}</div>
   }
 
   return (
     <div style={{ padding: '8px 0' }}>
       {/* 配置文件选择 */}
       <div style={{ marginBottom: '12px' }}>
-        <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>{t('toolsTab.toolConfig')}</div>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>{t('toolsTab.toolConfig')}</div>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           {PROFILES.map(p => (
             <button
@@ -113,17 +113,17 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
               onClick={() => handleSetProfile(p.id)}
               style={{
                 padding: '4px 12px', fontSize: '12px', border: '1px solid',
-                borderColor: profile === p.id ? 'var(--accent)' : '#ddd',
+                borderColor: profile === p.id ? 'var(--accent)' : 'var(--border-subtle)',
                 borderRadius: '4px', cursor: 'pointer',
-                backgroundColor: profile === p.id ? 'var(--accent)' : 'white',
-                color: profile === p.id ? 'white' : '#333',
+                backgroundColor: profile === p.id ? 'var(--accent)' : 'var(--bg-elevated)',
+                color: profile === p.id ? 'white' : 'var(--text-primary)',
               }}
             >
               {p.label}
             </button>
           ))}
           {isCustom && (
-            <span style={{ fontSize: '11px', color: '#999', marginLeft: '4px' }}>{t('toolsTab.custom')}</span>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '4px' }}>{t('toolsTab.custom')}</span>
           )}
         </div>
       </div>
@@ -140,7 +140,7 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
       {/* 内置工具列表 */}
       {builtinTools.length > 0 && (
         <div style={{ marginBottom: '12px' }}>
-          <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
             {t('toolsTab.builtinTools')} ({builtinTools.length})
           </div>
           {builtinTools.map(tool => (
@@ -152,7 +152,7 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
       {/* MCP 工具列表 */}
       {mcpTools.length > 0 && (
         <div>
-          <div style={{ fontSize: '12px', color: '#666', marginBottom: '6px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
             {t('toolsTab.mcpTools')} ({mcpTools.length})
           </div>
           {mcpTools.map(tool => (
@@ -162,7 +162,7 @@ export default function ToolsTab({ agentId }: ToolsTabProps) {
       )}
 
       {tools.length === 0 && (
-        <div style={{ textAlign: 'center', color: '#999', fontSize: '13px', padding: '20px 0' }}>
+        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '20px 0' }}>
           {t('toolsTab.noTools')}
         </div>
       )}
@@ -186,15 +186,15 @@ function ToolRow({ tool, onToggle }: { tool: ToolInfo; onToggle: (name: string, 
   return (
     <div style={{
       display: 'flex', alignItems: 'center', padding: '6px 8px',
-      marginBottom: '4px', borderRadius: '4px', backgroundColor: '#fafafa',
+      marginBottom: '4px', borderRadius: '4px', backgroundColor: 'var(--bg-glass)',
       gap: '8px',
     }}>
       {/* 工具信息 */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: '13px', fontWeight: 500, color: '#333' }}>{tool.name}</div>
+        <div style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)' }}>{tool.name}</div>
         {tool.description && (
           <div style={{
-            fontSize: '11px', color: '#999', marginTop: '2px',
+            fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {tool.description}
@@ -220,7 +220,7 @@ function ToolRow({ tool, onToggle }: { tool: ToolInfo; onToggle: (name: string, 
         />
         <span style={{
           position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: tool.enabled ? 'var(--accent)' : '#ccc',
+          backgroundColor: tool.enabled ? 'var(--accent)' : 'var(--border-subtle)',
           borderRadius: '9px', transition: 'background-color 0.2s',
         }}>
           <span style={{

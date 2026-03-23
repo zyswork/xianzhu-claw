@@ -201,7 +201,7 @@ export default function AgentDetailPage() {
             style={{
               padding: '10px 16px', border: 'none', cursor: 'pointer',
               fontSize: 14, backgroundColor: 'transparent', whiteSpace: 'nowrap',
-              color: activeTab === tab.id ? 'var(--accent)' : '#666',
+              color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-secondary)',
               borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
               fontWeight: activeTab === tab.id ? 600 : 400,
             }}
@@ -242,8 +242,8 @@ function SessionItem({ s, activeSession, onSelect, onDelete, renamingSession, re
     <div style={{
       display: 'flex', alignItems: 'center',
       padding: '8px 12px', cursor: 'pointer', fontSize: isSystem ? 12 : 13,
-      backgroundColor: s.id === activeSession ? '#eff6ff' : 'transparent',
-      borderBottom: '1px solid #f3f4f6',
+      backgroundColor: s.id === activeSession ? 'var(--accent-bg)' : 'transparent',
+      borderBottom: '1px solid var(--border-subtle)',
       borderLeft: s.id === activeSession ? '3px solid var(--accent)' : '3px solid transparent',
       opacity: isSystem ? 0.7 : 1,
     }}>
@@ -265,7 +265,7 @@ function SessionItem({ s, activeSession, onSelect, onDelete, renamingSession, re
       <button onClick={(e) => { e.stopPropagation(); onDelete() }}
         style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 14, padding: '0 4px', flexShrink: 0 }}
         onMouseEnter={(e) => { (e.target as HTMLElement).style.color = '#ef4444' }}
-        onMouseLeave={(e) => { (e.target as HTMLElement).style.color = '#d1d5db' }}
+        onMouseLeave={(e) => { (e.target as HTMLElement).style.color = 'var(--border-subtle)' }}
         title={useI18n.getState().t('agentDetailSub.deleteTitle')}
       >×</button>
     </div>
@@ -364,7 +364,7 @@ function ToolBar({ messageCount, showCompact, onCompact }: {
           style={{
             background: 'none', border: '1px solid var(--border-subtle)', borderRadius: 4,
             padding: '2px 8px', fontSize: 11, cursor: status === 'loading' ? 'wait' : 'pointer',
-            color: status === 'loading' ? '#d1d5db' : '#6b7280',
+            color: status === 'loading' ? 'var(--border-subtle)' : 'var(--text-secondary)',
           }}
         >
           {status === 'loading' ? t('agentDetail.compacting') : t('agentDetail.compactHistory')}
@@ -1183,9 +1183,9 @@ function ChatTab({ agentId }: { agentId: string }) {
                       maxWidth: isSystem ? '85%' : '70%',
                       minWidth: 0,
                       padding: '10px 14px', borderRadius: 12,
-                      backgroundColor: isUser ? 'var(--accent)' : isSystem ? '#f0fdf4' : '#f3f4f6',
-                      color: isUser ? 'white' : '#333',
-                      border: isSystem ? '1px solid #bbf7d0' : 'none',
+                      backgroundColor: isUser ? 'var(--accent)' : isSystem ? 'var(--success-bg)' : 'var(--assistant-bubble)',
+                      color: isUser ? '#fff' : 'var(--text-primary)',
+                      border: isSystem ? '1px solid var(--border-subtle)' : 'none',
                       fontSize: isSystem ? 13 : 14,
                       lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'anywhere',
                       minHeight: streaming && i === messages.length - 1 && !msg.content ? 40 : undefined,
@@ -1391,8 +1391,8 @@ function SkillsTab({ agentId }: { agentId: string }) {
                 onClick={() => handleToggle(skill.name, skill.enabled)}
                 style={{
                   padding: '4px 10px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
-                  border: '1px solid var(--border-subtle)', backgroundColor: skill.enabled ? 'var(--success-bg)' : '#f3f4f6',
-                  color: skill.enabled ? 'var(--success)' : '#666',
+                  border: '1px solid var(--border-subtle)', backgroundColor: skill.enabled ? 'var(--success-bg)' : 'var(--bg-glass)',
+                  color: skill.enabled ? 'var(--success)' : 'var(--text-secondary)',
                 }}
               >
                 {skill.enabled ? t('agentDetailSub.skillsEnabled') : t('agentDetailSub.skillsDisabled')}
@@ -1467,7 +1467,7 @@ function CronTab({ agentId }: { agentId: string }) {
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+            <tr style={{ borderBottom: '2px solid var(--border-subtle)' }}>
               <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.cronName')}</th>
               <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.cronPlan')}</th>
               <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.cronNextRun')}</th>
@@ -1484,16 +1484,16 @@ function CronTab({ agentId }: { agentId: string }) {
                 <td style={{ padding: '10px 12px' }}>
                   <span style={{
                     padding: '2px 8px', borderRadius: 4, fontSize: 11,
-                    backgroundColor: job.enabled ? 'var(--success-bg)' : '#f3f4f6',
-                    color: job.enabled ? 'var(--success)' : '#666',
+                    backgroundColor: job.enabled ? 'var(--success-bg)' : 'var(--bg-glass)',
+                    color: job.enabled ? 'var(--success)' : 'var(--text-secondary)',
                   }}>
                     {job.enabled ? t('agentDetailSub.cronRunning') : t('agentDetailSub.cronPaused')}
                   </span>
                 </td>
                 <td style={{ padding: '10px 12px', textAlign: 'right' }}>
                   <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                    <button onClick={() => handleTrigger(job.id)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border-subtle)', borderRadius: 4, cursor: 'pointer', backgroundColor: 'white' }}>{t('agentDetailSub.cronTrigger')}</button>
-                    <button onClick={() => handleToggle(job.id, job.enabled)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border-subtle)', borderRadius: 4, cursor: 'pointer', backgroundColor: 'white' }}>{job.enabled ? t('agentDetailSub.cronPause') : t('agentDetailSub.cronResume')}</button>
+                    <button onClick={() => handleTrigger(job.id)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border-subtle)', borderRadius: 4, cursor: 'pointer', backgroundColor: 'var(--bg-elevated)' }}>{t('agentDetailSub.cronTrigger')}</button>
+                    <button onClick={() => handleToggle(job.id, job.enabled)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid var(--border-subtle)', borderRadius: 4, cursor: 'pointer', backgroundColor: 'var(--bg-elevated)' }}>{job.enabled ? t('agentDetailSub.cronPause') : t('agentDetailSub.cronResume')}</button>
                     <button onClick={() => handleDelete(job.id)} style={{ padding: '3px 8px', fontSize: 11, border: '1px solid #fecaca', borderRadius: 4, cursor: 'pointer', backgroundColor: 'var(--error-bg)', color: 'var(--error)' }}>{t('common.delete')}</button>
                   </div>
                 </td>
@@ -1615,7 +1615,7 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
         <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 12 }}>{t('agentDetailSub.dangerDesc')}</p>
         {!deleteConfirm ? (
           <button onClick={() => setDeleteConfirm(true)} style={{
-            padding: '8px 16px', backgroundColor: 'white', color: 'var(--error)',
+            padding: '8px 16px', backgroundColor: 'var(--bg-elevated)', color: 'var(--error)',
             border: '1px solid #fecaca', borderRadius: 6, cursor: 'pointer', fontSize: 13,
           }}>
             {t('agentDetailSub.deleteAgent')}
@@ -1788,7 +1788,7 @@ function AuditTab({ agentId }: { agentId: string }) {
       ) : (
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
-            <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+            <tr style={{ borderBottom: '2px solid var(--border-subtle)' }}>
               <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.auditTime')}</th>
               <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.auditTool')}</th>
               <th style={{ textAlign: 'left', padding: '8px 12px' }}>{t('agentDetailSub.auditPolicy')}</th>
@@ -1875,8 +1875,8 @@ function SubagentsTab({ agentId }: { agentId: string }) {
     if (status === 'Completed') return { bg: 'var(--success-bg)', color: 'var(--success)' }
     if (status.startsWith('Failed')) return { bg: 'var(--error-bg)', color: 'var(--error)' }
     if (status === 'Timeout') return { bg: '#fef3c7', color: '#d97706' }
-    if (status === 'Cancelled') return { bg: '#f3f4f6', color: 'var(--text-secondary)' }
-    return { bg: '#f3f4f6', color: 'var(--text-secondary)' }
+    if (status === 'Cancelled') return { bg: 'var(--bg-glass)', color: 'var(--text-secondary)' }
+    return { bg: 'var(--bg-glass)', color: 'var(--text-secondary)' }
   }
 
   if (loading) return <div style={{ padding: 20, color: 'var(--text-muted)' }}>{t('common.loading')}</div>
@@ -2188,9 +2188,9 @@ function AutonomyTab({ agentId }: { agentId: string }) {
                       onClick={() => handleLevelChange(tool, key)}
                       style={{
                         padding: '3px 8px', fontSize: 11, borderRadius: 4, cursor: 'pointer',
-                        border: current === key ? `1px solid ${val.color}` : '1px solid #e5e7eb',
-                        backgroundColor: current === key ? val.bg : 'white',
-                        color: current === key ? val.color : '#999',
+                        border: current === key ? `1px solid ${val.color}` : '1px solid var(--border-subtle)',
+                        backgroundColor: current === key ? val.bg : 'var(--bg-elevated)',
+                        color: current === key ? val.color : 'var(--text-muted)',
                         fontWeight: current === key ? 600 : 400,
                       }}
                     >

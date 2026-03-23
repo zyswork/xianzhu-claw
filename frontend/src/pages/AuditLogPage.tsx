@@ -123,8 +123,8 @@ export default function AuditLogPage() {
                     <td style={tdStyle}>
                       <span style={{
                         fontSize: '11px', padding: '2px 8px', borderRadius: '4px',
-                        backgroundColor: entry.success ? '#d1fae5' : 'var(--error-bg)',
-                        color: entry.success ? '#065f46' : '#991b1b',
+                        backgroundColor: entry.success ? 'var(--success-bg)' : 'var(--error-bg)',
+                        color: entry.success ? 'var(--success)' : 'var(--error)',
                       }}>
                         {entry.success ? t('audit.statusSuccess') : t('audit.statusFailure')}
                       </span>
@@ -135,7 +135,7 @@ export default function AuditLogPage() {
                       </span>
                     </td>
                     <td style={tdStyle}>
-                      <span style={{ fontSize: '12px', color: entry.durationMs > 5000 ? '#ef4444' : '#6b7280' }}>
+                      <span style={{ fontSize: '12px', color: entry.durationMs > 5000 ? 'var(--error)' : 'var(--text-secondary)' }}>
                         {entry.durationMs}ms
                       </span>
                     </td>
