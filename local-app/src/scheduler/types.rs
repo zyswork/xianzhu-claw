@@ -53,6 +53,12 @@ pub enum ActionPayload {
         prompt: String,
         #[serde(default = "default_session_strategy")]
         session_strategy: String, // "new" | "reuse"
+        /// 模型覆盖（可选，不填用 Agent 默认模型）
+        #[serde(default)]
+        model: Option<String>,
+        /// 推理级别覆盖（可选）
+        #[serde(default)]
+        thinking: Option<String>,
     },
     Shell {
         command: String,

@@ -1759,7 +1759,9 @@ impl Tool for CronManageTool {
                     "name": { "type": "string", "description": "任务名称（create 必填）" },
                     "cron_expr": { "type": "string", "description": "Cron 表达式（create 必填），如 '0 9 * * *'" },
                     "prompt": { "type": "string", "description": "AI 执行指令（create 必填）" },
-                    "timezone": { "type": "string", "description": "时区，默认 Asia/Shanghai" }
+                    "timezone": { "type": "string", "description": "时区，默认 Asia/Shanghai" },
+                    "model": { "type": "string", "description": "指定模型（可选，如 gpt-4o / claude-sonnet-4-6），不填则用 Agent 默认模型" },
+                    "thinking": { "type": "string", "description": "推理级别（可选）：off/minimal/low/medium/high", "enum": ["off", "minimal", "low", "medium", "high"] }
                 },
                 "required": ["action", "agent_id"]
             }),
@@ -1787,14 +1789,21 @@ impl Tool for CronManageTool {
                 let cron_expr = args["cron_expr"].as_str().ok_or("缺少 cron_expr")?;
                 let prompt = args["prompt"].as_str().ok_or("缺少 prompt")?;
                 let tz = args["timezone"].as_str().unwrap_or("Asia/Shanghai");
+                let model = args["model"].as_str();
+                let thinking = args["thinking"].as_str();
                 let id = uuid::Uuid::new_v4().to_string();
                 let now = chrono::Utc::now().timestamp_millis();
                 let schedule = serde_json::json!({"kind":"cron","expr":cron_expr,"tz":tz}).to_string();
-                let payload = serde_json::json!({"type":"agent","prompt":prompt,"sessionStrategy":"new"}).to_string();
+                let mut payload_obj = serde_json::json!({"type":"agent","prompt":prompt,"sessionStrategy":"new"});
+                if let Some(m) = model { payload_obj["model"] = serde_json::json!(m); }
+                if let Some(t) = thinking { payload_obj["thinking"] = serde_json::json!(t); }
+                let payload = payload_obj.to_string();
                 sqlx::query("INSERT INTO cron_jobs (id, agent_id, name, job_type, schedule, action_payload, enabled, timeout_secs, created_at, updated_at) VALUES (?,?,?,'agent',?,?,1,300,?,?)")
                     .bind(&id).bind(agent_id).bind(name).bind(&schedule).bind(&payload).bind(now).bind(now)
                     .execute(&self.pool).await.map_err(|e| format!("创建失败: {}", e))?;
-                Ok(format!("✅ 定时任务已创建: {} | {} ({}) | {}", name, cron_expr, tz, &id[..8]))
+                let model_info = model.map(|m| format!(" | model: {}", m)).unwrap_or_default();
+                let thinking_info = thinking.map(|t| format!(" | thinking: {}", t)).unwrap_or_default();
+                Ok(format!("✅ 定时任务已创建: {} | {} ({}){}{} | {}", name, cron_expr, tz, model_info, thinking_info, &id[..8]))
             }
             "pause" => {
                 let jid = args["job_id"].as_str().ok_or("缺少 job_id")?;

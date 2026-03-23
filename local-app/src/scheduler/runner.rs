@@ -39,8 +39,8 @@ impl JobRunner {
 
     async fn execute_inner(&self, job: &CronJob) -> ExecResult {
         match &job.action_payload {
-            ActionPayload::Agent { prompt, session_strategy } => {
-                self.execute_agent(job, prompt, session_strategy).await
+            ActionPayload::Agent { prompt, session_strategy, model, thinking } => {
+                self.execute_agent(job, prompt, session_strategy, model.as_deref(), thinking.as_deref()).await
             }
             ActionPayload::Shell { command } => {
                 self.execute_shell(command).await
@@ -52,19 +52,24 @@ impl JobRunner {
     }
 
     /// Agent 任务：调用 Orchestrator
-    async fn execute_agent(&self, job: &CronJob, prompt: &str, _session_strategy: &str) -> ExecResult {
+    async fn execute_agent(&self, job: &CronJob, prompt: &str, _session_strategy: &str, model_override: Option<&str>, _thinking_override: Option<&str>) -> ExecResult {
         let agent_id = match &job.agent_id {
             Some(id) => id.clone(),
             None => return ExecResult::Failed { error: "Agent 任务缺少 agent_id".to_string() },
         };
 
-        // 查找 Agent 模型
-        let agent_model = match self.orchestrator.list_agents().await {
-            Ok(agents) => match agents.into_iter().find(|a| a.id == agent_id) {
-                Some(a) => a.model,
-                None => return ExecResult::Failed { error: format!("Agent {} 不存在", agent_id) },
-            },
-            Err(e) => return ExecResult::Failed { error: e },
+        // 查找模型：优先用 payload 指定的 model，否则用 Agent 默认
+        let agent_model = if let Some(m) = model_override {
+            log::info!("Cron 任务 {} 使用覆盖模型: {}", job.name, m);
+            m.to_string()
+        } else {
+            match self.orchestrator.list_agents().await {
+                Ok(agents) => match agents.into_iter().find(|a| a.id == agent_id) {
+                    Some(a) => a.model,
+                    None => return ExecResult::Failed { error: format!("Agent {} 不存在", agent_id) },
+                },
+                Err(e) => return ExecResult::Failed { error: e },
+            }
         };
 
         // 查找 provider 配置

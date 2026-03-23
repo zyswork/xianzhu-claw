@@ -45,7 +45,7 @@ pub async fn seed_default_jobs(pool: &SqlitePool) -> Result<(), String> {
             },
             action_payload: ActionPayload::Agent {
                 prompt: "请回顾过去24小时的对话记录，提取关键信息和重要决策，整理成结构化的长期记忆摘要。重点关注：用户偏好变化、新学到的知识、待跟进的事项。".into(),
-                session_strategy: "new".into(),
+                session_strategy: "new".into(), model: None, thinking: None,
             },
             timeout_secs: 300,
             guardrails: Guardrails::default(),
@@ -62,7 +62,7 @@ pub async fn seed_default_jobs(pool: &SqlitePool) -> Result<(), String> {
             schedule: Schedule::Every { secs: 1800 },
             action_payload: ActionPayload::Agent {
                 prompt: "执行系统健康检查：检查内存使用、数据库连接状态、最近任务执行情况。如发现异常，输出简要报告。".into(),
-                session_strategy: "new".into(),
+                session_strategy: "new".into(), model: None, thinking: None,
             },
             timeout_secs: 120,
             guardrails: Guardrails {
@@ -87,7 +87,7 @@ pub async fn seed_default_jobs(pool: &SqlitePool) -> Result<(), String> {
             },
             action_payload: ActionPayload::Agent {
                 prompt: "复盘过去一周的任务执行情况：统计成功/失败次数，分析失败原因，提出改进建议。输出结构化的周报摘要。".into(),
-                session_strategy: "new".into(),
+                session_strategy: "new".into(), model: None, thinking: None,
             },
             timeout_secs: 600,
             guardrails: Guardrails::default(),
