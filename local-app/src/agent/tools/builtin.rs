@@ -2188,7 +2188,10 @@ impl TtsTool {
             .ok_or("无法获取 home 目录")?
             .join(".yonclaw/tts");
         let _ = std::fs::create_dir_all(&output_dir);
-        let filename = format!("tts_{}.aiff", chrono::Utc::now().timestamp_millis());
+        #[cfg(target_os = "macos")]
+        let filename = format!("tts_{}.m4a", chrono::Utc::now().timestamp_millis());
+        #[cfg(not(target_os = "macos"))]
+        let filename = format!("tts_{}.wav", chrono::Utc::now().timestamp_millis());
         let output_path = output_dir.join(&filename);
 
         #[cfg(target_os = "macos")]
@@ -2196,12 +2199,14 @@ impl TtsTool {
             let voice = args.get("voice").and_then(|v| v.as_str()).unwrap_or("");
             let rate = args.get("speed").and_then(|s| s.as_u64()).unwrap_or(200);
 
+            // 先生成 AIFF 临时文件
+            let tmp_aiff = output_dir.join(format!("_tmp_{}.aiff", chrono::Utc::now().timestamp_millis()));
             let mut cmd = tokio::process::Command::new("say");
             if !voice.is_empty() {
                 cmd.arg("-v").arg(voice);
             }
             cmd.arg("-r").arg(rate.to_string());
-            cmd.arg("-o").arg(output_path.to_str().unwrap_or(""));
+            cmd.arg("-o").arg(tmp_aiff.to_str().unwrap_or(""));
             cmd.arg(text);
 
             let result = cmd.output().await
@@ -2210,6 +2215,22 @@ impl TtsTool {
             if !result.status.success() {
                 let stderr = String::from_utf8_lossy(&result.stderr);
                 return Err(format!("say 失败: {}", stderr));
+            }
+
+            // 转换为 m4a（浏览器可播放）
+            let convert = tokio::process::Command::new("afconvert")
+                .args(["-f", "m4af", "-d", "aac"])
+                .arg(tmp_aiff.to_str().unwrap_or(""))
+                .arg(output_path.to_str().unwrap_or(""))
+                .output().await;
+
+            // 清理临时文件
+            let _ = std::fs::remove_file(&tmp_aiff);
+
+            if let Ok(r) = convert {
+                if !r.status.success() {
+                    return Err("音频格式转换失败（afconvert）".to_string());
+                }
             }
 
             let size = std::fs::metadata(&output_path).map(|m| m.len()).unwrap_or(0);

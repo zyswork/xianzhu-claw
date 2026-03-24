@@ -382,12 +382,11 @@ function UserMessageContent({ content }: { content: string }) {
 
 /** 把本地文件路径转为 Tauri asset URL */
 function convertLocalPath(path: string): string {
-  // Tauri 1.x: 用 tauri://localhost/asset/ 协议访问本地文件
-  if (path.startsWith('/') || path.startsWith('~')) {
-    const resolved = path.startsWith('~')
-      ? path // Tauri 会解析 ~
-      : path
-    return `https://asset.localhost/${encodeURIComponent(resolved)}`
+  // Tauri 1.x: 用 asset protocol 访问本地文件
+  // macOS/Linux: /path/to/file 或 ~/path
+  // Windows: C:\path\to\file 或 D:/path
+  if (path.startsWith('/') || path.startsWith('~') || /^[A-Z]:[/\\]/i.test(path)) {
+    return `https://asset.localhost/${encodeURIComponent(path)}`
   }
   return path
 }

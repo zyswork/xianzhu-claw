@@ -11,19 +11,19 @@ import { toast } from '../hooks/useToast'
 
 const TOTAL_STEPS = 4
 
-// 暖白色调（参考 PetClaw）
+// 使用 CSS 变量以支持深色主题
 const S = {
-  bg: '#f7f7f4',
-  card: '#fff',
-  cardBorder: '#e8e8e4',
-  text: '#262521',
-  textSub: '#888882',
-  accent: '#262521',
-  accentBg: '#262521',
+  bg: 'var(--bg-base)',
+  card: 'var(--bg-elevated)',
+  cardBorder: 'var(--border-subtle)',
+  text: 'var(--text-primary)',
+  textSub: 'var(--text-secondary)',
+  accent: 'var(--text-primary)',
+  accentBg: 'var(--text-primary)',
   accentText: '#fff',
-  green: '#22c55e',
-  bar: '#ddd',
-  barActive: '#262521',
+  green: 'var(--success)',
+  bar: 'var(--border-subtle)',
+  barActive: 'var(--text-primary)',
 }
 
 export default function SetupPage({ onComplete }: { onComplete: () => void }) {
@@ -126,7 +126,7 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
               {item.status === 'done' && <span style={{ color: S.green, fontSize: 18 }}>{'\u2705'}</span>}
               {item.status === 'running' && <span style={{ color: S.textSub, fontSize: 13 }}>...</span>}
               {item.status === 'skip' && <span style={{ color: S.textSub, fontSize: 13 }}>{t('common.skip')}</span>}
-              {!item.status && <span style={{ color: '#ddd', fontSize: 13 }}>{'\u25CB'}</span>}
+              {!item.status && <span style={{ color: 'var(--border-subtle)', fontSize: 13 }}>{'\u25CB'}</span>}
             </div>
           ))}
         </div>
