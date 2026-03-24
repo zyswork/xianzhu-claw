@@ -67,8 +67,9 @@ pub struct Orchestrator {
     hook_runner: std::sync::Mutex<super::hooks::HookRunner>,
     /// 生命周期事件管理器（替代 hooks/observer）
     lifecycle: super::lifecycle::LifecycleManager,
-    /// 插件注册表（旧版 manifest）
-    pub plugin_registry: crate::plugin_sdk::PluginRegistry,
+    /// 插件注册表（旧版 manifest，已废弃，保留向后兼容）
+    #[allow(dead_code)]
+    plugin_registry_legacy: crate::plugin_system::PluginRegistry,
     /// 插件管理器（新版 Plugin API）
     pub plugin_manager: std::sync::Mutex<crate::plugin_system::PluginManager>,
     /// 模型提供商注册表
@@ -133,7 +134,7 @@ impl Orchestrator {
                 lm.register(Box::new(super::lifecycle::TokenTrackingHandler));
                 lm
             },
-            plugin_registry: crate::plugin_sdk::PluginRegistry::new(),
+            plugin_registry_legacy: crate::plugin_system::PluginRegistry::with_builtins(),
             plugin_manager: std::sync::Mutex::new(crate::plugin_system::PluginManager::new()),
             provider_registry: crate::plugin_system::create_default_registry(),
             evolution_state: std::sync::Arc::new(super::self_evolution::EvolutionState::new()),

@@ -9,6 +9,7 @@ pub mod provider_trait;
 pub mod providers;
 pub mod plugin_api;
 pub mod builtin_plugins;
+pub mod bundle_compat;
 
 pub use registry::PluginRegistry;
 pub use provider_trait::{ProviderRegistry, CallConfig};

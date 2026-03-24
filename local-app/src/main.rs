@@ -15,6 +15,7 @@ mod channel;
 mod config;
 mod daemon;
 mod db;
+#[deprecated(note = "使用 plugin_system 替代")]
 mod plugin_sdk;
 mod plugin_system;
 mod routing;
@@ -2059,6 +2060,55 @@ async fn list_marketplace_skills() -> Result<Vec<serde_json::Value>, String> {
 }
 
 /// 从云端下载技能到本地 marketplace（内部函数）
+/// 搜索云端技能市场
+#[tauri::command]
+async fn search_skill_hub(
+    query: String,
+) -> Result<Vec<serde_json::Value>, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build().map_err(|e| e.to_string())?;
+
+    let url = format!("https://zys-openclaw.com/api/v1/skill-hub/search?q={}", urlencoding::encode(&query));
+    let resp = client.get(&url).send().await
+        .map_err(|e| format!("搜索失败: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Ok(Vec::new()); // 搜索无结果或服务不可用
+    }
+
+    let data: serde_json::Value = resp.json().await.unwrap_or(serde_json::json!([]));
+    if let Some(arr) = data.as_array() {
+        Ok(arr.clone())
+    } else if let Some(arr) = data["results"].as_array() {
+        Ok(arr.clone())
+    } else {
+        Ok(Vec::new())
+    }
+}
+
+/// 导入外部插件（Claude/Cursor/Codex/MCP 格式）
+#[tauri::command]
+async fn import_external_plugin(
+    state: State<'_, Arc<AppState>>,
+    agent_id: String,
+    path: String,
+) -> Result<String, String> {
+    let dir = std::path::PathBuf::from(&path);
+    if !dir.exists() {
+        return Err(format!("路径不存在: {}", path));
+    }
+
+    let bundle = plugin_system::bundle_compat::parse_bundle(&dir)?;
+    log::info!("检测到 {:?} 插件: {} ({})", bundle.bundle_type, bundle.name, bundle.description);
+
+    let result = plugin_system::bundle_compat::install_bundle(
+        state.orchestrator.pool(), &agent_id, &bundle, &dir,
+    ).await?;
+
+    Ok(result)
+}
+
 async fn download_skill_from_hub_inner(slug: &str) -> Result<String, String> {
     let marketplace_dir = dirs::home_dir()
         .ok_or("无法获取 home 目录")?
@@ -4019,6 +4069,8 @@ async fn main() {
             set_agent_plugin,
             list_marketplace_skills,
             download_skill_from_hub,
+            search_skill_hub,
+            import_external_plugin,
             publish_skill_to_hub,
             install_skill_to_agent,
             uninstall_skill_from_agent,
