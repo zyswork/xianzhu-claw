@@ -82,17 +82,40 @@ impl SandboxExecutor {
             return Err(format!("命令不在白名单中: {}", command));
         }
 
-        // 2. 路径白名单检查（检查参数中的路径）
+        // 2. 路径白名单检查（resolve symlink 后检查）
         if !config.allowed_paths.is_empty() {
             for arg in args {
                 let path = PathBuf::from(arg);
                 if path.is_absolute() {
-                    let allowed = config
-                        .allowed_paths
-                        .iter()
-                        .any(|ap| path.starts_with(ap));
+                    // 安全: resolve symlinks 再检查边界
+                    let resolved = if path.exists() {
+                        path.canonicalize().unwrap_or_else(|_| path.clone())
+                    } else {
+                        path.clone()
+                    };
+
+                    // 安全: 逐段检查 symlink（防止中间段逃逸）
+                    if path.exists() {
+                        let mut cursor = PathBuf::new();
+                        for component in path.components() {
+                            cursor.push(component);
+                            if cursor.exists() {
+                                if let Ok(meta) = std::fs::symlink_metadata(&cursor) {
+                                    if meta.is_symlink() {
+                                        let target = std::fs::read_link(&cursor).unwrap_or_default();
+                                        log::warn!("沙箱: 路径段 {} 是 symlink → {:?}", cursor.display(), target);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    let allowed = config.allowed_paths.iter().any(|ap| {
+                        let ap_resolved = ap.canonicalize().unwrap_or_else(|_| ap.clone());
+                        resolved.starts_with(&ap_resolved)
+                    });
                     if !allowed {
-                        return Err(format!("路径不在白名单中: {}", arg));
+                        return Err(format!("路径不在白名单中（解析后: {}）: {}", resolved.display(), arg));
                     }
                 }
             }

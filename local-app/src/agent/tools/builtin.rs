@@ -914,6 +914,17 @@ impl Tool for FileEditTool {
         tokio::fs::write(path, &new_content).await
             .map_err(|e| format!("写入文件失败: {}", e))?;
 
+        // 安全: 写后验证（确认写入内容与预期一致）
+        let verify = tokio::fs::read_to_string(path).await
+            .map_err(|e| format!("写后验证读取失败: {}", e))?;
+        if !old_text.is_empty() && verify.contains(old_text) && !new_text.contains(old_text) {
+            log::warn!("file_edit 写后验证: old_text 仍存在于文件中（可能写入失败）");
+        }
+        if !new_text.is_empty() && !verify.contains(new_text) {
+            log::warn!("file_edit 写后验证: new_text 未出现在文件中（写入可能异常）");
+            return Err(format!("写后验证失败：new_text 未出现在文件中。当前文件前 500 字符:\n{}", &verify[..verify.len().min(500)]));
+        }
+
         log::info!("文件已编辑: {}", path);
         Ok(format!("文件已编辑: {} (新大小: {} 字节)", path, new_content.len()))
     }

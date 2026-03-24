@@ -6,6 +6,20 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// 透明 wrapper 列表（审批和执行共用，集中定义）
+///
+/// 这些命令不改变被包装程序的行为，只影响执行环境。
+/// 审批时需要解包找到实际执行的程序。
+pub const TRANSPARENT_WRAPPERS: &[&str] = &[
+    "time ", "env ", "nice ", "nohup ", "strace ", "ltrace ",
+    "stdbuf ", "timeout ", "ionice ", "taskset ",
+];
+
+/// 非透明 wrapper（需要额外权限审批）
+pub const OPAQUE_WRAPPERS: &[&str] = &[
+    "sudo ", "doas ", "chrt ",
+];
+
 /// 统一路径安全校验
 ///
 /// 检查路径是否安全，拒绝系统路径、敏感路径和路径遍历攻击
@@ -330,13 +344,11 @@ fn detect_dangerous_command(cmd: &str) -> Option<String> {
         }
     }
 
-    // 安全: 透明 wrapper 解包检测
-    // 如果命令以 time/env/nice 等透明 wrapper 开头，记录实际命令
-    let transparent_wrappers = ["time ", "env ", "nice ", "nohup ", "strace ", "ltrace "];
+    // 安全: 透明 wrapper 解包检测（集中定义，审批和执行共用）
     let mut actual_cmd = cmd_lower.as_str();
-    for wrapper in &transparent_wrappers {
+    for wrapper in TRANSPARENT_WRAPPERS {
         if actual_cmd.starts_with(wrapper) {
-            actual_cmd = &actual_cmd[wrapper.len()..];
+            actual_cmd = actual_cmd[wrapper.len()..].trim_start();
             log::info!("工具安全: 透明 wrapper '{}' 解包后实际命令: {}", wrapper.trim(), actual_cmd);
         }
     }
