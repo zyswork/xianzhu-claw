@@ -52,6 +52,8 @@ export default function McpTab({ agentId }: McpTabProps) {
   const [testing, setTesting] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [error, setError] = useState('')
+  const [showJsonImport, setShowJsonImport] = useState(false)
+  const [jsonInput, setJsonInput] = useState('')
 
   // 添加表单
   const [form, setForm] = useState({
@@ -130,19 +132,93 @@ export default function McpTab({ agentId }: McpTabProps) {
     finally { setImporting(false) }
   }
 
+  const handleJsonImport = async () => {
+    if (!jsonInput.trim()) return
+    try {
+      setError('')
+      const parsed = JSON.parse(jsonInput.trim())
+      // 支持两种格式：{ mcpServers: {...} } 或直接 { name: { command, args } }
+      const servers = parsed.mcpServers || parsed
+      if (typeof servers !== 'object' || Array.isArray(servers)) {
+        setError('JSON 格式错误：需要 { "mcpServers": { "name": { "command": "...", "args": [...] } } } 或 { "name": { "command": "..." } }')
+        return
+      }
+      let count = 0
+      for (const [name, cfg] of Object.entries(servers)) {
+        const c = cfg as any
+        if (!c.command) continue
+        const args = Array.isArray(c.args) ? c.args.join(' ') : ''
+        const env = c.env ? JSON.stringify(c.env) : undefined
+        await invoke('add_mcp_server', {
+          agentId,
+          name,
+          transport: c.type || 'stdio',
+          command: c.command,
+          args: args || undefined,
+          url: c.url || undefined,
+          env,
+        })
+        count++
+      }
+      await loadServers()
+      setJsonInput('')
+      setShowJsonImport(false)
+      toast.success(`已导入 ${count} 个 MCP Server`)
+    } catch (e) {
+      setError(`JSON 解析失败: ${e}`)
+    }
+  }
+
   return (
     <div>
       {/* 操作栏 */}
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-        <button onClick={() => setShowAdd(!showAdd)} style={btnStyle}>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '10px', flexWrap: 'wrap' }}>
+        <button onClick={() => { setShowAdd(!showAdd); setShowJsonImport(false) }} style={btnStyle}>
           {showAdd ? t('mcpTab.cancelBtn') : t('mcpTab.addBtn')}
         </button>
         <button onClick={handleImport} disabled={importing} style={btnStyle}>
           {importing ? t('mcpTab.importing') : t('mcpTab.importClaude')}
         </button>
+        <button onClick={() => { setShowJsonImport(!showJsonImport); setShowAdd(false) }} style={btnStyle}>
+          {showJsonImport ? t('mcpTab.cancelBtn') : '\u{1F4CB} JSON'}
+        </button>
       </div>
 
       {error && <div style={{ color: 'var(--error)', fontSize: '12px', marginBottom: '8px' }}>{error}</div>}
+
+      {/* JSON 粘贴导入 */}
+      {showJsonImport && (
+        <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8 }}>
+            粘贴 MCP 配置 JSON（支持 Claude/Cursor 格式）：
+          </div>
+          <textarea
+            value={jsonInput}
+            onChange={e => setJsonInput(e.target.value)}
+            placeholder={`{
+  "mcpServers": {
+    "my-server": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+    }
+  }
+}`}
+            rows={8}
+            style={{
+              width: '100%', padding: 10, borderRadius: 6,
+              border: '1px solid var(--border-subtle)', fontSize: 12,
+              fontFamily: 'monospace', backgroundColor: 'var(--bg-glass)',
+              color: 'var(--text-primary)', resize: 'vertical',
+            }}
+          />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+            <button onClick={handleJsonImport} disabled={!jsonInput.trim()}
+              style={{ padding: '6px 16px', borderRadius: 6, border: 'none', backgroundColor: 'var(--accent)', color: '#fff', fontSize: 12, cursor: 'pointer' }}>
+              导入
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 添加表单 */}
       {showAdd && (

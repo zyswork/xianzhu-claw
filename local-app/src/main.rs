@@ -1703,20 +1703,34 @@ async fn import_claude_mcp_config(
     state: State<'_, Arc<AppState>>,
     agent_id: String,
 ) -> Result<Vec<McpServerInfo>, String> {
-    // 读取 Claude Desktop 配置文件
-    let config_path = dirs::home_dir()
-        .ok_or("无法获取 home 目录")?
-        .join("Library/Application Support/Claude/claude_desktop_config.json");
+    // 按优先级查找 Claude MCP 配置
+    let home = dirs::home_dir().ok_or("无法获取 home 目录")?;
+    let candidates = [
+        home.join(".claude/config-templates/.mcp.json"),       // Claude Code
+        home.join(".claude/.mcp.json"),                        // Claude Code alt
+        home.join("Library/Application Support/Claude/claude_desktop_config.json"), // Claude Desktop (macOS)
+        home.join(".config/Claude/claude_desktop_config.json"), // Claude Desktop (Linux)
+    ];
 
-    let content = tokio::fs::read_to_string(&config_path).await
-        .map_err(|e| format!("读取 Claude Desktop 配置失败: {}。路径: {}", e, config_path.display()))?;
+    let mut content = String::new();
+    let mut found_path = String::new();
+    for path in &candidates {
+        if let Ok(c) = tokio::fs::read_to_string(path).await {
+            content = c;
+            found_path = path.display().to_string();
+            break;
+        }
+    }
+    if content.is_empty() {
+        return Err(format!("未找到 Claude MCP 配置。已搜索:\n{}", candidates.iter().map(|p| format!("  - {}", p.display())).collect::<Vec<_>>().join("\n")));
+    }
 
     let config: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("解析配置 JSON 失败: {}", e))?;
+        .map_err(|e| format!("解析 {} 失败: {}", found_path, e))?;
 
     let mcp_servers = config.get("mcpServers")
         .and_then(|v| v.as_object())
-        .ok_or("配置中未找到 mcpServers 字段")?;
+        .ok_or_else(|| format!("配置 {} 中未找到 mcpServers 字段。如果是新安装，请先在 Claude 中配置 MCP Server。", found_path))?;
 
     let mut imported = Vec::new();
     let now = chrono::Utc::now().timestamp_millis();
