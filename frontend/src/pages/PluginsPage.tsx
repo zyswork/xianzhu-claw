@@ -303,44 +303,92 @@ export default function PluginsPage() {
           <h3 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 600 }}>
             {'\u{1F50C}'} {t('plugins.apiCapabilities')}
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
-            {capabilities.map((cap: any) => (
-              <div key={cap.id} style={{
-                padding: '12px 16px', borderRadius: 10,
-                border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-elevated)',
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{cap.name}</span>
-                  <span style={{
-                    fontSize: 9, padding: '1px 6px', borderRadius: 8,
-                    backgroundColor: cap.type === 'provider' ? 'var(--accent-bg)' : 'var(--success-bg)',
-                    color: cap.type === 'provider' ? 'var(--accent)' : 'var(--success)',
-                  }}>{cap.type}</span>
+
+          {/* 按类型分组：搜索引擎 / 图片生成 / 语音合成 / LLM Provider */}
+          {['plugin', 'provider'].map(type => {
+            const items = capabilities.filter((c: any) => c.type === type)
+            if (items.length === 0) return null
+            return (
+              <div key={type} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase' }}>
+                  {type === 'plugin' ? t('plugins.capPlugins') : t('plugins.capProviders')}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{cap.description}</div>
-                {cap.capabilities && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {(cap.capabilities as string[]).map((c: string, i: number) => (
-                      <span key={i} style={{
-                        fontSize: 10, padding: '1px 6px', borderRadius: 6,
-                        backgroundColor: 'var(--bg-glass)', color: 'var(--text-secondary)',
-                      }}>{c}</span>
-                    ))}
-                  </div>
-                )}
-                {cap.models && (
-                  <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {(cap.models as string[]).slice(0, 5).map((m: string, i: number) => (
-                      <span key={i} style={{
-                        fontSize: 10, padding: '1px 6px', borderRadius: 6,
-                        backgroundColor: 'var(--bg-glass)', color: 'var(--text-accent)', fontFamily: 'monospace',
-                      }}>{m}</span>
-                    ))}
-                  </div>
-                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {items.map((cap: any) => {
+                    // 提取能力类型
+                    const capType = (cap.capabilities?.[0] || '').split('(')[0] || ''
+                    const capId = ((cap.capabilities?.[0] || '').match(/\("?([^)"]+)"?\)/) || [])[1] || cap.id
+
+                    return (
+                      <div key={cap.id} style={{
+                        padding: '12px 16px', borderRadius: 10,
+                        border: cap.enabled ? '1px solid var(--border-subtle)' : '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--bg-elevated)',
+                        opacity: cap.enabled ? 1 : 0.5,
+                        display: 'flex', alignItems: 'center', gap: 12,
+                      }}>
+                        {/* 信息 */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <span style={{ fontWeight: 600, fontSize: 13 }}>{cap.name}</span>
+                            <span style={{
+                              fontSize: 9, padding: '1px 6px', borderRadius: 8,
+                              backgroundColor: type === 'provider' ? 'var(--accent-bg)' : 'var(--success-bg)',
+                              color: type === 'provider' ? 'var(--accent)' : 'var(--success)',
+                            }}>{capType || type}</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{cap.description}</div>
+                          {cap.models && (
+                            <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                              {(cap.models as string[]).slice(0, 6).map((m: string, i: number) => (
+                                <span key={i} style={{
+                                  fontSize: 9, padding: '1px 5px', borderRadius: 4,
+                                  backgroundColor: 'var(--bg-glass)', color: 'var(--text-accent)', fontFamily: 'monospace',
+                                }}>{m}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 操作按钮 */}
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                          {/* 设为默认（搜索/TTS） */}
+                          {capType === 'WebSearch' && (
+                            <button onClick={async () => {
+                              try {
+                                await invoke('set_setting', { key: 'web_search_provider', value: capId })
+                                toast.success(`${cap.name} ${t('plugins.setAsDefault')}`)
+                              } catch (e) { toast.error(String(e)) }
+                            }} style={{
+                              padding: '4px 10px', fontSize: 11, borderRadius: 6,
+                              border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-glass)',
+                              cursor: 'pointer', color: 'var(--text-secondary)',
+                            }}>
+                              {t('plugins.useAsDefault')}
+                            </button>
+                          )}
+                          {capType === 'Tts' && (
+                            <button onClick={async () => {
+                              try {
+                                await invoke('set_setting', { key: 'tts_provider', value: capId })
+                                toast.success(`${cap.name} ${t('plugins.setAsDefault')}`)
+                              } catch (e) { toast.error(String(e)) }
+                            }} style={{
+                              padding: '4px 10px', fontSize: 11, borderRadius: 6,
+                              border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-glass)',
+                              cursor: 'pointer', color: 'var(--text-secondary)',
+                            }}>
+                              {t('plugins.useAsDefault')}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            ))}
-          </div>
+            )
+          })}
         </div>
       )}
     </div>

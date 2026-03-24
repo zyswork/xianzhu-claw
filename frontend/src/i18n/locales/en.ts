@@ -393,6 +393,10 @@ export const en: TranslationMap = {
     emptyType: 'No plugins of this type',
     hintDetail: 'Global: system availability. Agent: per-agent toggle. Different agents can have different plugin sets.',
     apiCapabilities: 'Registered Capabilities',
+    capPlugins: 'Capability Plugins',
+    capProviders: 'LLM Providers',
+    useAsDefault: 'Set as default',
+    setAsDefault: 'set as default',
   },
   settings: {
     title: 'Model Providers',
