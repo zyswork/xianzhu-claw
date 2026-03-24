@@ -968,6 +968,55 @@ function ChatTab({ agentId }: { agentId: string }) {
         return null // 返回 null 让消息走正常 LLM 流程，技能会被 skill_mgr.activate_for_message 匹配
       }
 
+      case 'think': {
+        const levels = ['off', 'minimal', 'low', 'medium', 'high']
+        if (!args.trim() || !levels.includes(args.trim().toLowerCase())) {
+          return `用法: /think <off|minimal|low|medium|high>\n当前可选推理级别：${levels.join(' / ')}`
+        }
+        try {
+          // 通过 Agent config 存储 thinking level
+          const detail = await invoke<any>('get_agent_detail', { agentId })
+          const config = detail?.config ? JSON.parse(detail.config) : {}
+          config.thinkingLevel = args.trim().toLowerCase()
+          await invoke('update_agent', { agentId, config: JSON.stringify(config) })
+          return `推理级别已设为 **${args.trim().toLowerCase()}**`
+        } catch (e) { return '设置失败: ' + e }
+      }
+
+      case 'fast': {
+        const arg = args.trim().toLowerCase()
+        if (!arg || arg === 'status') {
+          try {
+            const detail = await invoke<any>('get_agent_detail', { agentId })
+            const config = detail?.config ? JSON.parse(detail.config) : {}
+            return `快速模式: **${config.fastMode ? 'ON' : 'OFF'}**\n使用 /fast on 或 /fast off 切换`
+          } catch { return '查询失败' }
+        }
+        try {
+          const detail = await invoke<any>('get_agent_detail', { agentId })
+          const config = detail?.config ? JSON.parse(detail.config) : {}
+          config.fastMode = arg === 'on'
+          await invoke('update_agent', { agentId, config: JSON.stringify(config) })
+          return `快速模式已${arg === 'on' ? '开启' : '关闭'}`
+        } catch (e) { return '设置失败: ' + e }
+      }
+
+      case 'models': {
+        try {
+          const providers = await invoke<any[]>('get_providers')
+          const lines: string[] = ['## 可用模型\n']
+          for (const p of (providers || [])) {
+            if (!p.enabled) continue
+            const models = (p.models || []).map((m: any) => m.name || m.id).join(', ')
+            if (models) {
+              lines.push(`**${p.name}** (${p.apiType}): ${models}`)
+            }
+          }
+          lines.push('\n使用 /model provider_id/model_name 切换')
+          return lines.join('\n')
+        } catch (e) { return '查询失败: ' + e }
+      }
+
       default:
         return t('agentDetailSub.unknownSlashCmd', { cmd })
     }
