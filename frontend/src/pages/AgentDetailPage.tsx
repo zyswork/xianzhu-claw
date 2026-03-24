@@ -1146,7 +1146,7 @@ function ChatTab({ agentId }: { agentId: string }) {
                           cursor: 'pointer', userSelect: 'none', maxWidth: '100%', overflow: 'hidden',
                         }}
                       >
-                        <span style={{ flexShrink: 0, fontSize: 11, color: '#bbb' }}>{isExpanded ? '\u25BC' : '\u25B6'}</span>
+                        <span style={{ flexShrink: 0, fontSize: 11, color: 'var(--text-muted)' }}>{isExpanded ? '\u25BC' : '\u25B6'}</span>
                         <span style={{ flexShrink: 0 }}>{'\u{1F527}'}</span>
                         <strong style={{ flexShrink: 0 }}>{msg.toolName || t('common.tools')}</strong>
                         {!isExpanded && msg.content && (
@@ -1935,7 +1935,7 @@ function SubagentsTab({ agentId }: { agentId: string }) {
   }
 
   const statusColor = (status: string) => {
-    if (status === 'Running') return { bg: '#dbeafe', color: '#2563eb' }
+    if (status === 'Running') return { bg: 'var(--accent-bg)', color: 'var(--accent)' }
     if (status === 'Completed') return { bg: 'var(--success-bg)', color: 'var(--success)' }
     if (status.startsWith('Failed')) return { bg: 'var(--error-bg)', color: 'var(--error)' }
     if (status === 'Timeout') return { bg: '#fef3c7', color: '#d97706' }
@@ -2236,7 +2236,7 @@ function AutonomyTab({ agentId }: { agentId: string }) {
 
       {TOOL_GROUP_TOOLS.map((group) => (
         <div key={group.key} style={{ marginBottom: 20 }}>
-          <h4 style={{ margin: '0 0 8px', fontSize: 14, color: '#374151' }}>{t(`agentDetailSub.${group.key}`)}</h4>
+          <h4 style={{ margin: '0 0 8px', fontSize: 14, color: 'var(--text-primary)' }}>{t(`agentDetailSub.${group.key}`)}</h4>
           {group.tools.map((tool) => {
             const current = config.overrides[tool] || config.default_level || 'L1Confirm'
             return (
