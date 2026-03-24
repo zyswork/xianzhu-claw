@@ -397,6 +397,11 @@ export const en: TranslationMap = {
     capProviders: 'LLM Providers',
     useAsDefault: 'Set as default',
     setAsDefault: 'set as default',
+    currentDefault: 'Default',
+    configKey: 'Configure Key',
+    keySaved: 'API Key saved',
+    configKeyTitle: 'Configure {name} API Key',
+    configKeyHint: 'Save API Key locally (env var: {envVar}). You can also set it via environment variable after restart.',
   },
   settings: {
     title: 'Model Providers',

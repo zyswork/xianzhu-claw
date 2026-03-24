@@ -344,6 +344,22 @@ impl WebSearchTool {
         Self { pool }
     }
 
+    /// 获取 API Key（优先 DB settings → 环境变量）
+    async fn get_api_key(pool: &sqlx::SqlitePool, env_var: &str) -> Option<String> {
+        // 优先从 settings 读取（用户在插件页配置的）
+        let db_key: Option<String> = sqlx::query_scalar(
+            "SELECT value FROM settings WHERE key = ?"
+        ).bind(format!("plugin_key_{}", env_var))
+        .fetch_optional(pool).await.ok().flatten();
+
+        if let Some(key) = db_key {
+            if !key.is_empty() { return Some(key); }
+        }
+
+        // 回退到环境变量
+        std::env::var(env_var).ok().filter(|k| !k.is_empty())
+    }
+
     /// 从 DB 读取用户配置的搜索引擎偏好
     async fn get_preferred_provider(pool: &sqlx::SqlitePool) -> String {
         let result: Option<String> = sqlx::query_scalar(
@@ -403,13 +419,13 @@ impl Tool for WebSearchTool {
         // 按指定 provider 或 auto fallback 链执行
         match preferred.as_str() {
             "serper" => {
-                let key = std::env::var("SERPER_API_KEY").unwrap_or_default();
-                if key.is_empty() { return Err("SERPER_API_KEY 未配置".to_string()); }
+                let key = Self::get_api_key(&self.pool, "SERPER_API_KEY").await
+                    .ok_or("SERPER_API_KEY 未配置。请在插件页面配置 API Key 或设置环境变量。")?;
                 search_serper(&client, &key, query).await
             }
             "tavily" => {
-                let key = std::env::var("TAVILY_API_KEY").unwrap_or_default();
-                if key.is_empty() { return Err("TAVILY_API_KEY 未配置".to_string()); }
+                let key = Self::get_api_key(&self.pool, "TAVILY_API_KEY").await
+                    .ok_or("TAVILY_API_KEY 未配置。请在插件页面配置 API Key 或设置环境变量。")?;
                 search_tavily(&client, &key, query).await
             }
             "duckduckgo" => {
@@ -417,15 +433,11 @@ impl Tool for WebSearchTool {
             }
             _ => {
                 // auto: Serper → Tavily → DuckDuckGo → fallback
-                if let Ok(key) = std::env::var("SERPER_API_KEY") {
-                    if !key.is_empty() {
-                        if let Ok(r) = search_serper(&client, &key, query).await { return Ok(r); }
-                    }
+                if let Some(key) = Self::get_api_key(&self.pool, "SERPER_API_KEY").await {
+                    if let Ok(r) = search_serper(&client, &key, query).await { return Ok(r); }
                 }
-                if let Ok(key) = std::env::var("TAVILY_API_KEY") {
-                    if !key.is_empty() {
-                        if let Ok(r) = search_tavily(&client, &key, query).await { return Ok(r); }
-                    }
+                if let Some(key) = Self::get_api_key(&self.pool, "TAVILY_API_KEY").await {
+                    if let Ok(r) = search_tavily(&client, &key, query).await { return Ok(r); }
                 }
                 match search_duckduckgo(&client, query).await {
                     Ok(r) => Ok(r),

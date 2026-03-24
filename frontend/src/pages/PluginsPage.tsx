@@ -36,9 +36,13 @@ export default function PluginsPage() {
   const [configValues, setConfigValues] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [capabilities, setCapabilities] = useState<any[]>([])
+  const [defaultSearch, setDefaultSearch] = useState('auto')
+  const [defaultTts, setDefaultTts] = useState('local')
+  const [configModal, setConfigModal] = useState<{ id: string; envVar: string; label: string } | null>(null)
+  const [configKeyInput, setConfigKeyInput] = useState('')
 
   useEffect(() => { loadAgents() }, [])
-  useEffect(() => { loadPlugins(); loadCapabilities() }, [])
+  useEffect(() => { loadPlugins(); loadCapabilities(); loadDefaults() }, [])
   useEffect(() => { if (selectedAgent) loadAgentStates() }, [selectedAgent])
 
   const loadAgents = async () => {
@@ -62,6 +66,35 @@ export default function PluginsPage() {
       const caps = await invoke<any[]>('list_plugin_capabilities')
       setCapabilities(caps || [])
     } catch {}
+  }
+
+  const loadDefaults = async () => {
+    try {
+      const search = await invoke<string>('get_setting', { key: 'web_search_provider' }).catch(() => 'auto')
+      const tts = await invoke<string>('get_setting', { key: 'tts_provider' }).catch(() => 'local')
+      setDefaultSearch(search || 'auto')
+      setDefaultTts(tts || 'local')
+    } catch {}
+  }
+
+  const setDefault = async (key: string, value: string) => {
+    try {
+      await invoke('set_setting', { key, value })
+      if (key === 'web_search_provider') setDefaultSearch(value)
+      if (key === 'tts_provider') setDefaultTts(value)
+      toast.success(t('plugins.setAsDefault'))
+    } catch (e) { toast.error(String(e)) }
+  }
+
+  const saveApiKey = async () => {
+    if (!configModal || !configKeyInput.trim()) return
+    try {
+      // 存到 settings 表，key 格式: plugin_key_{envVar}
+      await invoke('set_setting', { key: `plugin_key_${configModal.envVar}`, value: configKeyInput.trim() })
+      toast.success(t('plugins.keySaved'))
+      setConfigModal(null)
+      setConfigKeyInput('')
+    } catch (e) { toast.error(String(e)) }
   }
 
   const loadAgentStates = async () => {
@@ -350,34 +383,53 @@ export default function PluginsPage() {
                           )}
                         </div>
 
-                        {/* 操作按钮 */}
-                        <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                          {/* 设为默认（搜索/TTS） */}
-                          {capType === 'WebSearch' && (
-                            <button onClick={async () => {
-                              try {
-                                await invoke('set_setting', { key: 'web_search_provider', value: capId })
-                                toast.success(`${cap.name} ${t('plugins.setAsDefault')}`)
-                              } catch (e) { toast.error(String(e)) }
-                            }} style={{
-                              padding: '4px 10px', fontSize: 11, borderRadius: 6,
-                              border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-glass)',
-                              cursor: 'pointer', color: 'var(--text-secondary)',
-                            }}>
+                        {/* 状态 + 操作按钮 */}
+                        <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'center' }}>
+                          {/* 当前默认标识 */}
+                          {capType === 'WebSearch' && defaultSearch === capId && (
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, backgroundColor: 'var(--success-bg)', color: 'var(--success)', fontWeight: 600 }}>
+                              {t('plugins.currentDefault')}
+                            </span>
+                          )}
+                          {capType === 'Tts' && defaultTts === capId && (
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 8, backgroundColor: 'var(--success-bg)', color: 'var(--success)', fontWeight: 600 }}>
+                              {t('plugins.currentDefault')}
+                            </span>
+                          )}
+
+                          {/* 需要 API Key 的插件：配置按钮 */}
+                          {cap.description?.includes('API_KEY') && (() => {
+                            const envVar = (cap.description.match(/([A-Z_]+_API_KEY)/)?.[1]) || ''
+                            return envVar ? (
+                              <button onClick={() => { setConfigModal({ id: cap.id, envVar, label: cap.name }); setConfigKeyInput('') }}
+                                style={{
+                                  padding: '4px 10px', fontSize: 11, borderRadius: 6,
+                                  border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-glass)',
+                                  cursor: 'pointer', color: 'var(--text-accent)',
+                                }}>
+                                {'\u{1F511}'} {t('plugins.configKey')}
+                              </button>
+                            ) : null
+                          })()}
+
+                          {/* 设为默认 */}
+                          {capType === 'WebSearch' && defaultSearch !== capId && (
+                            <button onClick={() => setDefault('web_search_provider', capId)}
+                              style={{
+                                padding: '4px 10px', fontSize: 11, borderRadius: 6,
+                                border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-glass)',
+                                cursor: 'pointer', color: 'var(--text-secondary)',
+                              }}>
                               {t('plugins.useAsDefault')}
                             </button>
                           )}
-                          {capType === 'Tts' && (
-                            <button onClick={async () => {
-                              try {
-                                await invoke('set_setting', { key: 'tts_provider', value: capId })
-                                toast.success(`${cap.name} ${t('plugins.setAsDefault')}`)
-                              } catch (e) { toast.error(String(e)) }
-                            }} style={{
-                              padding: '4px 10px', fontSize: 11, borderRadius: 6,
-                              border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-glass)',
-                              cursor: 'pointer', color: 'var(--text-secondary)',
-                            }}>
+                          {capType === 'Tts' && defaultTts !== capId && (
+                            <button onClick={() => setDefault('tts_provider', capId)}
+                              style={{
+                                padding: '4px 10px', fontSize: 11, borderRadius: 6,
+                                border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-glass)',
+                                cursor: 'pointer', color: 'var(--text-secondary)',
+                              }}>
                               {t('plugins.useAsDefault')}
                             </button>
                           )}
@@ -389,6 +441,51 @@ export default function PluginsPage() {
               </div>
             )
           })}
+        </div>
+      )}
+      {/* API Key 配置弹窗 */}
+      {configModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 10000,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)',
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg-elevated)', borderRadius: 16, padding: '24px 28px',
+            maxWidth: 440, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+            border: '1px solid var(--border-subtle)',
+          }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: 16, fontWeight: 600 }}>
+              {'\u{1F511}'} {t('plugins.configKeyTitle', { name: configModal.label })}
+            </h3>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '0 0 12px' }}>
+              {t('plugins.configKeyHint', { envVar: configModal.envVar })}
+            </p>
+            <input
+              type="password"
+              value={configKeyInput}
+              onChange={e => setConfigKeyInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && saveApiKey()}
+              placeholder={configModal.envVar}
+              autoFocus
+              style={{
+                width: '100%', padding: '10px 14px', borderRadius: 8,
+                border: '1px solid var(--border-subtle)', fontSize: 13,
+                backgroundColor: 'var(--bg-glass)', color: 'var(--text-primary)',
+                marginBottom: 16,
+              }}
+            />
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setConfigModal(null)}
+                style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-elevated)', cursor: 'pointer', fontSize: 13 }}>
+                {t('common.cancel')}
+              </button>
+              <button onClick={saveApiKey} disabled={!configKeyInput.trim()}
+                style={{ padding: '8px 16px', borderRadius: 8, border: 'none', backgroundColor: 'var(--accent)', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                {t('common.save')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

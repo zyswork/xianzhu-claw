@@ -397,6 +397,11 @@ export const zhCN: TranslationMap = {
     capProviders: 'LLM 提供商',
     useAsDefault: '设为默认',
     setAsDefault: '已设为默认',
+    currentDefault: '当前默认',
+    configKey: '配置 Key',
+    keySaved: 'API Key 已保存',
+    configKeyTitle: '配置 {name} API Key',
+    configKeyHint: '将 API Key 保存到本地（环境变量 {envVar}）。重启后也可通过设置环境变量生效。',
   },
   settings: {
     title: '模型供应商',
