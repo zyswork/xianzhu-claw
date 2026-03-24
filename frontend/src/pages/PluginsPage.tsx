@@ -338,13 +338,13 @@ export default function PluginsPage() {
           </h3>
 
           {/* 按类型分组：搜索引擎 / 图片生成 / 语音合成 / LLM Provider */}
-          {['plugin', 'provider'].map(type => {
+          {['plugin'].map(type => {
             const items = capabilities.filter((c: any) => c.type === type)
             if (items.length === 0) return null
             return (
               <div key={type} style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, textTransform: 'uppercase' }}>
-                  {type === 'plugin' ? t('plugins.capPlugins') : t('plugins.capProviders')}
+                  {t('plugins.capPlugins')}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {items.map((cap: any) => {

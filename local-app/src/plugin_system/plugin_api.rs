@@ -260,19 +260,7 @@ impl PluginManager {
             })
         }).collect();
 
-        // 追加 Model Provider 信息
-        for p in &self.model_providers {
-            result.push(serde_json::json!({
-                "id": p.id(),
-                "name": p.display_name(),
-                "version": "1.0.0",
-                "description": format!("LLM Provider: {}", p.display_name()),
-                "type": "provider",
-                "capabilities": [format!("Provider({})", p.id())],
-                "models": p.supported_models(),
-                "enabled": true,
-            }));
-        }
+        // Provider 信息由前端从设置页供应商列表获取，不在这里重复
 
         result
     }
