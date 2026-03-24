@@ -823,7 +823,11 @@ impl LlmClient {
             if !response.status().is_success() {
                 let status = response.status();
                 let body_text = response.text().await.unwrap_or_default();
-                log::error!("LLM API 错误 {}: {}", status, body_text.chars().take(500).collect::<String>());
+                // 安全: 清洗错误响应中可能泄露的凭据
+                let safe_body = body_text
+                    .replace(&config.api_key, "***REDACTED***")
+                    .chars().take(500).collect::<String>();
+                log::error!("LLM API 错误 {}: {}", status, safe_body);
 
                 // 5xx / 429 可重试；4xx（除 429）不可重试
                 let is_retryable = status.as_u16() >= 500 || status.as_u16() == 429;
@@ -838,7 +842,7 @@ impl LlmClient {
                     think_buffer.clear();
                     continue;
                 }
-                return Err(format!("LLM API 错误 {}: {}", status, body_text));
+                return Err(format!("LLM API 错误 {}: {}", status, safe_body));
             }
             log::info!("LLM API 响应开始: status=200, 开始读取 SSE 流");
 

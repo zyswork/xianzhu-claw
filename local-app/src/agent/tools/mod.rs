@@ -12,6 +12,31 @@ use std::collections::HashMap;
 pub(crate) fn validate_path_safety(path: &str) -> Result<(), String> {
     let p = std::path::Path::new(path);
 
+    // 安全: 检测符号链接（防止 symlink 攻击绕过路径限制）
+    if p.exists() {
+        let metadata = std::fs::symlink_metadata(p)
+            .map_err(|e| format!("访问路径失败: {}", e))?;
+        if metadata.is_symlink() {
+            // 检查 symlink 目标是否也在允许范围内
+            let target = std::fs::read_link(p)
+                .map_err(|e| format!("读取链接目标失败: {}", e))?;
+            let resolved = if target.is_absolute() { target } else {
+                p.parent().unwrap_or(std::path::Path::new("/")).join(&target)
+            };
+            log::warn!("安全: 检测到符号链接 {} → {:?}", path, resolved);
+            // 对 symlink 的目标也做安全校验（递归检查）
+            if let Ok(canonical_target) = resolved.canonicalize() {
+                let target_str = canonical_target.to_string_lossy();
+                let blocked_prefixes = ["/etc", "/usr", "/bin", "/sbin", "/System", "/Library", "/var/root", "/private/etc"];
+                for prefix in &blocked_prefixes {
+                    if target_str.starts_with(prefix) {
+                        return Err(format!("安全限制：符号链接指向系统路径 {} → {}", path, target_str));
+                    }
+                }
+            }
+        }
+    }
+
     // 尝试规范化路径
     let canonical = if p.exists() {
         p.canonicalize()

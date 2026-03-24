@@ -818,8 +818,15 @@ impl Tool for FileListTool {
         let mut items: Vec<String> = Vec::new();
         while let Some(entry) = entries.next_entry().await.map_err(|e| e.to_string())? {
             let file_type = entry.file_type().await.map_err(|e| e.to_string())?;
+            // 安全: 标记符号链接（不隐藏，但提示用户）
             let name = entry.file_name().to_string_lossy().to_string();
-            let marker = if file_type.is_dir() { "/" } else { "" };
+            let marker = if file_type.is_symlink() {
+                " -> [symlink]"
+            } else if file_type.is_dir() {
+                "/"
+            } else {
+                ""
+            };
             items.push(format!("{}{}", name, marker));
         }
 
