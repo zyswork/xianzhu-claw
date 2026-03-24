@@ -1797,6 +1797,18 @@ async fn toggle_skill(
     agent::SkillManager::toggle_skill(&skill_name, &agent_id, enabled, state.orchestrator.pool()).await
 }
 
+/// 查询 Plugin API 能力列表
+#[tauri::command]
+async fn list_plugin_capabilities(
+    state: State<'_, Arc<AppState>>,
+) -> Result<Vec<serde_json::Value>, String> {
+    if let Ok(pm) = state.orchestrator.plugin_manager.lock() {
+        Ok(pm.to_json())
+    } else {
+        Ok(Vec::new())
+    }
+}
+
 /// 列出所有已注册的系统插件（含 DB 里的启用状态）
 #[tauri::command]
 async fn list_system_plugins(
@@ -3549,6 +3561,12 @@ async fn main() {
     // 注入 Orchestrator 到 DelegateTaskTool（解决循环依赖）
     agent::delegate::inject_orchestrator(orchestrator.clone());
 
+    // 注册内置插件到 PluginManager
+    if let Ok(mut pm) = orchestrator.plugin_manager.lock() {
+        plugin_system::register_builtin_plugins(&mut pm, pool_clone.clone());
+        log::info!("PluginManager: {} 个插件已加载", pm.list_plugins().len());
+    }
+
     // 构建应用共享状态
     let app_state = Arc::new(AppState { db, orchestrator: orchestrator.clone(), scheduler: std::sync::OnceLock::new() });
 
@@ -3929,6 +3947,7 @@ async fn main() {
             list_skills,
             toggle_skill,
             list_system_plugins,
+            list_plugin_capabilities,
             toggle_system_plugin,
             save_plugin_config,
             get_plugin_config,

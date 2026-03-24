@@ -437,6 +437,9 @@ impl Tool for WebSearchTool {
 }
 
 /// Serper.dev Google 搜索 API
+pub async fn search_serper_public(client: &reqwest::Client, api_key: &str, query: &str) -> Result<String, String> {
+    search_serper(client, api_key, query).await
+}
 async fn search_serper(client: &reqwest::Client, api_key: &str, query: &str) -> Result<String, String> {
     let resp = client.post("https://google.serper.dev/search")
         .header("X-API-KEY", api_key)
@@ -480,6 +483,9 @@ async fn search_serper(client: &reqwest::Client, api_key: &str, query: &str) -> 
 }
 
 /// DuckDuckGo Instant Answer API（免费）
+pub async fn search_duckduckgo_public(client: &reqwest::Client, query: &str) -> Result<String, String> {
+    search_duckduckgo(client, query).await
+}
 async fn search_duckduckgo(client: &reqwest::Client, query: &str) -> Result<String, String> {
     // DuckDuckGo Instant Answer API
     let url = format!("https://api.duckduckgo.com/?q={}&format=json&no_html=1&skip_disambig=1", urlencoding::encode(query));
@@ -527,6 +533,9 @@ async fn search_duckduckgo(client: &reqwest::Client, query: &str) -> Result<Stri
 
 /// DuckDuckGo Lite HTML 爬取（备用方案）
 /// Tavily AI 搜索 API
+pub async fn search_tavily_public(client: &reqwest::Client, api_key: &str, query: &str) -> Result<String, String> {
+    search_tavily(client, api_key, query).await
+}
 async fn search_tavily(client: &reqwest::Client, api_key: &str, query: &str) -> Result<String, String> {
     let resp = client
         .post("https://api.tavily.com/search")

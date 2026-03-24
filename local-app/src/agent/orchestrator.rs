@@ -67,8 +67,10 @@ pub struct Orchestrator {
     hook_runner: std::sync::Mutex<super::hooks::HookRunner>,
     /// 生命周期事件管理器（替代 hooks/observer）
     lifecycle: super::lifecycle::LifecycleManager,
-    /// 插件注册表（旧版）
+    /// 插件注册表（旧版 manifest）
     pub plugin_registry: crate::plugin_sdk::PluginRegistry,
+    /// 插件管理器（新版 Plugin API）
+    pub plugin_manager: std::sync::Mutex<crate::plugin_system::PluginManager>,
     /// 模型提供商注册表
     provider_registry: crate::plugin_system::ProviderRegistry,
     /// 自我进化状态
@@ -132,6 +134,7 @@ impl Orchestrator {
                 lm
             },
             plugin_registry: crate::plugin_sdk::PluginRegistry::new(),
+            plugin_manager: std::sync::Mutex::new(crate::plugin_system::PluginManager::new()),
             provider_registry: crate::plugin_system::create_default_registry(),
             evolution_state: std::sync::Arc::new(super::self_evolution::EvolutionState::new()),
             evolution_config: super::self_evolution::EvolutionConfig::default(),
