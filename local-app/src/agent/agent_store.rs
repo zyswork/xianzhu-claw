@@ -52,6 +52,22 @@ pub fn estimate_cost(model: &str, input_tokens: u64, output_tokens: u64) -> f64 
         (0.2, 0.6)
     } else if m.starts_with("grok") {
         (3.0, 15.0)
+    } else if m.starts_with("glm-5") {
+        (2.0, 8.0)
+    } else if m.starts_with("glm") {
+        (0.5, 2.0)
+    } else if m.starts_with("minimax") {
+        (1.0, 4.0)
+    } else if m.starts_with("kimi") || m.starts_with("moonshot") {
+        (0.5, 2.0)
+    } else if m.starts_with("baichuan") {
+        (0.5, 2.0)
+    } else if m.starts_with("step") {
+        (0.5, 2.0)
+    } else if m.starts_with("doubao") {
+        (0.3, 1.0)
+    } else if m.starts_with("o3") || m.starts_with("o1") {
+        (5.0, 20.0) // reasoning models 较贵
     } else {
         (1.0, 3.0)
     };
