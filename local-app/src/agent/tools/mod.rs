@@ -264,6 +264,18 @@ fn truncate_output(output: &str, max_bytes: usize) -> String {
 
 /// 检测危险 bash 命令，返回警告消息
 fn detect_dangerous_command(cmd: &str) -> Option<String> {
+    // 安全: 检测不可见 Unicode 字符（防止隐藏命令攻击）
+    if cmd.chars().any(|c| {
+        matches!(c,
+            '\u{200B}'..='\u{200F}' | // 零宽字符
+            '\u{2028}'..='\u{202F}' | // 段落/行分隔/嵌入
+            '\u{FEFF}' |              // BOM
+            '\u{115F}' | '\u{1160}' | '\u{3164}' | '\u{FFA0}' // 韩文填充符
+        ) || c.is_control() && c != '\n' && c != '\r' && c != '\t'
+    }) {
+        return Some("安全拦截：命令包含不可见 Unicode 字符，可能隐藏恶意内容".to_string());
+    }
+
     let cmd_lower = cmd.to_lowercase();
 
     // 高危：不可逆的破坏性命令
@@ -289,9 +301,24 @@ fn detect_dangerous_command(cmd: &str) -> Option<String> {
     for pattern in &warn_patterns {
         if cmd_lower.contains(pattern) {
             log::warn!("工具安全: bash_exec 执行了敏感命令: {}", cmd);
-            // 不拦截，只记录
             break;
         }
+    }
+
+    // 安全: 透明 wrapper 解包检测
+    // 如果命令以 time/env/nice 等透明 wrapper 开头，记录实际命令
+    let transparent_wrappers = ["time ", "env ", "nice ", "nohup ", "strace ", "ltrace "];
+    let mut actual_cmd = cmd_lower.as_str();
+    for wrapper in &transparent_wrappers {
+        if actual_cmd.starts_with(wrapper) {
+            actual_cmd = &actual_cmd[wrapper.len()..];
+            log::info!("工具安全: 透明 wrapper '{}' 解包后实际命令: {}", wrapper.trim(), actual_cmd);
+        }
+    }
+
+    // 安全: 检测 Shell 行续行中的命令替换（$( ) 在续行中可能被隐藏）
+    if cmd.contains("\\\n") && (cmd.contains("$(") || cmd.contains("`")) {
+        log::warn!("工具安全: 检测到续行中的命令替换: {}", &cmd[..cmd.len().min(100)]);
     }
 
     None

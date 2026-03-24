@@ -60,8 +60,16 @@ export function ApprovalDialog() {
 
   if (!pending) return null
 
-  const argsPreview = JSON.stringify(pending.arguments, null, 2)
-    .slice(0, 500)
+  // 安全: 转义不可见 Unicode 字符（防止隐藏命令攻击）
+  const sanitizeInvisible = (text: string) =>
+    text.replace(/[\p{Cf}\u115F\u1160\u3164\uFFA0\u200B-\u200F\u2028-\u202F\uFEFF]/gu, (ch) => {
+      const code = ch.codePointAt(0)?.toString(16).toUpperCase() ?? 'FFFD'
+      return `\\u{${code}}`
+    })
+
+  const argsPreview = sanitizeInvisible(
+    JSON.stringify(pending.arguments, null, 2).slice(0, 500)
+  )
 
   return (
     <div style={{

@@ -494,8 +494,22 @@ impl Orchestrator {
         }
         let mcp_defs = self.mcp_manager.get_tool_definitions().await;
         if !mcp_defs.is_empty() {
-            log::info!("注入 {} 个 MCP 工具", mcp_defs.len());
-            final_tool_defs.extend(mcp_defs);
+            // 安全: 拒绝与内置工具同名的 MCP 工具（防止工具名碰撞攻击）
+            let builtin_names: std::collections::HashSet<String> = final_tool_defs.iter()
+                .map(|d| d.name.clone())
+                .collect();
+            let mut injected = 0;
+            for def in mcp_defs {
+                if builtin_names.contains(&def.name) {
+                    log::warn!("安全: MCP 工具 '{}' 与内置工具同名，已拒绝注册", def.name);
+                    continue;
+                }
+                final_tool_defs.push(def);
+                injected += 1;
+            }
+            if injected > 0 {
+                log::info!("注入 {} 个 MCP 工具", injected);
+            }
         }
 
         // 4b. 技能激活：根据用户消息匹配技能，注册技能工具

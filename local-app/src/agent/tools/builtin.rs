@@ -1194,19 +1194,29 @@ impl Tool for WebFetchTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<String, String> {
         let url = arguments.get("url").and_then(|u| u.as_str())
             .ok_or("缺少 url 参数")?;
-        // SSRF 防护：拒绝私有 IP 地址
+        // SSRF 防护：拒绝私有 IP、内网地址、非 HTTP 协议
         if let Ok(parsed) = url::Url::parse(url) {
+            // 协议白名单
+            if !matches!(parsed.scheme(), "http" | "https") {
+                return Err(format!("安全限制：只允许 http/https 协议，不允许 {}", parsed.scheme()));
+            }
             if let Some(host) = parsed.host_str() {
-                // 检查是否为私有/保留 IP
-                let is_private = host == "localhost"
-                    || host == "127.0.0.1"
-                    || host == "0.0.0.0"
-                    || host == "::1"
-                    || host.starts_with("10.")
-                    || host.starts_with("192.168.")
-                    || host.starts_with("169.254.")
-                    || (host.starts_with("172.") && {
-                        host.split('.').nth(1)
+                let host_lower = host.to_lowercase();
+                let is_private = host_lower == "localhost"
+                    || host_lower == "127.0.0.1"
+                    || host_lower == "0.0.0.0"
+                    || host_lower == "::1"
+                    || host_lower == "[::1]"
+                    || host_lower.starts_with("10.")
+                    || host_lower.starts_with("192.168.")
+                    || host_lower.starts_with("169.254.")
+                    || host_lower.starts_with("fe80:")  // IPv6 链路本地
+                    || host_lower.starts_with("fd")     // IPv6 唯一本地
+                    || host_lower.starts_with("fc")     // IPv6 唯一本地
+                    || host_lower.ends_with(".local")   // mDNS
+                    || host_lower.ends_with(".internal")
+                    || (host_lower.starts_with("172.") && {
+                        host_lower.split('.').nth(1)
                             .and_then(|s| s.parse::<u8>().ok())
                             .map_or(false, |n| (16..=31).contains(&n))
                     });

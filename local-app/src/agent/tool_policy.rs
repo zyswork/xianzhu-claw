@@ -29,12 +29,18 @@ pub enum PolicySource {
 /// 工具策略配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolPolicyConfig {
-    /// 允许的工具列表（空 = 允许所有未被 deny 的）
+    /// 允许的工具列表
+    /// - 未配置 (allowlist_configured=false): 允许所有未被 deny 的
+    /// - 已配置但为空 (allowlist_configured=true, allow 为空): deny-all（安全默认）
+    /// - 已配置非空: 只允许列表中的工具
     #[serde(default)]
     pub allow: HashSet<String>,
     /// 拒绝的工具列表（优先级高于 allow）
     #[serde(default)]
     pub deny: HashSet<String>,
+    /// 是否明确配置了白名单（区分"未配置"和"配置为空"）
+    #[serde(default)]
+    pub allowlist_configured: bool,
 }
 
 /// 策略引擎
@@ -120,8 +126,8 @@ impl ToolPolicyEngine {
                     source: PolicySource::AgentConfig,
                 };
             }
-            // 如果有 allow 列表且工具不在其中
-            if !agent_policy.allow.is_empty() && !agent_policy.allow.contains(tool_name) {
+            // 安全: 白名单已配置时严格执行（空白名单 = deny-all）
+            if (agent_policy.allowlist_configured || !agent_policy.allow.is_empty()) && !agent_policy.allow.contains(tool_name) {
                 return PolicyDecision {
                     allowed: false,
                     reason: format!("工具 {} 不在 Agent 允许列表中", tool_name),
