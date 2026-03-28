@@ -316,6 +316,7 @@ export default function GroupChatPage() {
     } catch (e) {
       const errMsg = `Error: ${e}`
       console.error(`[GroupChat] ${agentName} error:`, e)
+      toast.error(t('common.error') + ': ' + String(e))
       streamingRef.current = false
       setStreaming(false)
       setMessages(prev => prev.map(m =>

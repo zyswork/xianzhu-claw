@@ -159,7 +159,7 @@ export default function AuditLogPage() {
                               margin: 0, padding: '8px', backgroundColor: '#1e1e1e', color: '#d4d4d4',
                               borderRadius: '6px', fontSize: '11px', overflow: 'auto', maxHeight: '200px',
                             }}>
-                              {formatJson(entry.arguments)}
+                              {formatJson(entry.arguments, t('audit.noValue'))}
                             </pre>
                           </div>
                           <div>
@@ -168,7 +168,7 @@ export default function AuditLogPage() {
                               margin: 0, padding: '8px', backgroundColor: '#1e1e1e', color: '#d4d4d4',
                               borderRadius: '6px', fontSize: '11px', overflow: 'auto', maxHeight: '200px',
                             }}>
-                              {entry.result ? (entry.result.length > 500 ? entry.result.substring(0, 500) + '...' : entry.result) : '(无)'}
+                              {entry.result ? (entry.result.length > 500 ? entry.result.substring(0, 500) + '...' : entry.result) : t('audit.noValue')}
                             </pre>
                           </div>
                         </div>
@@ -229,10 +229,10 @@ function formatTime(ts: number): string {
   })
 }
 
-function formatJson(str: string): string {
+function formatJson(str: string, fallback = '-'): string {
   try {
     return JSON.stringify(JSON.parse(str), null, 2)
   } catch {
-    return str || '(无)'
+    return str || fallback
   }
 }

@@ -43,13 +43,13 @@ interface Agent {
 
 /** 预置 Agent 模板 */
 const TEMPLATES = [
-  { nameKey: 'chatPage.templateGeneral', name: '通用助理', prompt: '你是一个有用的AI助手，擅长回答各种问题。', icon: 'AI', desc: '日常问答、信息整理' },
-  { nameKey: 'chatPage.templateCoding', name: '编程助手', prompt: '你是一个资深编程助手，擅长代码编写、调试和架构设计。请用简洁专业的方式回答。', icon: '<>', desc: '全栈开发、代码调试' },
-  { nameKey: 'chatPage.templateTranslator', name: '翻译助手', prompt: '你是一个专业翻译，擅长中英互译。保持原文风格和语气，翻译要自然流畅。', icon: 'Aa', desc: '中英互译、多语言' },
-  { nameKey: 'chatPage.templateWriter', name: '写作助手', prompt: '你是一个专业写作助手，擅长文章撰写、润色和创意写作。', icon: 'W', desc: '文案创作、内容润色' },
-  { nameKey: '', name: '数据分析师', prompt: '你是一位数据分析专家。擅长数据解读、统计分析、趋势预测。能够处理 CSV/Excel 数据，生成分析报告。', icon: '#', desc: '数据分析、报表解读' },
-  { nameKey: '', name: '学习导师', prompt: '你是一位耐心的学习导师。用简单易懂的方式解释复杂概念，善于用类比和例子帮助理解。根据学生水平调整讲解深度。', icon: 'E', desc: '知识讲解、学习指导' },
-  { nameKey: '', name: '创意顾问', prompt: '你是一位创意顾问。擅长头脑风暴、创意方案设计、营销策划。善于跳出常规思维，提供新颖独特的视角和解决方案。', icon: '*', desc: '头脑风暴、营销策划' },
+  { nameKey: 'chatPage.templateGeneral', descKey: 'agentCreate.templateGeneralDesc', prompt: '你是一个有用的AI助手，擅长回答各种问题。', icon: 'AI' },
+  { nameKey: 'chatPage.templateCoding', descKey: 'agentCreate.templateCodingDesc', prompt: '你是一个资深编程助手，擅长代码编写、调试和架构设计。请用简洁专业的方式回答。', icon: '<>' },
+  { nameKey: 'chatPage.templateTranslator', descKey: 'agentCreate.templateTranslatorDesc', prompt: '你是一个专业翻译，擅长中英互译。保持原文风格和语气，翻译要自然流畅。', icon: 'Aa' },
+  { nameKey: 'chatPage.templateWriter', descKey: 'agentCreate.templateWriterDesc', prompt: '你是一个专业写作助手，擅长文章撰写、润色和创意写作。', icon: 'W' },
+  { nameKey: 'agentCreate.templateDataAnalyst', descKey: 'agentCreate.templateDataAnalystDesc', prompt: '你是一位数据分析专家。擅长数据解读、统计分析、趋势预测。能够处理 CSV/Excel 数据，生成分析报告。', icon: '#' },
+  { nameKey: 'agentCreate.templateTutor', descKey: 'agentCreate.templateTutorDesc', prompt: '你是一位耐心的学习导师。用简单易懂的方式解释复杂概念，善于用类比和例子帮助理解。根据学生水平调整讲解深度。', icon: 'E' },
+  { nameKey: 'agentCreate.templateCreative', descKey: 'agentCreate.templateCreativeDesc', prompt: '你是一位创意顾问。擅长头脑风暴、创意方案设计、营销策划。善于跳出常规思维，提供新颖独特的视角和解决方案。', icon: '*' },
 ]
 
 /** 温度预设 */
@@ -75,7 +75,7 @@ export default function AgentCreatePage() {
 
   // Step 1: 基本信息
   const [name, setName] = useState('')
-  const [systemPrompt, setSystemPrompt] = useState('你是一个有用的AI助手。')
+  const [systemPrompt, setSystemPrompt] = useState(t('chatPage.defaultPrompt'))
 
   // Step 2: 模型配置
   const [allModels, setAllModels] = useState<ModelItem[]>([])
@@ -314,7 +314,7 @@ export default function AgentCreatePage() {
             </label>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
               {TEMPLATES.map((tpl, idx) => {
-                const tplName = tpl.nameKey ? t(tpl.nameKey) : tpl.name
+                const tplName = t(tpl.nameKey)
                 const isSelected = name === tplName
                 return (
                   <button
@@ -332,7 +332,7 @@ export default function AgentCreatePage() {
                   >
                     <div style={{ fontSize: 24, marginBottom: 4 }}>{tpl.icon}</div>
                     <div style={{ fontWeight: 600, fontSize: 13 }}>{tplName}</div>
-                    {tpl.desc && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{tpl.desc}</div>}
+                    {tpl.descKey && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t(tpl.descKey)}</div>}
                   </button>
                 )
               })}

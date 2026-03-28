@@ -118,6 +118,7 @@ export default function AgentDetailPage() {
         if (found) setAgent(found)
       } catch (e) {
         console.error(e)
+        toast.error(t('common.error') + ': ' + String(e))
       } finally {
         setLoading(false)
       }
@@ -884,7 +885,7 @@ function SubagentsTab({ agentId }: { agentId: string }) {
     try {
       await invoke('cancel_subagent', { subagentId })
       loadSubagents()
-    } catch (e) { console.error(e) }
+    } catch (e) { console.error(e); toast.error(t('common.error') + ': ' + String(e)) }
   }
 
   const statusColor = (status: string) => {
@@ -1177,7 +1178,7 @@ function AutonomyTab({ agentId }: { agentId: string }) {
     setSaving(true)
     try {
       await invoke('update_autonomy_config', { agentId, autonomyConfig: newConfig })
-    } catch (e) { console.error(e) }
+    } catch (e) { console.error(e); toast.error(t('common.error') + ': ' + String(e)) }
     finally { setSaving(false) }
   }
 

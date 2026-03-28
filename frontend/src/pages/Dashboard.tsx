@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback, type CSSProperties } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { Link } from 'react-router-dom'
 import { useI18n } from '../i18n'
+import { toast } from '../hooks/useToast'
 
 /* ─── 数据类型 ─────────────────────────────── */
 
@@ -161,6 +162,7 @@ export default function Dashboard() {
       )
     } catch (e) {
       setError(t('dashboard.errorLoading', { error: String(e) }))
+      toast.error(t('common.error') + ': ' + String(e))
     }
     setLoading(false)
   }, [t])
@@ -349,7 +351,7 @@ export default function Dashboard() {
                   fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center',
                   padding: '8px 0',
                 }}>
-                  +{agents.length - 6} more...
+                  {t('dashboard.moreAgents', { n: agents.length - 6 })}
                 </Link>
               )}
             </div>
@@ -391,7 +393,7 @@ export default function Dashboard() {
               </h2>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <SystemMetric label={t('dashboard.dbConnected')} icon="database" value={health?.db ? 'OK' : 'Error'} color={health?.db ? 'var(--success)' : 'var(--error)'} />
+              <SystemMetric label={t('dashboard.dbConnected')} icon="database" value={health?.db ? t('common.ok') : t('common.errorStatus')} color={health?.db ? 'var(--success)' : 'var(--error)'} />
               <SystemMetric
                 label={t('dashboard.embeddingCache')}
                 icon="cache"
@@ -401,7 +403,7 @@ export default function Dashboard() {
               <SystemMetric
                 label={t('dashboard.responseCache')}
                 icon="cache"
-                value={`${cache?.response_cache?.entries ?? 0} entries / ${cache?.response_cache?.total_hits ?? 0} ${t('dashboard.cacheHits')}`}
+                value={`${cache?.response_cache?.entries ?? 0}${t('common.entries')} / ${cache?.response_cache?.total_hits ?? 0} ${t('dashboard.cacheHits')}`}
                 color="#06b6d4"
               />
             </div>
@@ -414,7 +416,7 @@ export default function Dashboard() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
           <SvgIcon name="trend" size={18} color="var(--accent)" />
           <h2 style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: 'var(--text-heading)' }}>
-            Token {t('dashboard.todayTokens')}
+            {t('dashboard.tokenTrend')}
           </h2>
         </div>
         {hasTokenData ? (
@@ -470,8 +472,8 @@ export default function Dashboard() {
               display: 'flex', justifyContent: 'space-between', marginTop: '8px',
               fontSize: '11px', color: 'var(--text-muted)',
             }}>
-              {['6d', '5d', '4d', '3d', '2d', '1d', 'Today'].map((lbl) => (
-                <span key={lbl}>{lbl}</span>
+              {[6, 5, 4, 3, 2, 1, 0].map((d) => (
+                <span key={d}>{d === 0 ? t('dashboard.chartToday') : t('dashboard.chartDaysAgo', { n: d })}</span>
               ))}
             </div>
           </div>
@@ -482,7 +484,7 @@ export default function Dashboard() {
             borderRadius: '10px',
           }}>
             <SvgIcon name="trend" size={16} color="var(--text-muted)" />
-            <span style={{ marginLeft: '8px' }}>暂无 Token 使用数据</span>
+            <span style={{ marginLeft: '8px' }}>{t('dashboard.noTokenData')}</span>
           </div>
         )}
       </div>

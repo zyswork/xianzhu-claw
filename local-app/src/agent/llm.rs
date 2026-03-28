@@ -841,7 +841,8 @@ impl LlmClient {
                         continue;
                     }
                     log::error!("LLM HTTP 请求最终失败（{} 次尝试）: {}", MAX_RETRIES, e);
-                    return Err(format!("LLM 连接失败（重试 {} 次后）: {}", MAX_RETRIES, e));
+                    let raw = format!("LLM 连接失败（重试 {} 次后）: {}", MAX_RETRIES, e);
+                    return Err(classify_llm_error(&raw));
                 }
             };
             if !response.status().is_success() {
@@ -866,7 +867,8 @@ impl LlmClient {
                     think_buffer.clear();
                     continue;
                 }
-                return Err(format!("LLM API 错误 {}: {}", status, safe_body));
+                let raw = format!("LLM API 错误 {}: {}", status, safe_body);
+                return Err(classify_llm_error(&raw));
             }
             log::info!("LLM API 响应开始: status=200, 开始读取 SSE 流");
 
@@ -917,7 +919,8 @@ impl LlmClient {
                             // 检测错误事件
                             if let Some(err_msg) = Self::extract_sse_error(&json) {
                                 log::error!("LLM API 返回错误事件: {}", err_msg);
-                                return Err(format!("LLM 服务端错误: {}", err_msg));
+                                let raw = format!("LLM 服务端错误: {}", err_msg);
+                                return Err(classify_llm_error(&raw));
                             }
                             // 提取 usage 统计
                             Self::extract_usage(&json, &mut result);
@@ -977,7 +980,7 @@ impl LlmClient {
                         think_buffer.clear();
                         continue;
                     }
-                    return Err(e);
+                    return Err(classify_llm_error(&e));
                 }
             }
         }
@@ -1513,6 +1516,58 @@ impl LlmClient {
     }
 }
 
+/// 对 LLM 原始错误信息进行分类，返回用户友好的提示
+///
+/// 保持原始错误在日志中，仅改善用户看到的提示文本
+pub fn classify_llm_error(error: &str) -> String {
+    let lower = error.to_lowercase();
+
+    // 429 / rate limit
+    if lower.contains("429") || lower.contains("rate limit") || lower.contains("too many requests") || lower.contains("请求过于频繁") {
+        return "请求过于频繁，请稍后重试".to_string();
+    }
+
+    // 401 / unauthorized
+    if lower.contains("401") || lower.contains("unauthorized") || lower.contains("invalid api key")
+        || lower.contains("invalid x-api-key") || lower.contains("authentication") || lower.contains("api key") && lower.contains("invalid")
+    {
+        return "API Key 无效或已过期，请检查设置".to_string();
+    }
+
+    // 402 / payment / quota / 余额 / 积分
+    if lower.contains("402") || lower.contains("payment required") || lower.contains("insufficient")
+        || lower.contains("quota") || lower.contains("余额不足") || lower.contains("积分")
+        || lower.contains("额度") || lower.contains("credit") || lower.contains("billing")
+    {
+        return "API 额度不足，请充值或更换供应商".to_string();
+    }
+
+    // 5xx server errors
+    if lower.contains("500") || lower.contains("502") || lower.contains("503") || lower.contains("504")
+        || lower.contains("internal server error") || lower.contains("bad gateway")
+        || lower.contains("service unavailable") || lower.contains("服务端错误")
+    {
+        return "AI 服务暂时不可用，请稍后重试".to_string();
+    }
+
+    // timeout
+    if lower.contains("timeout") || lower.contains("超时") || lower.contains("timed out") {
+        return "请求超时，请检查网络或重试".to_string();
+    }
+
+    // connection errors
+    if lower.contains("connection refused") || lower.contains("connection reset")
+        || lower.contains("connect error") || lower.contains("dns") || lower.contains("无法连接")
+        || lower.contains("连接失败") || lower.contains("network") && lower.contains("error")
+    {
+        return "无法连接到 AI 服务，请检查网络".to_string();
+    }
+
+    // 无法分类的错误，返回原始信息（截断过长文本）
+    let trimmed: String = error.chars().take(200).collect();
+    trimmed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1645,5 +1700,47 @@ mod tests {
         let j = serde_json::json!({"type":"message_delta","delta":{"stop_reason":"tool_use"}});
         sse_test_event(&c, &j, &mut r, &mut oa, &mut an, &tx);
         assert_eq!(r.stop_reason, "tool_use");
+    }
+
+    #[test]
+    fn test_classify_llm_error_rate_limit() {
+        assert_eq!(classify_llm_error("LLM API 错误 429: Too Many Requests"), "请求过于频繁，请稍后重试");
+        assert_eq!(classify_llm_error("rate limit exceeded"), "请求过于频繁，请稍后重试");
+    }
+
+    #[test]
+    fn test_classify_llm_error_unauthorized() {
+        assert_eq!(classify_llm_error("LLM API 错误 401: Unauthorized"), "API Key 无效或已过期，请检查设置");
+        assert_eq!(classify_llm_error("Invalid API key provided"), "API Key 无效或已过期，请检查设置");
+    }
+
+    #[test]
+    fn test_classify_llm_error_payment() {
+        assert_eq!(classify_llm_error("LLM API 错误 402: Payment Required"), "API 额度不足，请充值或更换供应商");
+        assert_eq!(classify_llm_error("余额不足，请充值"), "API 额度不足，请充值或更换供应商");
+        assert_eq!(classify_llm_error("insufficient quota"), "API 额度不足，请充值或更换供应商");
+    }
+
+    #[test]
+    fn test_classify_llm_error_server() {
+        assert_eq!(classify_llm_error("LLM API 错误 500: Internal Server Error"), "AI 服务暂时不可用，请稍后重试");
+        assert_eq!(classify_llm_error("502 Bad Gateway"), "AI 服务暂时不可用，请稍后重试");
+    }
+
+    #[test]
+    fn test_classify_llm_error_timeout() {
+        assert_eq!(classify_llm_error("流式读取超时（60 秒无数据）"), "请求超时，请检查网络或重试");
+        assert_eq!(classify_llm_error("request timed out"), "请求超时，请检查网络或重试");
+    }
+
+    #[test]
+    fn test_classify_llm_error_connection() {
+        assert_eq!(classify_llm_error("connection refused"), "无法连接到 AI 服务，请检查网络");
+        assert_eq!(classify_llm_error("dns resolution failed"), "无法连接到 AI 服务，请检查网络");
+    }
+
+    #[test]
+    fn test_classify_llm_error_unknown() {
+        assert_eq!(classify_llm_error("some unknown error"), "some unknown error");
     }
 }

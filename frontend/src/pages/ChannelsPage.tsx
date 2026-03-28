@@ -160,7 +160,7 @@ export default function ChannelsPage() {
           }
         }
         setError(t('channels.errorTimeout'))
-      } catch (e: unknown) { setError(t('channels.errorLoginFailed') + ': ' + String(e)); console.error(e) }
+      } catch (e: unknown) { setError(t('channels.errorLoginFailed') + ': ' + String(e)); console.error(e); toast.error(t('common.error') + ': ' + String(e)) }
       setSaving(false)
       return
     }
@@ -239,7 +239,7 @@ export default function ChannelsPage() {
 
   const handleDisconnect = async (channelId: string) => {
     if (!await confirm(t('channels.confirmDisconnect'))) return
-    try { await cloudApi('POST', `/api/v1/channels/${channelId}/disconnect`); checkStatuses() } catch (e) { setError(String(e)) }
+    try { await cloudApi('POST', `/api/v1/channels/${channelId}/disconnect`); checkStatuses() } catch (e) { setError(String(e)); toast.error(t('common.error') + ': ' + String(e)) }
   }
 
   return (

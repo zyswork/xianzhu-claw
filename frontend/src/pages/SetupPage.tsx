@@ -47,7 +47,7 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
       const agents = await invoke<Array<{ id: string; name: string }>>('list_agents')
       if (!agents || agents.length === 0) {
         await invoke('create_agent', {
-          name: t('chatPage.templateGeneral'), systemPrompt: '你是一个有用的AI助手，擅长回答各种问题。', model: 'gpt-4o',
+          name: t('chatPage.templateGeneral'), systemPrompt: t('chatPage.defaultPrompt'), model: 'gpt-4o',
         })
       }
       setSetupStatus(s => ({ ...s, agent: 'done' }))
@@ -222,13 +222,13 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
                       apiType: 'openai', apiKey: apiKey.trim(),
                       baseUrl: apiUrl.trim() || null,
                     })
-                    toast.success(`Connection OK (${result.latency_ms}ms, ${result.models_available} models)`)
-                  } catch (e) { toast.error('Connection failed: ' + String(e)) }
+                    toast.success(t('setup.connectionOk', { latency: result.latency_ms, models: result.models_available }))
+                  } catch (e) { toast.error(t('setup.connectionFailed', { error: String(e) })) }
                 }} disabled={!apiKey.trim()} style={{
                   ...styles.btnGhost,
                   opacity: apiKey.trim() ? 1 : 0.4,
                 }}>
-                  {t('settings.testBtn') || 'Test'}
+                  {t('setup.testBtn')}
                 </button>
               </div>
             </div>
@@ -275,7 +275,7 @@ export default function SetupPage({ onComplete }: { onComplete: () => void }) {
       <div style={styles.container}>
         {/* 品牌名 */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h2 style={styles.brand}>衔烛</h2>
+          <h2 style={styles.brand}>{t('setup.brandName')}</h2>
           <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', letterSpacing: 1 }}>XianZhu AI</div>
         </div>
 

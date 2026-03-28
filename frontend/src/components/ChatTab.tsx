@@ -58,6 +58,7 @@ interface Message {
   content: string
   toolName?: string
   thinking?: string
+  isError?: boolean
 }
 
 interface Skill {
@@ -1048,7 +1049,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       setStreaming(false)
       streamBuf.current = ''
       thinkingBuf.current = ''
-      setMessages((prev) => [...prev, { role: 'system', content: `${t('common.error')}: ${e.payload}` }])
+      setMessages((prev) => [...prev, { role: 'system', content: e.payload, isError: true }])
     })
 
     // 外部消息事件（Telegram/Mobile）— 带 sessionId 和消息内容
@@ -1390,7 +1391,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       case 'think': {
         const levels = ['off', 'minimal', 'low', 'medium', 'high']
         if (!args.trim() || !levels.includes(args.trim().toLowerCase())) {
-          return `用法: /think <off|minimal|low|medium|high>\n当前可选推理级别：${levels.join(' / ')}`
+          return t('agentDetailSub.thinkUsage', { levels: levels.join(' / ') })
         }
         try {
           // 通过 Agent config 存储 thinking level
@@ -1398,8 +1399,8 @@ export default function ChatTab({ agentId }: { agentId: string }) {
           const config = detail?.config ? JSON.parse(detail.config) : {}
           config.thinkingLevel = args.trim().toLowerCase()
           await invoke('update_agent', { agentId, config: JSON.stringify(config) })
-          return `推理级别已设为 **${args.trim().toLowerCase()}**`
-        } catch (e) { return '设置失败: ' + e }
+          return t('agentDetailSub.thinkSet', { level: args.trim().toLowerCase() })
+        } catch (e) { return t('agentDetailSub.setFailed', { error: String(e) }) }
       }
 
       case 'fast': {
@@ -1408,22 +1409,22 @@ export default function ChatTab({ agentId }: { agentId: string }) {
           try {
             const detail = await invoke<any>('get_agent_detail', { agentId })
             const config = detail?.config ? JSON.parse(detail.config) : {}
-            return `快速模式: **${config.fastMode ? 'ON' : 'OFF'}**\n使用 /fast on 或 /fast off 切换`
-          } catch { return '查询失败' }
+            return t('agentDetailSub.fastStatus', { status: config.fastMode ? 'ON' : 'OFF' })
+          } catch { return t('agentDetailSub.queryFailed') }
         }
         try {
           const detail = await invoke<any>('get_agent_detail', { agentId })
           const config = detail?.config ? JSON.parse(detail.config) : {}
           config.fastMode = arg === 'on'
           await invoke('update_agent', { agentId, config: JSON.stringify(config) })
-          return `快速模式已${arg === 'on' ? '开启' : '关闭'}`
-        } catch (e) { return '设置失败: ' + e }
+          return t('agentDetailSub.fastToggled', { state: arg === 'on' ? t('agentDetailSub.fastOn') : t('agentDetailSub.fastOff') })
+        } catch (e) { return t('agentDetailSub.setFailed', { error: String(e) }) }
       }
 
       case 'models': {
         try {
           const providers = await invoke<any[]>('get_providers')
-          const lines: string[] = ['## 可用模型\n']
+          const lines: string[] = [t('agentDetailSub.availableModels')]
           for (const p of (providers || [])) {
             if (!p.enabled) continue
             const models = (p.models || []).map((m: any) => m.name || m.id).join(', ')
@@ -1431,9 +1432,9 @@ export default function ChatTab({ agentId }: { agentId: string }) {
               lines.push(`**${p.name}** (${p.apiType}): ${models}`)
             }
           }
-          lines.push('\n使用 /model provider_id/model_name 切换')
+          lines.push(t('agentDetailSub.modelSwitchHint'))
           return lines.join('\n')
-        } catch (e) { return '查询失败: ' + e }
+        } catch (e) { return t('agentDetailSub.queryFailed') + ': ' + e }
       }
 
       default:
@@ -1502,7 +1503,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       loadMessagesRef.current()
     } catch (e) {
       setStreaming(false)
-      setMessages((prev) => [...prev, { role: 'system', content: String(e) }])
+      setMessages((prev) => [...prev, { role: 'system', content: String(e), isError: true }])
     }
   }
 
@@ -1538,7 +1539,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
         })
       } catch (e) {
         setStreaming(false)
-        setMessages(prev => [...prev, { role: 'system', content: String(e) }])
+        setMessages(prev => [...prev, { role: 'system', content: String(e), isError: true }])
       }
     } catch (e) {
       toast.error(String(e))
@@ -1559,7 +1560,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       }
     }
     if (userMsgIdx < 0 || !userContent) {
-      toast.error('找不到对应的用户消息')
+      toast.error(t('agentDetailSub.userMsgNotFound'))
       return
     }
     try {
@@ -1582,7 +1583,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
         })
       } catch (e) {
         setStreaming(false)
-        setMessages(prev => [...prev, { role: 'system', content: String(e) }])
+        setMessages(prev => [...prev, { role: 'system', content: String(e), isError: true }])
       }
     } catch (e) {
       toast.error(String(e))
@@ -2001,6 +2002,9 @@ export default function ChatTab({ agentId }: { agentId: string }) {
 
                 const isUser = msg.role === 'user'
                 const isSystem = msg.role === 'system'
+                const isErrorMsg = !!(msg.isError)
+                // 检测错误消息中是否包含需要跳转设置的关键词
+                const needsSettingsLink = isErrorMsg && /设置|Key|供应商|充值|过期/.test(msg.content)
 
                 return (
                   <div key={i} style={{
@@ -2014,13 +2018,17 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                     {/* 头像 */}
                     <div style={{
                       width: 30, height: 30, borderRadius: 8, flexShrink: 0, marginTop: 2,
-                      background: isUser ? 'var(--accent)' : 'rgba(52,211,153,0.08)',
+                      background: isUser ? 'var(--accent)' : isErrorMsg ? 'rgba(239,68,68,0.1)' : 'rgba(52,211,153,0.08)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      border: isUser ? 'none' : '1px solid rgba(52,211,153,0.15)',
+                      border: isUser ? 'none' : isErrorMsg ? '1px solid rgba(239,68,68,0.2)' : '1px solid rgba(52,211,153,0.15)',
                     }}>
                       {isUser ? (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                        </svg>
+                      ) : isErrorMsg ? (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                         </svg>
                       ) : (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -2034,9 +2042,10 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                     {msg.role === 'assistant' && msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
                     <div style={{
                       padding: '10px 14px', borderRadius: isUser ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
-                      backgroundColor: isUser ? 'var(--accent)' : isSystem ? 'var(--success-bg)' : 'var(--bg-elevated)',
-                      color: isUser ? '#fff' : 'var(--text-primary)',
-                      border: isUser ? 'none' : '1px solid var(--border-subtle)',
+                      backgroundColor: isUser ? 'var(--accent)' : isErrorMsg ? 'rgba(239,68,68,0.06)' : isSystem ? 'var(--success-bg)' : 'var(--bg-elevated)',
+                      color: isUser ? '#fff' : isErrorMsg ? '#ef4444' : 'var(--text-primary)',
+                      border: isUser ? 'none' : isErrorMsg ? '1px solid rgba(239,68,68,0.2)' : '1px solid var(--border-subtle)',
+                      borderLeft: isErrorMsg ? '3px solid #ef4444' : undefined,
                       fontSize: isSystem ? 13 : 14,
                       lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'anywhere',
                       minHeight: streaming && i === messages.length - 1 && !msg.content ? 40 : undefined,
@@ -2077,6 +2086,47 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                                 border: 'none', backgroundColor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600,
                               }}
                             >Send</button>
+                          </div>
+                        </div>
+                      ) : isErrorMsg ? (
+                        <div>
+                          <div>{msg.content}</div>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                            {needsSettingsLink && (
+                              <button
+                                onClick={() => { window.location.hash = '#/settings' }}
+                                style={{
+                                  padding: '4px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
+                                  border: '1px solid rgba(239,68,68,0.3)', backgroundColor: 'rgba(239,68,68,0.08)',
+                                  color: '#ef4444', fontWeight: 500,
+                                }}
+                              >{t('agentDetailSub.goToSettings')}</button>
+                            )}
+                            <button
+                              onClick={async () => {
+                                if (!activeSession || !agentId || streaming) return
+                                // 找到最后一条用户消息
+                                const lastUserMsg = messages.slice(0, i).reverse().find(m => m.role === 'user')
+                                if (!lastUserMsg) return
+                                // 移除错误消息，添加空 assistant 占位
+                                setMessages(prev => [...prev.filter((_, idx) => idx !== i), { role: 'assistant', content: '' }])
+                                setStreaming(true)
+                                streamBuf.current = ''
+                                try {
+                                  await invoke('send_message', { agentId, sessionId: activeSession, message: lastUserMsg.content })
+                                  setStreaming(false)
+                                  loadMessagesRef.current()
+                                } catch (e2) {
+                                  setStreaming(false)
+                                  setMessages(prev => [...prev, { role: 'system', content: String(e2), isError: true }])
+                                }
+                              }}
+                              style={{
+                                padding: '4px 12px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
+                                border: '1px solid rgba(239,68,68,0.3)', backgroundColor: 'transparent',
+                                color: '#ef4444', fontWeight: 500,
+                              }}
+                            >{t('agentDetailSub.retry')}</button>
                           </div>
                         </div>
                       ) : (msg.role === 'assistant' || isSystem) ? (
