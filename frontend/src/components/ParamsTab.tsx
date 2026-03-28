@@ -10,32 +10,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useI18n } from '../i18n'
-import Select from './Select'
+import ProviderModelSelector from './ProviderModelSelector'
 
 interface ParamsTabProps {
   agentId: string
 }
 
-interface ProviderModel {
-  id: string
-  name: string
-}
-
-interface Provider {
-  id: string
-  name: string
-  baseUrl: string
-  apiKeyMasked?: string
-  models: ProviderModel[]
-  enabled: boolean
-}
-
-interface ModelOption {
-  id: string
-  label: string
-  provider: string
-  providerName: string
-}
 
 /** 温度预设 */
 const TEMP_PRESETS = [
@@ -54,33 +34,12 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
   const [model, setModel] = useState('')
   const [temperature, setTemperature] = useState(0.7)
   const [maxTokens, setMaxTokens] = useState(4096)
-  const [models, setModels] = useState<ModelOption[]>([])
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [saving, setSaving] = useState(false)
   const [status, setStatus] = useState('')
   const [loading, setLoading] = useState(true)
 
-  /** 加载可用模型列表 */
-  const loadModels = useCallback(async () => {
-    try {
-      const providers = await invoke<Provider[]>('get_providers')
-      const opts: ModelOption[] = []
-      for (const p of providers || []) {
-        if (!p.enabled) continue
-        const hasKey = !!p.apiKeyMasked && p.apiKeyMasked !== ''
-        const isLocal = p.id === 'ollama' || p.baseUrl?.includes('localhost')
-        if (!hasKey && !isLocal) continue
-        for (const m of p.models || []) {
-          opts.push({ id: m.id, label: m.name, provider: p.id, providerName: p.name })
-        }
-      }
-      setModels(opts)
-    } catch (e) {
-      console.error('加载模型列表失败:', e)
-    }
-  }, [])
-
-  /** 加载当前 Agent 参数 */
+/** 加载当前 Agent 参数 */
   const loadAgentParams = useCallback(async () => {
     setLoading(true)
     try {
@@ -102,9 +61,8 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
   }, [agentId])
 
   useEffect(() => {
-    loadModels()
     loadAgentParams()
-  }, [loadModels, loadAgentParams])
+  }, [loadAgentParams])
 
   /** 保存参数 */
   const handleSave = async () => {
@@ -157,18 +115,9 @@ export default function ParamsTab({ agentId }: ParamsTabProps) {
 
       {/* 模型选择 */}
       <div style={{ marginBottom: '14px' }}>
-        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>{t('paramsTab.selectModel')}</div>
-        <Select
+        <ProviderModelSelector
           value={model}
           onChange={setModel}
-          searchable
-          options={[
-            ...(model && !models.some(m => m.id === model) ? [{ value: model, label: `${model} ${t('paramsTab.current')}` }] : []),
-            ...models.map(m => ({
-              value: m.id,
-              label: `${m.label} (${m.providerName})`,
-            })),
-          ]}
           style={{ width: '100%' }}
         />
       </div>

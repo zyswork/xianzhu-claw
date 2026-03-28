@@ -380,7 +380,15 @@ fn sanitize_messages_for_openai(messages: &[serde_json::Value]) -> Vec<serde_jso
                 continue;
             }
             // 有 tool_calls 的 assistant 消息 → 保留（OpenAI 原生格式）
-            result.push(msg.clone());
+            let mut m = msg.clone();
+            // 确保 content 不为 null（Kimi 等不接受空 assistant 消息）
+            if m["content"].is_null() || (m["content"].as_str().map_or(false, |s| s.is_empty()) && m.get("tool_calls").is_none()) {
+                // 无 tool_calls 且 content 为空 → 跳过
+                if m.get("tool_calls").is_none() { continue; }
+                // 有 tool_calls 但 content 为 null → 设为空字符串
+                m["content"] = serde_json::json!("");
+            }
+            result.push(m);
             continue;
         }
 
@@ -565,6 +573,7 @@ fn default_max_tokens(provider: &str, model: &str) -> i32 {
     if m.starts_with("qwen") { return 8192; }
     if m.starts_with("minimax") || m.starts_with("abab") { return 16384; }
     if m.starts_with("deepseek") { return 8192; }
+    if m.starts_with("glm") { return 16384; }
     if m.starts_with("gpt-4o") || m.starts_with("gpt-4-turbo") || m.starts_with("gpt-5") { return 16384; }
     if m.starts_with("gpt-4") { return 8192; }
     if m.starts_with("gpt-3.5") { return 4096; }
@@ -732,10 +741,49 @@ impl LlmClient {
                     body["tool_choice"] = serde_json::json!("auto");
                     body["parallel_tool_calls"] = serde_json::json!(true);
                 } }
-                // 特定模型 temperature 强制覆盖
+                // 特定模型兼容性处理
                 let ml = pure_model.to_lowercase();
-                if ml.contains("kimi-k2") || ml.contains("o1") || ml.contains("o3") || ml.contains("o4") {
-                    // Kimi K2.x / OpenAI o 系列要求 temperature=1
+                if ml.contains("kimi-k2") {
+                    // kimi-k2.5 不是推理模型，显式关闭 thinking（参考 OpenClaw）
+                    // kimi-k2-thinking / kimi-k2-thinking-turbo 才需要启用
+                    if !ml.contains("thinking") {
+                        // thinking 禁用时 temperature 必须为 0.6
+                        body["temperature"] = serde_json::json!(0.6);
+                        body["thinking"] = serde_json::json!({"type": "disabled"});
+                    } else {
+                        // thinking 启用时 temperature 必须为 1
+                        body["temperature"] = serde_json::json!(1);
+                        // thinking 模型：为历史 assistant 消息补充空 reasoning_content
+                        body["thinking"] = serde_json::json!({"type": "enabled"});
+                        if let Some(msgs) = body["messages"].as_array_mut() {
+                            for m in msgs.iter_mut() {
+                                if m["role"].as_str() == Some("assistant") && m.get("reasoning_content").is_none() {
+                                    m["reasoning_content"] = serde_json::json!("");
+                                }
+                            }
+                        }
+                    }
+                    // Kimi thinking 模式下不支持 required/pinned tool_choice
+                    if ml.contains("thinking") {
+                        if let Some(tc) = body.get("tool_choice") {
+                            if tc.as_str() == Some("required") {
+                                body["tool_choice"] = serde_json::json!("auto");
+                            }
+                        }
+                    }
+                    // 移除 Kimi 不支持的参数
+                    body.as_object_mut().map(|o| {
+                        o.remove("parallel_tool_calls");
+                        o.remove("stream_options");
+                    });
+                } else if ml.starts_with("glm") || ml.contains("glm-") {
+                    // Z.AI GLM 系列：启用 tool_stream 支持实时工具调用流式传输（参考 OpenClaw zai-stream-wrappers.ts）
+                    body["tool_stream"] = serde_json::json!(true);
+                    // GLM 推理模型（glm-z1、glm-4.7、glm-5 等）处理
+                    // Z.AI 不支持 parallel_tool_calls
+                    body.as_object_mut().map(|o| { o.remove("parallel_tool_calls"); });
+                } else if ml.contains("o1") || ml.contains("o3") || ml.contains("o4") {
+                    // OpenAI o 系列: temperature 必须为 1
                     body["temperature"] = serde_json::json!(1);
                 }
                 (url, body)

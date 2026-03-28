@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { useNavigate } from 'react-router-dom'
 import { useI18n } from '../i18n'
-import Select from '../components/Select'
+import ProviderModelSelector from '../components/ProviderModelSelector'
 
 interface ProviderModel {
   id: string
@@ -134,7 +134,7 @@ export default function AgentCreatePage() {
           const available = hasKey || isLocal
           for (const m of p.models || []) {
             models.push({
-              id: m.id,
+              id: `${p.id}/${m.id}`,
               label: m.name,
               provider: p.id,
               providerName: p.name,
@@ -156,8 +156,9 @@ export default function AgentCreatePage() {
   const applyTemplate = (tpl: Template) => {
     setName(t(tpl.nameKey))
     setSystemPrompt(tpl.prompt)
-    if (tpl.model && allModels.some((m) => m.id === tpl.model)) {
-      setSelectedModel(tpl.model!)
+    if (tpl.model) {
+      const match = allModels.find((m) => m.id === tpl.model || m.id.endsWith(`/${tpl.model}`))
+      if (match) setSelectedModel(match.id)
     }
     if (tpl.temperature != null) {
       setTemperature(tpl.temperature)
@@ -181,8 +182,9 @@ export default function AgentCreatePage() {
       // 填充表单
       setName(config.name || '')
       setSystemPrompt(config.systemPrompt || '')
-      if (config.model && allModels.some((m) => m.id === config.model)) {
-        setSelectedModel(config.model)
+      if (config.model) {
+        const match = allModels.find((m) => m.id === config.model || m.id.endsWith(`/${config.model}`))
+        if (match) setSelectedModel(match.id)
       }
       if (config.temperature != null) setTemperature(config.temperature)
       if (config.maxTokens != null) setMaxTokens(config.maxTokens)
@@ -442,25 +444,12 @@ export default function AgentCreatePage() {
 
           {/* 模型选择 */}
           <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 6 }}>
-              {t('agentCreate.fieldModel')}
-            </label>
-            {allModels.length === 0 ? (
-              <div style={{ padding: 12, backgroundColor: 'var(--warning-bg)', borderRadius: 6, fontSize: 13, color: 'var(--warning)' }}>
-                {t('agentCreate.warningNoModels')}
-              </div>
-            ) : (
-              <Select
-                value={selectedModel}
-                onChange={setSelectedModel}
-                options={allModels.map((m) => ({
-                  value: m.id,
-                  label: `${m.label} (${m.providerName})${!m.available ? ` — ${t('settings.labelNoKey')}` : ''}`,
-                }))}
-                searchable
-                style={{ width: '100%' }}
-              />
-            )}
+            <ProviderModelSelector
+              value={selectedModel}
+              onChange={setSelectedModel}
+              requireKey={false}
+              style={{ width: '100%' }}
+            />
           </div>
 
           {/* 温度 */}

@@ -154,7 +154,8 @@ pub async fn auto_name_session(
             || title.starts_with("[微信]")
             || title.starts_with("[Discord]")
             || title.starts_with("[Slack]")
-            || title.starts_with("Conversation");
+            || title.starts_with("Conversation")
+            || title.starts_with("对话");
         if !is_default {
             return; // 用户已手动命名
         }

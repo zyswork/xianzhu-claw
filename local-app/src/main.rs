@@ -274,6 +274,32 @@ async fn main() {
                     "models": [{"id": "deepseek-chat", "name": "DeepSeek Chat"}, {"id": "deepseek-reasoner", "name": "DeepSeek Reasoner"}],
                     "enabled": true,
                 }),
+                serde_json::json!({
+                    "id": "zhipu", "name": "智谱 AI (GLM)", "apiType": "openai",
+                    "baseUrl": "https://open.bigmodel.cn/api/paas/v4", "apiKey": "",
+                    "models": [
+                        {"id": "glm-5", "name": "GLM-5"},
+                        {"id": "glm-5-turbo", "name": "GLM-5 Turbo"},
+                        {"id": "glm-4.7", "name": "GLM-4.7"},
+                        {"id": "glm-4.7-flash", "name": "GLM-4.7 Flash"},
+                        {"id": "glm-4.7-flashx", "name": "GLM-4.7 FlashX"},
+                        {"id": "glm-4.6", "name": "GLM-4.6"},
+                        {"id": "glm-z1", "name": "GLM-Z1 (推理)"}
+                    ],
+                    "enabled": true,
+                }),
+                serde_json::json!({
+                    "id": "zhipu-coding", "name": "智谱 AI (CodePlan)", "apiType": "openai",
+                    "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4", "apiKey": "",
+                    "models": [
+                        {"id": "glm-5", "name": "GLM-5"},
+                        {"id": "glm-5-turbo", "name": "GLM-5 Turbo"},
+                        {"id": "glm-4.7", "name": "GLM-4.7"},
+                        {"id": "glm-4.7-flash", "name": "GLM-4.7 Flash"},
+                        {"id": "glm-4.6", "name": "GLM-4.6"}
+                    ],
+                    "enabled": true,
+                }),
             ];
         }
 

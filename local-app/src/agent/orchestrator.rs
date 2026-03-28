@@ -1006,7 +1006,10 @@ impl Orchestrator {
 
         // 自动生成会话标题：如果是第一条消息且标题为默认值
         if let Ok(Some(session)) = memory::conversation::get_session(&self.pool, session_id).await {
-            if session.title == "New Session" {
+            let is_default_title = session.title == "New Session"
+                || session.title.starts_with("对话")
+                || session.title.starts_with("Conversation");
+            if is_default_title {
                 let auto_title: String = user_message.chars().take(20).collect();
                 let _ = memory::conversation::rename_session(&self.pool, session_id, &auto_title).await;
             }

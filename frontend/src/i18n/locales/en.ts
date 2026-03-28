@@ -43,6 +43,8 @@ export const en: TranslationMap = {
     failed: 'Failed',
     name: 'Name',
     model: 'Model',
+    provider: 'Provider',
+    pleaseSelect: 'Please select',
     status: 'Status',
     actions: 'Actions',
     logout: 'Logout',

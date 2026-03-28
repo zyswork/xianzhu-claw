@@ -18,6 +18,7 @@ import ParamsTab from '../components/ParamsTab'
 import McpTab from '../components/McpTab'
 import ChannelsTab from '../components/ChannelsTab'
 import Select from '../components/Select'
+import ProviderModelSelector from '../components/ProviderModelSelector'
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -402,26 +403,9 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
   const [model, setModel] = useState(agent.model)
   const [temperature, setTemperature] = useState(agent.temperature ?? 0.7)
   const [maxTokens, setMaxTokens] = useState(agent.maxTokens ?? 2048)
-  const [models, setModels] = useState<{ id: string; label: string }[]>([])
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [msg, setMsg] = useState('')
-
-  useEffect(() => {
-    ;(async () => {
-      try {
-        const providers = await invoke<ProviderInfo[]>('get_providers')
-        const list: { id: string; label: string }[] = []
-        for (const p of providers) {
-          if (!p.enabled) continue
-          for (const m of (p.models || [])) {
-            list.push({ id: m.id, label: `${m.name || m.id} (${p.name})` })
-          }
-        }
-        setModels(list)
-      } catch (e) { console.error(e) }
-    })()
-  }, [])
 
   const handleSave = async () => {
     setSaving(true)
@@ -477,16 +461,10 @@ function SettingsTab({ agentId, agent, onUpdate, onDelete }: {
         </div>
 
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 6, color: 'var(--text-muted)' }}>{t('common.model')}</label>
-          <Select
+          <ProviderModelSelector
             value={model}
             onChange={setModel}
-            searchable
-            options={[
-              ...models.map(m => ({ value: m.id, label: m.label })),
-              ...(!models.find(m => m.id === model) ? [{ value: model, label: model }] : []),
-            ]}
-            placeholder={t('common.model')}
+            requireKey={false}
           />
         </div>
       </div>

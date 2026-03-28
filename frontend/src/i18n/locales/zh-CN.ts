@@ -43,6 +43,8 @@ export const zhCN: TranslationMap = {
     failed: '失败',
     name: '名称',
     model: '模型',
+    provider: '供应商',
+    pleaseSelect: '请选择',
     status: '状态',
     actions: '操作',
     logout: '退出登录',

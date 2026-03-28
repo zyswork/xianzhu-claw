@@ -1168,7 +1168,8 @@ export default function ChatTab({ agentId }: { agentId: string }) {
           if (m.role === 'tool') {
             parsed.push({ role: 'tool', content: m.content || '', toolName: m.name || t('common.tools') })
           } else if (m.role === 'assistant' && m.tool_calls) {
-            if (m.content) parsed.push({ role: 'assistant', content: m.content })
+            // 先展示工具卡片，再展示后续 assistant 消息中的最终回复
+            // 跳过本消息的前置文本（preamble），避免工具在下、文字在上的顺序问题
             for (const tc of (Array.isArray(m.tool_calls) ? m.tool_calls : [])) {
               parsed.push({ role: 'tool', content: '', toolName: tc.function?.name || tc.name || t('common.tools') })
             }
@@ -1271,6 +1272,9 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       }
       // 从 DB 重新加载结构化消息（消除 streaming 临时状态与 DB 数据的差异，避免闪烁）
       loadMessagesRef.current()
+      // 立即刷新会话列表（同步命名已完成）；延迟再刷一次（LLM 异步命名约 1-3 秒后完成）
+      loadSessionsRef.current()
+      setTimeout(() => loadSessionsRef.current(), 3000)
     })
     const unlisten3 = listen<string>('llm-error', (e) => {
       setStreaming(false)
@@ -2252,19 +2256,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                         {/* 内容列 */}
                         <div style={{ display: 'flex', flexDirection: 'column', maxWidth: 560, minWidth: 0 }}>
                           {msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
-                          {/* 文字部分 */}
-                          {textParts.map((part, pi) => (
-                            <div key={`t-${pi}`} style={{
-                              padding: '10px 14px', borderRadius: '12px 12px 12px 4px',
-                              backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)',
-                              border: '1px solid var(--border-subtle)',
-                              fontSize: 14, lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'anywhere',
-                              marginBottom: 4,
-                            }}>
-                              {renderMd(part.content)}
-                            </div>
-                          ))}
-                          {/* 工具合并为一个组卡片 */}
+                          {/* 工具合并为一个组卡片（先于文字显示，与完成后顺序一致） */}
                           <div style={{
                             marginTop: 4, marginBottom: 6, maxWidth: 560,
                             borderRadius: 10, overflow: 'hidden',
@@ -2304,6 +2296,18 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                               ))}
                             </div>
                           </div>
+                          {/* 文字部分（在工具卡片之后显示，与完成后顺序一致） */}
+                          {textParts.map((part, pi) => (
+                            <div key={`t-${pi}`} style={{
+                              padding: '10px 14px', borderRadius: '12px 12px 12px 4px',
+                              backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)',
+                              border: '1px solid var(--border-subtle)',
+                              fontSize: 14, lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'anywhere',
+                              marginTop: 4,
+                            }}>
+                              {renderMd(part.content)}
+                            </div>
+                          ))}
                           {streaming && i === messages.length - 1 && <TypingIndicator />}
                         </div>
                       </div>
