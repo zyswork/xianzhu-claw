@@ -732,6 +732,12 @@ impl LlmClient {
                     body["tool_choice"] = serde_json::json!("auto");
                     body["parallel_tool_calls"] = serde_json::json!(true);
                 } }
+                // 特定模型 temperature 强制覆盖
+                let ml = pure_model.to_lowercase();
+                if ml.contains("kimi-k2") || ml.contains("o1") || ml.contains("o3") || ml.contains("o4") {
+                    // Kimi K2.x / OpenAI o 系列要求 temperature=1
+                    body["temperature"] = serde_json::json!(1);
+                }
                 (url, body)
             }
             "anthropic" => {
