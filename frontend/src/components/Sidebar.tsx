@@ -4,10 +4,11 @@
  * 支持响应式折叠：< 768px 自动折叠为图标模式
  */
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useI18n } from '../i18n'
 import { useAuthStore } from '../store/authStore'
+import { useSidebarStore } from '../store/sidebarStore'
 import { useTheme, type Theme } from '../hooks/useTheme'
 import {
   IconChat, IconGroup, IconSkills, IconCron, IconChannels,
@@ -25,6 +26,8 @@ interface NavItem {
   icon: React.ReactNode
   label: string
   path: string
+  /** 快捷键编号（1~9），用于显示 ⌘N 提示 */
+  shortcutNum?: number
 }
 
 export default function Sidebar() {
@@ -33,7 +36,7 @@ export default function Sidebar() {
   const { t } = useI18n()
   const { user, logout } = useAuthStore()
   const { theme, setTheme } = useTheme()
-  const [collapsed, setCollapsed] = useState(isNarrowViewport)
+  const { collapsed, setCollapsed } = useSidebarStore()
 
   // 监听视口宽度变化，自动折叠/展开
   useEffect(() => {
@@ -43,21 +46,21 @@ export default function Sidebar() {
     return () => mql.removeEventListener('change', handler)
   }, [])
 
-  // 主功能导航
+  // 主功能导航（shortcutNum 对应 Cmd+N 快捷键）
   const mainNav: NavItem[] = [
-    { icon: <IconChat size={18} />, label: t('sidebar.chat'), path: '/agents' },
-    { icon: <IconGroup size={18} />, label: t('sidebar.groupChat'), path: '/group-chat' },
-    { icon: <IconSkills size={18} />, label: t('sidebar.skills'), path: '/skills' },
-    { icon: <IconCron size={18} />, label: t('sidebar.cron'), path: '/cron' },
-    { icon: <IconChannels size={18} />, label: t('sidebar.channels'), path: '/channels' },
+    { icon: <IconChat size={18} />, label: t('sidebar.chat'), path: '/agents', shortcutNum: 1 },
+    { icon: <IconGroup size={18} />, label: t('sidebar.groupChat'), path: '/group-chat', shortcutNum: 2 },
+    { icon: <IconSkills size={18} />, label: t('sidebar.skills'), path: '/skills', shortcutNum: 3 },
+    { icon: <IconCron size={18} />, label: t('sidebar.cron'), path: '/cron', shortcutNum: 4 },
+    { icon: <IconChannels size={18} />, label: t('sidebar.channels'), path: '/channels', shortcutNum: 5 },
   ]
 
   // 管理导航
   const manageNav: NavItem[] = [
-    { icon: <IconDashboard size={18} />, label: t('sidebar.dashboard'), path: '/dashboard' },
-    { icon: <IconMemory size={18} />, label: t('sidebar.memory'), path: '/memory' },
-    { icon: <IconPlugins size={18} />, label: t('sidebar.plugins'), path: '/plugins' },
-    { icon: <IconPlaza size={18} />, label: t('sidebar.plaza'), path: '/plaza' },
+    { icon: <IconDashboard size={18} />, label: t('sidebar.dashboard'), path: '/dashboard', shortcutNum: 6 },
+    { icon: <IconMemory size={18} />, label: t('sidebar.memory'), path: '/memory', shortcutNum: 7 },
+    { icon: <IconPlugins size={18} />, label: t('sidebar.plugins'), path: '/plugins', shortcutNum: 8 },
+    { icon: <IconPlaza size={18} />, label: t('sidebar.plaza'), path: '/plaza', shortcutNum: 9 },
   ]
 
   // 主题切换选项
@@ -74,6 +77,9 @@ export default function Sidebar() {
     const isActive = location.pathname === item.path ||
       (item.path === '/agents' && location.pathname.startsWith('/agents'))
 
+    const shortcutHint = item.shortcutNum ? ` (${'\u2318'}${item.shortcutNum})` : ''
+    const tooltipText = collapsed ? item.label + shortcutHint : undefined
+
     const className = [
       'sidebar-nav-item',
       isActive && 'sidebar-nav-item--active',
@@ -87,7 +93,8 @@ export default function Sidebar() {
         href={item.path}
         onClick={(e) => { e.preventDefault(); navigate(item.path) }}
         className={className}
-        data-tooltip={collapsed ? item.label : undefined}
+        title={item.shortcutNum ? `${item.label} (${'\u2318'}${item.shortcutNum})` : item.label}
+        data-tooltip={tooltipText}
       >
         {collapsed ? (
           item.icon
@@ -159,7 +166,7 @@ export default function Sidebar() {
           <button
             className="sidebar-new-btn--icon"
             onClick={() => navigate('/agents/new')}
-            title={t('sidebar.newChat')}
+            title={`${t('sidebar.newChat')} (\u2318N)`}
           >
             <IconPlus size={16} />
           </button>
@@ -182,7 +189,7 @@ export default function Sidebar() {
 
       {/* ── 底部区域 ── */}
       <div className="sidebar-bottom">
-        {/* 设置链接 */}
+        {/* 设置链接 (⌘,) */}
         {renderNavItem({ icon: <IconSettings size={18} />, label: t('sidebar.settings'), path: '/settings' })}
 
         {/* 主题切换（展开时显示） */}

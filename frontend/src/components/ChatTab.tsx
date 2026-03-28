@@ -17,6 +17,7 @@ import { toast } from '../hooks/useToast'
 import { useConfirm, showConfirm } from '../hooks/useConfirm'
 import { useVoiceInput } from '../hooks/useVoiceInput'
 import { useVoiceOutput } from '../hooks/useVoiceOutput'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 import Select from './Select'
 
 // 初始化 Mermaid
@@ -1083,29 +1084,23 @@ export default function ChatTab({ agentId }: { agentId: string }) {
 
   useEffect(() => { loadSessions() }, [loadSessions])
 
-  // 快捷键系统
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const meta = e.metaKey || e.ctrlKey
-      // Ctrl/Cmd+N: 新会话
-      if (meta && e.key === 'n') { e.preventDefault(); createSession() }
-      // Ctrl/Cmd+/: 聚焦搜索
-      if (meta && e.key === '/') {
-        e.preventDefault()
-        setSessionSearch(prev => prev ? '' : ' ') // 切换搜索框
-        setTimeout(() => setSessionSearch(''), 10) // 清空触发 focus
-      }
-      // Ctrl/Cmd+E: 导出当前会话
-      if (meta && e.key === 'e' && activeSession) { e.preventDefault(); exportSession(activeSession) }
-      // Escape: 关闭搜索/取消选择
-      if (e.key === 'Escape') {
-        if (sessionSearch) setSessionSearch('')
-        else if (selectMode) { setSelectMode(false); setSelectedSessions(new Set()) }
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [activeSession, sessionSearch, selectMode])
+  // 快捷键系统（使用全局 hook）
+  useKeyboardShortcuts({
+    // Cmd+N: 新建会话
+    'cmd+n': () => createSession(),
+    // Cmd+/: 聚焦搜索
+    'cmd+/': () => {
+      setSessionSearch(prev => prev ? '' : ' ') // 切换搜索框
+      setTimeout(() => setSessionSearch(''), 10) // 清空触发 focus
+    },
+    // Cmd+E: 导出当前会话
+    'cmd+e': () => { if (activeSession) exportSession(activeSession) },
+    // Escape: 关闭搜索/取消选择
+    'escape': () => {
+      if (sessionSearch) setSessionSearch('')
+      else if (selectMode) { setSelectMode(false); setSelectedSessions(new Set()) }
+    },
+  })
 
   const loadMessages = useCallback(async () => {
     if (!activeSession) return

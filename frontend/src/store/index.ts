@@ -1,4 +1,5 @@
 export { useAuthStore } from './authStore'
 export { useEnterpriseStore } from './enterpriseStore'
+export { useSidebarStore } from './sidebarStore'
 export type { User } from './authStore'
 export type { Enterprise } from './enterpriseStore'

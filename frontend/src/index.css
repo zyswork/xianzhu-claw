@@ -76,18 +76,18 @@
 
 /* ─── 浅色主题：清晰层次 + 柔和阴影 ─── */
 [data-theme="light"] {
-  /* 背景：淡灰底，卡片纯白，形成层次 */
-  --bg-primary: #eef0f4;
-  --bg-base: #eef0f4;
+  /* 背景：三层分明 — 页面灰白 → 卡片纯白 → 悬浮白 */
+  --bg-primary: #f5f6f8;
+  --bg-base: #f5f6f8;
   --bg-surface: #ffffff;
   --bg-elevated: #ffffff;
-  --bg-glass: rgba(255, 255, 255, 0.85);
-  --bg-glass-hover: rgba(255, 255, 255, 0.95);
+  --bg-glass: rgba(255, 255, 255, 0.9);
+  --bg-glass-hover: rgba(255, 255, 255, 1);
   --bg-glass-active: rgba(16, 185, 129, 0.06);
 
   --glass-blur: blur(16px);
-  --glass-border: 1px solid rgba(0, 0, 0, 0.1);
-  --glass-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --glass-border: 1px solid rgba(0, 0, 0, 0.08);
+  --glass-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 
   /* 侧边栏：保持深色，稳重 */
   --sidebar-bg: #1a1f2e;
@@ -95,25 +95,25 @@
   --sidebar-active: rgba(16, 185, 129, 0.15);
   --sidebar-border: rgba(255, 255, 255, 0.06);
 
-  /* 边框：明显可见 */
-  --border-subtle: rgba(0, 0, 0, 0.1);
-  --border-default: rgba(0, 0, 0, 0.15);
+  /* 边框：柔和，不突兀 */
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-default: rgba(0, 0, 0, 0.12);
   --border-active: #0d9668;
-  --border-accent: rgba(13, 150, 104, 0.3);
+  --border-accent: rgba(13, 150, 104, 0.25);
 
-  /* 文字 */
+  /* 文字：深灰为主，层次清晰 */
   --text-primary: #1a1a2e;
-  --text-secondary: #4a5568;
-  --text-muted: #7a8599;
-  --text-accent: #047857;
-  --text-heading: #0d0d1a;
+  --text-secondary: #64748b;
+  --text-muted: #94a3b8;
+  --text-accent: #059669;
+  --text-heading: #0f172a;
 
-  /* 强调色 */
-  --accent: #0d9668;
-  --accent-light: #10b981;
-  --accent-hover: #047857;
-  --accent-bg: rgba(13, 150, 104, 0.07);
-  --accent-gradient: linear-gradient(135deg, #0d9668, #0891b2);
+  /* 强调色：保持绿色，浅色下更清爽 */
+  --accent: #10b981;
+  --accent-light: #34d399;
+  --accent-hover: #059669;
+  --accent-bg: rgba(16, 185, 129, 0.08);
+  --accent-gradient: linear-gradient(135deg, #10b981, #06b6d4);
 
   /* 状态色 */
   --success: #16a34a;
@@ -124,18 +124,18 @@
   --error-bg: rgba(220, 38, 38, 0.06);
 
   /* 对话气泡 */
-  --user-bubble: rgba(13, 150, 104, 0.06);
+  --user-bubble: rgba(16, 185, 129, 0.08);
   --assistant-bubble: #ffffff;
 
-  /* 代码 */
-  --code-bg: rgba(0, 0, 0, 0.04);
-  --code-text: #0d9668;
-  --pre-bg: #1e293b;
-  --pre-text: #d4d4d4;
+  /* 代码：浅灰底 + 深色文字 */
+  --code-bg: #f1f5f9;
+  --code-text: #059669;
+  --pre-bg: #f8f9fa;
+  --pre-text: #1e293b;
 
   /* 滚动条 */
-  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
-  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.12);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.2);
 
   color-scheme: light;
 }
@@ -401,14 +401,98 @@ select option { background: var(--bg-elevated); color: var(--text-primary); }
   padding: 0;
 }
 
-/* 浅色主题代码块 */
+/* ─── 浅色主题：组件覆盖 ─── */
+
+/* 代码块：浅灰底 + 柔和边框 */
 [data-theme="light"] .code-block-wrapper {
-  border-color: rgba(0, 0, 0, 0.1);
+  border-color: rgba(0, 0, 0, 0.06);
+  background: #f8f9fa;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 [data-theme="light"] .code-block-header {
+  background: rgba(0, 0, 0, 0.03);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .code-block-wrapper pre code {
+  color: #1e293b;
+}
+
+[data-theme="light"] .code-lang {
+  color: #94a3b8;
+}
+
+[data-theme="light"] .code-copy-btn {
+  color: #94a3b8 !important;
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .code-copy-btn:hover {
+  color: #1a1a2e !important;
+  border-color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.08) !important;
+}
+
+/* 毛玻璃卡片：浅色下使用白底 + 微阴影 */
+[data-theme="light"] .glass-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+[data-theme="light"] .glass-card:hover {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .glass-subtle {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .glass {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Markdown 渲染：浅色适配 */
+[data-theme="light"] .markdown-body pre {
+  background: #f8f9fa;
+  color: #1e293b;
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .markdown-body code {
+  background: #f1f5f9;
+  color: #059669;
+}
+
+[data-theme="light"] .markdown-body pre code {
+  background: none;
+  color: inherit;
+}
+
+[data-theme="light"] .markdown-body blockquote {
   background: rgba(0, 0, 0, 0.02);
-  border-bottom-color: rgba(0, 0, 0, 0.08);
+  color: #64748b;
+}
+
+[data-theme="light"] .markdown-body th {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+/* 打字指示器 */
+[data-theme="light"] .typing-indicator {
+  background: #f1f5f9;
+}
+
+/* Mermaid 流程图 */
+[data-theme="light"] .mermaid-rendered {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: rgba(0, 0, 0, 0.06);
 }
 
 /* ─── 侧边栏样式 ─── */
@@ -977,6 +1061,38 @@ button:active:not(:disabled) {
 
 .sidebar-tooltip:hover::after {
   opacity: 1;
+}
+
+/* ─── 浅色主题：表单控件覆盖 ─── */
+
+/* 原生 select 下拉箭头：浅色下用深灰 */
+[data-theme="light"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+}
+
+/* 输入框 focus 光圈：浅色下稍淡 */
+[data-theme="light"] select:focus,
+[data-theme="light"] input:focus,
+[data-theme="light"] textarea:focus {
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
+}
+
+/* 滑块轨道：浅色下可见 */
+[data-theme="light"] input[type="range"] {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] input[type="range"]::-webkit-slider-thumb {
+  border-color: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+}
+
+/* Tooltip 浅色适配 */
+[data-theme="light"] .sidebar-tooltip::after {
+  background: #1e293b;
+  color: #f0f0f5;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 /* ---- 响应式：窄屏适配 (< 768px) ---- */
