@@ -4,7 +4,7 @@
  * 从 AgentDetailPage.tsx 提取的独立组件
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
 import { listen } from '@tauri-apps/api/event'
 import { marked } from 'marked'
@@ -415,8 +415,24 @@ function SessionItem({ s, activeSession, onSelect, onDelete, onExport, renamingS
   )
 }
 
+/** 转义正则特殊字符 */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 搜索高亮：将匹配的关键词用 <mark> 包裹 */
+function highlightText(text: string, query: string) {
+  if (!query) return text
+  const parts = text.split(new RegExp(`(${escapeRegExp(query)})`, 'gi'))
+  return parts.map((part, i) =>
+    part.toLowerCase() === query.toLowerCase()
+      ? <mark key={i} style={{ backgroundColor: 'var(--warning, #f59e0b)', color: '#000', borderRadius: 2, padding: '0 2px' }}>{part}</mark>
+      : part
+  )
+}
+
 /** 用户消息内容渲染（支持 ![图片](/path) 显示缩略图） */
-function UserMessageContent({ content }: { content: string }) {
+function UserMessageContent({ content, searchQuery }: { content: string; searchQuery?: string }) {
   // 检测 Markdown 图片引用: ![图片](/path/to/file.jpg)
   const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g
   const parts: Array<{ type: 'text' | 'image'; value: string }> = []
@@ -436,7 +452,7 @@ function UserMessageContent({ content }: { content: string }) {
   }
 
   if (parts.length === 0 || !parts.some(p => p.type === 'image')) {
-    return <>{content}</>
+    return <>{searchQuery ? highlightText(content, searchQuery) : content}</>
   }
 
   return (
@@ -451,7 +467,7 @@ function UserMessageContent({ content }: { content: string }) {
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
         ) : (
-          <span key={i}>{p.value}</span>
+          <span key={i}>{searchQuery ? highlightText(p.value, searchQuery) : p.value}</span>
         )
       )}
     </div>
@@ -847,6 +863,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSession, setActiveSession] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
+  const [displayCount, setDisplayCount] = useState(50)
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   // 对话模式：flash=快速回复(不使用工具), standard=标准, thinking=深度思考
@@ -870,6 +887,13 @@ export default function ChatTab({ agentId }: { agentId: string }) {
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set())
   const [selectMode, setSelectMode] = useState(false)
   const [sessionSearch, setSessionSearch] = useState('')
+  // 对话内搜索状态
+  const [chatSearchOpen, setChatSearchOpen] = useState(false)
+  const [chatSearchQuery, setChatSearchQuery] = useState('')
+  const [chatSearchIdx, setChatSearchIdx] = useState(0)
+  const chatSearchInputRef = useRef<HTMLInputElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
   const toggleTool = (key: string) => setExpandedTools(prev => {
     const next = new Set(prev)
@@ -877,6 +901,27 @@ export default function ChatTab({ agentId }: { agentId: string }) {
     return next
   })
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // 对话内搜索：计算匹配消息索引
+  const chatSearchMatches = useMemo(() => {
+    if (!chatSearchQuery.trim()) return [] as number[]
+    const q = chatSearchQuery.toLowerCase()
+    const matches: number[] = []
+    messages.forEach((m, i) => {
+      if (m.content && typeof m.content === 'string' && m.content.toLowerCase().includes(q)) {
+        matches.push(i)
+      }
+    })
+    return matches
+  }, [chatSearchQuery, messages])
+
+  // 搜索：跳转到匹配的消息位置
+  useEffect(() => {
+    if (chatSearchMatches.length === 0 || !messagesContainerRef.current) return
+    const idx = chatSearchMatches[chatSearchIdx] ?? chatSearchMatches[0]
+    const el = messagesContainerRef.current.querySelector(`[data-msg-idx="${idx}"]`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [chatSearchIdx, chatSearchMatches])
 
   // 代码块复制按钮 — 事件委托
   const handleCodeCopyClick = useCallback((e: React.MouseEvent) => {
@@ -1095,9 +1140,17 @@ export default function ChatTab({ agentId }: { agentId: string }) {
     },
     // Cmd+E: 导出当前会话
     'cmd+e': () => { if (activeSession) exportSession(activeSession) },
+    // Cmd+F: 对话内搜索
+    'cmd+f': () => {
+      if (activeSession) {
+        setChatSearchOpen(true)
+        setTimeout(() => chatSearchInputRef.current?.focus(), 50)
+      }
+    },
     // Escape: 关闭搜索/取消选择
     'escape': () => {
-      if (sessionSearch) setSessionSearch('')
+      if (chatSearchOpen) { setChatSearchOpen(false); setChatSearchQuery(''); setChatSearchIdx(0) }
+      else if (sessionSearch) setSessionSearch('')
       else if (selectMode) { setSelectMode(false); setSelectedSessions(new Set()) }
     },
   })
@@ -1106,7 +1159,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
     if (!activeSession) return
     const seq = ++messageLoadSeqRef.current
     try {
-      const structured = await invoke<any[]>('load_structured_messages', { sessionId: activeSession, limit: 50 })
+      const structured = await invoke<any[]>('load_structured_messages', { sessionId: activeSession, limit: displayCount })
       if (messageLoadSeqRef.current !== seq) return // 过期响应，丢弃
       if (structured && structured.length > 0) {
         const parsed: Message[] = []
@@ -1136,9 +1189,16 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       if (messageLoadSeqRef.current !== seq) return
       console.error(e)
     }
-  }, [agentId, activeSession])
+  }, [agentId, activeSession, displayCount])
 
   useEffect(() => { loadMessages() }, [loadMessages])
+
+  // 切换会话时关闭搜索
+  useEffect(() => {
+    setChatSearchOpen(false)
+    setChatSearchQuery('')
+    setChatSearchIdx(0)
+  }, [activeSession])
 
   // 定时检查当前会话是否有新消息（兼容 Telegram/外部消息）
   useEffect(() => {
@@ -1865,7 +1925,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
               )}
               <div style={{ flex: 1 }}>
                 <SessionItem s={s} activeSession={activeSession}
-                  onSelect={() => { if (!selectMode) { setActiveSession(s.id); setMessages([]) } else { toggleSessionSelect(s.id) } }}
+                  onSelect={() => { if (!selectMode) { setActiveSession(s.id); setMessages([]); setDisplayCount(50) } else { toggleSessionSelect(s.id) } }}
                   onDelete={() => deleteSession(s.id)}
                   onExport={() => exportSession(s.id)}
                   renamingSession={renamingSession} renameValue={renameValue}
@@ -1908,7 +1968,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
               </div>
               {showSystemSessions && sessions.filter(s => isSystemSession(s.title)).map((s) => (
                 <SessionItem key={s.id} s={s} activeSession={activeSession}
-                  onSelect={() => { setActiveSession(s.id); setMessages([]) }}
+                  onSelect={() => { setActiveSession(s.id); setMessages([]); setDisplayCount(50) }}
                   onDelete={() => deleteSession(s.id)}
                   renamingSession={renamingSession} renameValue={renameValue}
                   setRenameValue={setRenameValue}
@@ -1938,8 +1998,107 @@ export default function ChatTab({ agentId }: { agentId: string }) {
           </div>
         ) : (
           <>
-            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '16px 20px' }} onClick={handleCodeCopyClick}>
-              {groupMessages(messages).map((group) => {
+            {/* 对话内搜索栏 */}
+            {chatSearchOpen && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+                backgroundColor: 'var(--bg-elevated)', borderBottom: '1px solid var(--border-subtle)',
+                flexShrink: 0,
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input
+                  ref={chatSearchInputRef}
+                  type="text"
+                  value={chatSearchQuery}
+                  onChange={e => { setChatSearchQuery(e.target.value); setChatSearchIdx(0) }}
+                  onKeyDown={e => {
+                    if (e.key === 'Escape') { setChatSearchOpen(false); setChatSearchQuery(''); setChatSearchIdx(0) }
+                    else if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (chatSearchMatches.length > 0) setChatSearchIdx(prev => (prev + 1) % chatSearchMatches.length)
+                    }
+                    else if (e.key === 'Enter' && e.shiftKey) {
+                      e.preventDefault()
+                      if (chatSearchMatches.length > 0) setChatSearchIdx(prev => (prev - 1 + chatSearchMatches.length) % chatSearchMatches.length)
+                    }
+                  }}
+                  placeholder={t('chat.searchInChat')}
+                  autoFocus
+                  style={{
+                    flex: 1, padding: '4px 8px', fontSize: 13, borderRadius: 4,
+                    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-glass)',
+                    color: 'var(--text-primary)', outline: 'none', minWidth: 0,
+                  }}
+                />
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 60, textAlign: 'center' }}>
+                  {chatSearchQuery.trim()
+                    ? chatSearchMatches.length > 0
+                      ? t('chat.matchCount', { current: chatSearchIdx + 1, total: chatSearchMatches.length })
+                      : t('chat.noMatches')
+                    : ''}
+                </span>
+                <button
+                  onClick={() => { if (chatSearchMatches.length > 0) setChatSearchIdx(prev => (prev - 1 + chatSearchMatches.length) % chatSearchMatches.length) }}
+                  disabled={chatSearchMatches.length === 0}
+                  style={{
+                    padding: '2px 6px', border: '1px solid var(--border-subtle)', borderRadius: 4,
+                    backgroundColor: 'transparent', color: 'var(--text-muted)', cursor: chatSearchMatches.length > 0 ? 'pointer' : 'default',
+                    opacity: chatSearchMatches.length > 0 ? 1 : 0.4, fontSize: 12,
+                  }}
+                  title="Previous (Shift+Enter)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="18 15 12 9 6 15"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => { if (chatSearchMatches.length > 0) setChatSearchIdx(prev => (prev + 1) % chatSearchMatches.length) }}
+                  disabled={chatSearchMatches.length === 0}
+                  style={{
+                    padding: '2px 6px', border: '1px solid var(--border-subtle)', borderRadius: 4,
+                    backgroundColor: 'transparent', color: 'var(--text-muted)', cursor: chatSearchMatches.length > 0 ? 'pointer' : 'default',
+                    opacity: chatSearchMatches.length > 0 ? 1 : 0.4, fontSize: 12,
+                  }}
+                  title="Next (Enter)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+                <button
+                  onClick={() => { setChatSearchOpen(false); setChatSearchQuery(''); setChatSearchIdx(0) }}
+                  style={{
+                    padding: '2px 6px', border: 'none', borderRadius: 4,
+                    backgroundColor: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12,
+                  }}
+                  title="Close (Esc)"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            )}
+            <div ref={messagesContainerRef} style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '16px 20px' }} onClick={handleCodeCopyClick}>
+              {/* 消息分页：仅显示最近 displayCount 条，避免大量消息时渲染卡顿 */}
+              {messages.length > displayCount && (
+                <div style={{ textAlign: 'center', marginBottom: 12 }}>
+                  <button
+                    onClick={() => setDisplayCount(c => c + 50)}
+                    style={{
+                      padding: '6px 16px', fontSize: 12,
+                      background: 'var(--bg-elevated)', color: 'var(--text-secondary)',
+                      border: '1px solid var(--border-subtle)', borderRadius: 6,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {t('chat.loadMore') || '加载更早的消息'} ({messages.length - displayCount} {t('chat.messagesRemaining') || '条'})
+                  </button>
+                </div>
+              )}
+              {groupMessages(messages.slice(-displayCount)).map((group) => {
                 // 连续工具调用合并为一组
                 if (group.type === 'tool-group') {
                   return (
@@ -1964,7 +2123,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   const accentColor = meta.success ? 'var(--accent, #34d399)' : 'var(--error, #ef4444)'
                   const statusBg = meta.success ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)'
                   return (
-                    <div key={i} style={{
+                    <div key={i} data-msg-idx={i} style={{
                       marginBottom: 6, marginLeft: 38, maxWidth: 560,
                       borderRadius: 10, overflow: 'hidden',
                       border: '1px solid var(--border-subtle)',
@@ -2075,7 +2234,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   const textParts = parts.filter(p => p.type === 'text')
                   if (toolParts.length > 0) {
                     return (
-                      <div key={i} className="msg-row message-enter" style={{
+                      <div key={i} data-msg-idx={i} className="msg-row message-enter" style={{
                         marginBottom: 12, display: 'flex', flexDirection: 'row',
                         alignItems: 'flex-start', gap: 8, overflow: 'hidden',
                       }}>
@@ -2158,7 +2317,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   // Yield 状态
                   if (c.includes('⏸️') || c.includes('YIELD:') || c.includes('⏳ Waiting for subagent')) {
                     return (
-                      <div key={i} style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+                      <div key={i} data-msg-idx={i} style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
                         <div style={{
                           padding: '10px 16px', borderRadius: 10, fontSize: 13,
                           backgroundColor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
@@ -2172,7 +2331,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   // Subagent Result
                   if (c.includes('[Subagent Result')) {
                     return (
-                      <div key={i} style={{ marginBottom: 12 }}>
+                      <div key={i} data-msg-idx={i} style={{ marginBottom: 12 }}>
                         <div style={{
                           padding: '10px 14px', borderRadius: 10, fontSize: 13,
                           backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)',
@@ -2191,7 +2350,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                     const header = lines[0] || ''
                     const turns = lines.slice(1)
                     return (
-                      <div key={i} style={{ marginBottom: 12 }}>
+                      <div key={i} data-msg-idx={i} style={{ marginBottom: 12 }}>
                         <div style={{
                           padding: '10px 14px', borderRadius: 10, fontSize: 13,
                           backgroundColor: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
@@ -2215,7 +2374,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   // Auto-compact 通知
                   if (c.includes('Context overflow') || c.includes('auto-compacting') || c.includes('Auto-compacted')) {
                     return (
-                      <div key={i} style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+                      <div key={i} data-msg-idx={i} style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
                         <div style={{
                           padding: '8px 14px', borderRadius: 8, fontSize: 12,
                           backgroundColor: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)',
@@ -2235,11 +2394,16 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                 const needsSettingsLink = isErrorMsg && /设置|Key|供应商|充值|过期/.test(msg.content)
 
                 return (
-                  <div key={i} style={{
+                  <div key={i} data-msg-idx={i} style={{
                     marginBottom: 12, display: 'flex',
                     flexDirection: isUser ? 'row-reverse' : 'row',
                     alignItems: 'flex-start', gap: 8,
                     overflow: 'hidden',
+                    ...(chatSearchOpen && chatSearchMatches.includes(i) ? {
+                      boxShadow: chatSearchMatches[chatSearchIdx] === i
+                        ? '0 0 0 2px var(--accent)' : '0 0 0 1px var(--warning, #f59e0b)',
+                      borderRadius: 12,
+                    } : {}),
                   }}
                     className="msg-row message-enter"
                   >
@@ -2364,7 +2528,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                             ? <TypingIndicator />
                             : null
                       ) : (
-                        <UserMessageContent content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content || '')} />
+                        <UserMessageContent content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content || '')} searchQuery={chatSearchOpen ? chatSearchQuery : undefined} />
                       )}
                     </div>
                     {/* 操作按钮（消息下方，hover 显示） */}

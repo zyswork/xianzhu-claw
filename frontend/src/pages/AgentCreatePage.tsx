@@ -41,15 +41,49 @@ interface Agent {
   createdAt: number
 }
 
+/** 模板分类 */
+type TemplateCategory = 'general' | 'dev' | 'creative' | 'work'
+
+interface Template {
+  nameKey: string
+  descKey: string
+  prompt: string
+  icon: string
+  category: TemplateCategory
+  model?: string
+  temperature?: number
+}
+
+/** 分类顺序 */
+const CATEGORY_ORDER: TemplateCategory[] = ['general', 'dev', 'creative', 'work']
+
+/** 分类 i18n key 映射 */
+const CATEGORY_KEYS: Record<TemplateCategory, string> = {
+  general: 'agentCreate.catGeneral',
+  dev: 'agentCreate.catDev',
+  creative: 'agentCreate.catCreative',
+  work: 'agentCreate.catWork',
+}
+
 /** 预置 Agent 模板 */
-const TEMPLATES = [
-  { nameKey: 'chatPage.templateGeneral', descKey: 'agentCreate.templateGeneralDesc', prompt: '你是一个有用的AI助手，擅长回答各种问题。', icon: 'AI' },
-  { nameKey: 'chatPage.templateCoding', descKey: 'agentCreate.templateCodingDesc', prompt: '你是一个资深编程助手，擅长代码编写、调试和架构设计。请用简洁专业的方式回答。', icon: '<>' },
-  { nameKey: 'chatPage.templateTranslator', descKey: 'agentCreate.templateTranslatorDesc', prompt: '你是一个专业翻译，擅长中英互译。保持原文风格和语气，翻译要自然流畅。', icon: 'Aa' },
-  { nameKey: 'chatPage.templateWriter', descKey: 'agentCreate.templateWriterDesc', prompt: '你是一个专业写作助手，擅长文章撰写、润色和创意写作。', icon: 'W' },
-  { nameKey: 'agentCreate.templateDataAnalyst', descKey: 'agentCreate.templateDataAnalystDesc', prompt: '你是一位数据分析专家。擅长数据解读、统计分析、趋势预测。能够处理 CSV/Excel 数据，生成分析报告。', icon: '#' },
-  { nameKey: 'agentCreate.templateTutor', descKey: 'agentCreate.templateTutorDesc', prompt: '你是一位耐心的学习导师。用简单易懂的方式解释复杂概念，善于用类比和例子帮助理解。根据学生水平调整讲解深度。', icon: 'E' },
-  { nameKey: 'agentCreate.templateCreative', descKey: 'agentCreate.templateCreativeDesc', prompt: '你是一位创意顾问。擅长头脑风暴、创意方案设计、营销策划。善于跳出常规思维，提供新颖独特的视角和解决方案。', icon: '*' },
+const TEMPLATES: Template[] = [
+  // ── 通用 ──
+  { nameKey: 'chatPage.templateGeneral', descKey: 'agentCreate.templateGeneralDesc', prompt: '你是一个有用的AI助手，擅长回答各种问题。', icon: 'AI', category: 'general' },
+  { nameKey: 'agentCreate.tplTutorName', descKey: 'agentCreate.tplTutorDesc', icon: 'E', category: 'general', model: 'claude-sonnet-4-6', temperature: 0.7, prompt: '你是一位耐心的学习导师，采用苏格拉底式教学法。\n\n核心原则：\n- 不直接给出答案，而是通过提问引导学生自己思考和发现\n- 用简单易懂的语言和生动的类比解释复杂概念\n- 根据学生的水平动态调整讲解深度\n- 每次讲解后用小问题检验理解程度\n- 鼓励学生提出疑问，营造安全的学习氛围\n\n回答格式：\n1. 先确认学生的理解程度\n2. 用类比或故事引入概念\n3. 逐步深入，层层递进\n4. 总结要点，给出思考题' },
+  { nameKey: 'agentCreate.tplCustomerServiceName', descKey: 'agentCreate.tplCustomerServiceDesc', icon: 'CS', category: 'general', model: 'gpt-4o-mini', temperature: 0.3, prompt: '你是一位专业、友善、耐心的客户服务助手。\n\n核心原则：\n- 始终保持礼貌和耐心，即使面对重复或情绪化的问题\n- 先理解客户的核心诉求，再提供解决方案\n- 给出清晰、分步的操作指引\n- 无法解决的问题，说明原因并建议转人工\n- 使用温暖但专业的语气\n\n回答规范：\n1. 先表示理解客户的问题\n2. 提供具体的解决步骤\n3. 询问是否还有其他需要帮助的地方' },
+
+  // ── 开发 ──
+  { nameKey: 'agentCreate.tplCodeName', descKey: 'agentCreate.tplCodeDesc', icon: '<>', category: 'dev', model: 'claude-sonnet-4-6', temperature: 0.2, prompt: '你是一位资深全栈编程专家，精通多种编程语言和框架。\n\n核心能力：\n- 代码编写：Python, TypeScript, Rust, Go, Java 等主流语言\n- 代码审查：发现潜在bug、安全漏洞、性能瓶颈\n- 调试诊断：根据错误信息和日志定位问题\n- 架构设计：给出可维护、可扩展的设计建议\n\n回答规范：\n1. 先理解需求和上下文\n2. 给出完整可运行的代码，附带必要注释\n3. 解释关键设计决策\n4. 提醒潜在的边界条件和注意事项\n5. 如有多种方案，说明各自优劣' },
+  { nameKey: 'agentCreate.tplDataAnalystName', descKey: 'agentCreate.tplDataAnalystDesc', icon: '#', category: 'dev', model: 'gpt-4o', temperature: 0.3, prompt: '你是一位资深数据分析师，擅长从数据中发现洞察。\n\n核心能力：\n- SQL 查询编写与优化（MySQL, PostgreSQL, BigQuery）\n- Python 数据处理（Pandas, NumPy, Matplotlib, Seaborn）\n- 统计分析：假设检验、回归分析、A/B 测试\n- 数据可视化：图表选择、仪表盘设计\n- 业务分析：指标拆解、归因分析、趋势预测\n\n回答规范：\n1. 先理清分析目标和数据结构\n2. 给出完整的分析思路和代码\n3. 解读结果的业务含义\n4. 指出数据质量问题或分析局限性' },
+
+  // ── 创作 ──
+  { nameKey: 'agentCreate.tplTranslatorName', descKey: 'agentCreate.tplTranslatorDesc', icon: 'Aa', category: 'creative', model: 'gpt-4o', temperature: 0.3, prompt: '你是一位精通多语种的专业翻译专家，熟悉中文、英语、日语、韩语。\n\n核心原则：\n- 准确传达原文含义，不遗漏不曲解\n- 保持原文的语气、风格和情感色彩\n- 译文自然流畅，符合目标语言的表达习惯\n- 专业术语翻译准确统一，必要时附注原文\n- 文化差异的内容做适当本地化处理\n\n回答规范：\n1. 直接给出译文\n2. 对有争议的翻译选择附注说明\n3. 如有文化背景需要解释，简要注释' },
+  { nameKey: 'agentCreate.tplWriterName', descKey: 'agentCreate.tplWriterDesc', icon: 'W', category: 'creative', model: 'claude-sonnet-4-6', temperature: 0.8, prompt: '你是一位专业的写作助手，擅长各类文体的创作与润色。\n\n核心能力：\n- 文章写作：散文、议论文、叙事文、说明文\n- 文案创作：广告文案、社交媒体文案、品牌故事\n- 内容润色：修改语病、优化表达、提升文采\n- 创意写作：小说、诗歌、剧本、段子\n\n回答规范：\n1. 先确认写作目的、目标读者和风格要求\n2. 提供完整的作品，注重结构和节奏\n3. 可根据要求调整语气（正式/轻松/幽默/严肃）\n4. 润色时保留原文核心意思，标注主要修改' },
+  { nameKey: 'agentCreate.templateCreative', descKey: 'agentCreate.templateCreativeDesc', prompt: '你是一位创意顾问。擅长头脑风暴、创意方案设计、营销策划。善于跳出常规思维，提供新颖独特的视角和解决方案。', icon: '*', category: 'creative' },
+
+  // ── 工作 ──
+  { nameKey: 'agentCreate.tplProductManagerName', descKey: 'agentCreate.tplProductManagerDesc', icon: 'PM', category: 'work', model: 'gpt-4o', temperature: 0.5, prompt: '你是一位经验丰富的产品经理，擅长从用户需求到产品落地的全流程。\n\n核心能力：\n- 需求分析：用户调研、痛点挖掘、需求优先级排序\n- PRD 撰写：功能描述、用户故事、验收标准\n- 竞品分析：市场定位、差异化、SWOT 分析\n- 用户体验：信息架构、交互流程、可用性评估\n- 项目管理：里程碑规划、风险识别\n\n回答规范：\n1. 从用户视角出发分析问题\n2. 给出结构化的文档或分析\n3. 用数据和案例支撑观点\n4. 平衡用户需求、技术可行性和商业价值' },
+  { nameKey: 'agentCreate.tplDailyReportName', descKey: 'agentCreate.tplDailyReportDesc', icon: 'DR', category: 'work', model: 'gpt-4o-mini', temperature: 0.3, prompt: '你是一位专业的工作汇报助手，帮助整理和撰写工作日报、周报、月报。\n\n核心能力：\n- 信息整理：将零散的工作内容结构化\n- 亮点提炼：突出关键成果和数据\n- 问题总结：归纳遇到的困难和解决方案\n- 计划梳理：整理下一步工作计划\n\n回答规范：\n1. 采用简洁清晰的要点式格式\n2. 按「已完成 / 进行中 / 计划中」分类\n3. 用量化数据体现工作成果\n4. 突出重点，避免流水账\n\n请将你的工作内容告诉我，我来帮你整理成规范的报告。' },
 ]
 
 /** 温度预设 */
@@ -119,9 +153,15 @@ export default function AgentCreatePage() {
   }, [])
 
   // 应用模板
-  const applyTemplate = (tpl: (typeof TEMPLATES)[0]) => {
+  const applyTemplate = (tpl: Template) => {
     setName(t(tpl.nameKey))
     setSystemPrompt(tpl.prompt)
+    if (tpl.model && allModels.some((m) => m.id === tpl.model)) {
+      setSelectedModel(tpl.model!)
+    }
+    if (tpl.temperature != null) {
+      setTemperature(tpl.temperature)
+    }
   }
 
   // AI 生成 Agent 配置
@@ -307,36 +347,47 @@ export default function AgentCreatePage() {
         <div>
           <h3 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 600 }}>{t('agentCreate.stepBasic')}</h3>
 
-          {/* 模板选择 */}
+          {/* 模板选择（按分类展示） */}
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: 'block', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
               {t('agentCreate.quickTemplates')}
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-              {TEMPLATES.map((tpl, idx) => {
-                const tplName = t(tpl.nameKey)
-                const isSelected = name === tplName
-                return (
-                  <button
-                    key={tpl.nameKey || idx}
-                    onClick={() => { setName(tplName); setSystemPrompt(tpl.prompt) }}
-                    style={{
-                      padding: '12px 10px',
-                      border: isSelected ? '2px solid var(--accent)' : '1px solid var(--border-subtle)',
-                      borderRadius: 10,
-                      backgroundColor: isSelected ? 'var(--accent-bg)' : 'var(--bg-elevated)',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      fontSize: 12,
-                    }}
-                  >
-                    <div style={{ fontSize: 24, marginBottom: 4 }}>{tpl.icon}</div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{tplName}</div>
-                    {tpl.descKey && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t(tpl.descKey)}</div>}
-                  </button>
-                )
-              })}
-            </div>
+            {CATEGORY_ORDER.map((cat) => {
+              const catTemplates = TEMPLATES.filter((tpl) => tpl.category === cat)
+              if (catTemplates.length === 0) return null
+              return (
+                <div key={cat} style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+                    {t(CATEGORY_KEYS[cat])}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+                    {catTemplates.map((tpl, idx) => {
+                      const tplName = t(tpl.nameKey)
+                      const isSelected = name === tplName
+                      return (
+                        <button
+                          key={tpl.nameKey || idx}
+                          onClick={() => applyTemplate(tpl)}
+                          style={{
+                            padding: '12px 10px',
+                            border: isSelected ? '2px solid var(--accent)' : '1px solid var(--border-subtle)',
+                            borderRadius: 10,
+                            backgroundColor: isSelected ? 'var(--accent-bg)' : 'var(--bg-elevated)',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                            fontSize: 12,
+                          }}
+                        >
+                          <div style={{ fontSize: 24, marginBottom: 4 }}>{tpl.icon}</div>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{tplName}</div>
+                          {tpl.descKey && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{t(tpl.descKey)}</div>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
           </div>
 
           {/* Agent 名称 */}
