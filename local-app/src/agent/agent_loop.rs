@@ -912,6 +912,7 @@ mod tests {
         let mut messages = Vec::new();
         let response = LlmResponse {
             content: "Hello".to_string(),
+            thinking_content: String::new(),
             tool_calls: vec![],
             stop_reason: "stop".to_string(),
             usage: None,
@@ -927,6 +928,7 @@ mod tests {
         let mut messages = Vec::new();
         let response = LlmResponse {
             content: "".to_string(),
+            thinking_content: String::new(),
             tool_calls: vec![super::super::tools::ParsedToolCall {
                 id: "c1".to_string(),
                 name: "search".to_string(),

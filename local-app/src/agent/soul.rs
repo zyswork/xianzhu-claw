@@ -721,7 +721,7 @@ mod tests {
     fn test_session_type_full() {
         let engine = SoulEngine::for_session(SessionType::Full);
         let names = engine.section_names();
-        assert_eq!(names.len(), 8);
+        assert_eq!(names.len(), 9);
         assert!(names.contains(&"identity"));
         assert!(names.contains(&"soul"));
         assert!(names.contains(&"safety"));
@@ -735,7 +735,7 @@ mod tests {
     fn test_session_type_light() {
         let engine = SoulEngine::for_session(SessionType::Light);
         let names = engine.section_names();
-        assert_eq!(names.len(), 4);
+        assert_eq!(names.len(), 5);
         assert!(names.contains(&"identity"));
         assert!(names.contains(&"soul"));
         assert!(names.contains(&"tools"));

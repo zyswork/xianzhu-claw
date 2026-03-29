@@ -764,8 +764,10 @@ requires:
         let valid = SkillManifest {
             name: "test_skill".to_string(),
             version: "0.1.0".to_string(),
+            author: "test".to_string(),
             description: "测试".to_string(),
             trigger_keywords: vec![],
+            allowed_tools: vec![],
             permissions: SkillPermissions::default(),
             tools: vec![SkillToolDecl {
                 name: "my_tool".to_string(),
