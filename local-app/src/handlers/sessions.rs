@@ -1023,14 +1023,14 @@ RunLoop.current.run()
             .spawn()
             .map_err(|e| format!("启动录音失败: {}", e))?;
 
-        *RECORDING_PROCESS.lock().unwrap() = Some(child);
-        *RECORDING_PATH.lock().unwrap() = Some(path_str.clone());
+        *RECORDING_PROCESS.lock().map_err(|_| "录音进程锁异常".to_string())? = Some(child);
+        *RECORDING_PATH.lock().map_err(|_| "录音路径锁异常".to_string())? = Some(path_str.clone());
         log::info!("录音开始: {}", path_str);
         Ok(path_str)
     }
 
     pub async fn stop() -> Result<String, String> {
-        let mut guard = RECORDING_PROCESS.lock().unwrap();
+        let mut guard = RECORDING_PROCESS.lock().map_err(|_| "录音进程锁异常".to_string())?;
         if let Some(ref mut child) = *guard {
             unsafe { libc::kill(child.id() as i32, libc::SIGTERM); }
             let _ = child.wait();
@@ -1038,7 +1038,7 @@ RunLoop.current.run()
         *guard = None;
         std::thread::sleep(std::time::Duration::from_millis(200));
 
-        let path = RECORDING_PATH.lock().unwrap().take()
+        let path = RECORDING_PATH.lock().map_err(|_| "录音路径锁异常".to_string())?.take()
             .ok_or("没有进行中的录音")?;
         let meta = std::fs::metadata(&path).map_err(|_| "录音文件不存在")?;
         if meta.len() < 100 { return Err("录音时间太短".to_string()); }

@@ -371,6 +371,16 @@ impl Tool for DelegateTaskTool {
             log::warn!("delegate_task: 无法获取父 Agent 上下文（_parent_agent_id 为空）");
         }
 
+        // 兜底模型：从 settings 读取 default_model，避免硬编码
+        let fallback_model: String = sqlx::query_scalar::<_, String>(
+            "SELECT value FROM settings WHERE key = 'default_model'"
+        )
+            .fetch_optional(&self.pool)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or_else(|| "gpt-4o-mini".to_string());
+
         // 模型选择：优先使用调用方显式指定的，否则继承父 Agent 的模型配置
         let model_str = if let Some(m) = arguments["model"].as_str().filter(|s| !s.is_empty()) {
             m.to_string()
@@ -383,10 +393,10 @@ impl Tool for DelegateTaskTool {
                     log::info!("delegate_task: 继承父 Agent 模型 {}", m);
                     m
                 }
-                _ => "gpt-4o-mini".to_string(),
+                _ => fallback_model.clone(),
             }
         } else {
-            "gpt-4o-mini".to_string()
+            fallback_model.clone()
         };
 
         // 加载路由配置（用于 model="auto" 或未指定模型时智能选择）
@@ -401,7 +411,7 @@ impl Tool for DelegateTaskTool {
                 .fetch_optional(&self.pool)
                 .await
                 .unwrap_or(None)
-                .unwrap_or_else(|| "gpt-4o-mini".to_string());
+                .unwrap_or_else(|| fallback_model.clone());
             let cfg = RouterConfig::from_agent_config(&parent_model, agent_config.as_deref());
             if cfg.is_enabled() { Some((cfg, parent_model)) } else { None }
         } else {

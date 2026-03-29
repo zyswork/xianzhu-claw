@@ -394,19 +394,21 @@ pub async fn get_history(
     Ok(history)
 }
 
-/// 清除会话的对话历史
+/// 清除会话的对话历史（事务保证一致性）
 pub async fn clear_session_history(
     pool: &SqlitePool,
     session_id: &str,
 ) -> Result<(), sqlx::Error> {
+    let mut tx = pool.begin().await?;
     sqlx::query("DELETE FROM conversations WHERE session_id = ?")
         .bind(session_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
     sqlx::query("DELETE FROM chat_messages WHERE session_id = ?")
         .bind(session_id)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
     log::info!("会话对话历史已清除: session_id={}", session_id);
     Ok(())
 }
