@@ -549,6 +549,28 @@ impl Orchestrator {
                     "\n\n---\n\n# Environment\n\n- Workspace: {}\n- Skills: {}/skills\n- Memory: {}/memory\n- Agent ID: {}",
                     wp, wp, wp, agent_id
                 ));
+                // 注入可协作 Agent 列表（Agent 发现机制）
+                let peers = super::relations::RelationManager::get_relations(&self.pool, agent_id).await.unwrap_or_default();
+                if !peers.is_empty() {
+                    let mut peer_lines = Vec::new();
+                    for r in &peers {
+                        let peer_id = if r.from_id == agent_id { &r.to_id } else { &r.from_id };
+                        let peer_info: Option<(String, String)> = sqlx::query_as(
+                            "SELECT name, model FROM agents WHERE id = ?"
+                        ).bind(peer_id).fetch_optional(&self.pool).await.ok().flatten();
+                        if let Some((name, model)) = peer_info {
+                            let direction = if r.from_id == agent_id { "→" } else { "←" };
+                            peer_lines.push(format!("- {} **{}** ({}, {}) `{}`", direction, name, r.relation_type, model, peer_id));
+                        }
+                    }
+                    if !peer_lines.is_empty() {
+                        prompt.push_str(&format!(
+                            "\n\n---\n\n# Collaborators\n\n你可以通过 `collaborate` 或 `agent_chat` 或 `delegate_task` 工具与以下 Agent 协作：\n\n{}\n\n使用 agent_id 指定目标。",
+                            peer_lines.join("\n")
+                        ));
+                    }
+                }
+
                 log::info!("SoulEngine 构建的 system_prompt 长度: {} 字节, 前200字符: {}", prompt.len(), prompt.chars().take(200).collect::<String>());
                 prompt
             } else {

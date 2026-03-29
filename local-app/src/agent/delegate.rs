@@ -35,7 +35,7 @@ pub fn inject_orchestrator(orch: Arc<super::orchestrator::Orchestrator>) {
 }
 
 /// 获取 Orchestrator 引用
-fn get_orchestrator() -> Result<&'static Arc<super::orchestrator::Orchestrator>, String> {
+pub fn get_orchestrator() -> Result<&'static Arc<super::orchestrator::Orchestrator>, String> {
     ORCHESTRATOR.get().ok_or_else(|| "Orchestrator 未初始化".to_string())
 }
 

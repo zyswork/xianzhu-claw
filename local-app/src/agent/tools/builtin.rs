@@ -4053,12 +4053,12 @@ impl Tool for SessionTool {
 
 // ─── 多 Agent 协作工具 ──────────────────────────────────────
 
-/// Agent 协作工具
+/// Agent 协作工具（v2）
 ///
-/// 支持：
-/// - 向其他 Agent 发消息
-/// - 邀请 Agent 加入协作
-/// - 查看 Agent 列表和邮箱
+/// 通过 SubagentRegistry 消息队列实现 Agent 间通信：
+/// - 向其他 Agent 发消息（带权限检查）
+/// - 查看邮箱收件
+/// - 发现可协作 Agent 及其关系
 pub struct CollaborateTool {
     pool: sqlx::SqlitePool,
 }
@@ -4072,18 +4072,17 @@ impl Tool for CollaborateTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "collaborate".to_string(),
-            description: "多 Agent 协作。发消息给其他 Agent、邀请协作、查看可用 Agent。".to_string(),
+            description: "多 Agent 协作。发消息给其他 Agent、查看邮箱、发现可协作的 Agent。需要先建立关系（Delegate/Collaborator/Supervisor）才能发消息。".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
                     "action": {
                         "type": "string",
-                        "description": "操作：send_message/invite/list_agents/check_mailbox",
-                        "enum": ["send_message", "invite", "list_agents", "check_mailbox"]
+                        "description": "操作类型",
+                        "enum": ["send_message", "check_mailbox", "list_agents", "list_peers"]
                     },
-                    "target_agent_id": { "type": "string", "description": "目标 Agent ID" },
-                    "message": { "type": "string", "description": "消息内容" },
-                    "task": { "type": "string", "description": "邀请协作的任务描述（invite 时）" }
+                    "target_agent_id": { "type": "string", "description": "目标 Agent ID（send_message 时必填）" },
+                    "message": { "type": "string", "description": "消息内容（send_message 时必填）" }
                 },
                 "required": ["action"]
             }),
@@ -4094,48 +4093,91 @@ impl Tool for CollaborateTool {
 
     async fn execute(&self, arguments: serde_json::Value) -> Result<String, String> {
         let action = arguments["action"].as_str().unwrap_or("list_agents");
+        let my_agent_id = arguments["_parent_agent_id"].as_str().unwrap_or("");
 
         match action {
             "list_agents" => {
+                // 列出所有 Agent
                 let agents: Vec<(String, String, String)> = sqlx::query_as(
                     "SELECT id, name, model FROM agents ORDER BY name"
                 ).fetch_all(&self.pool).await.unwrap_or_default();
                 let list: Vec<String> = agents.iter()
-                    .map(|(id, name, model)| format!("- {} ({}) [{}]", name, model, &id[..id.len().min(8)]))
+                    .map(|(id, name, model)| format!("- **{}** (模型: {}) `{}`", name, model, &id[..id.len().min(8)]))
                     .collect();
-                Ok(format!("{} agents:\n{}", agents.len(), list.join("\n")))
+                Ok(format!("共 {} 个 Agent：\n{}", agents.len(), list.join("\n")))
+            }
+            "list_peers" => {
+                // 列出当前 Agent 的关系（可通信的 Agent）
+                if my_agent_id.is_empty() {
+                    return Err("无法获取当前 Agent ID".into());
+                }
+                let relations = super::super::relations::RelationManager::get_relations(&self.pool, my_agent_id).await?;
+                if relations.is_empty() {
+                    return Ok("当前没有与其他 Agent 建立关系。请在「关系」页面创建 Delegate 或 Collaborator 关系后才能通信。".into());
+                }
+                let mut lines = Vec::new();
+                for r in &relations {
+                    let peer_id = if r.from_id == my_agent_id { &r.to_id } else { &r.from_id };
+                    let peer_name: String = sqlx::query_scalar("SELECT name FROM agents WHERE id = ?")
+                        .bind(peer_id)
+                        .fetch_optional(&self.pool).await.ok().flatten()
+                        .unwrap_or_else(|| peer_id[..peer_id.len().min(8)].to_string());
+                    let direction = if r.from_id == my_agent_id { "→" } else { "←" };
+                    lines.push(format!("- {} **{}** ({}) `{}`", direction, peer_name, r.relation_type, &peer_id[..peer_id.len().min(8)]));
+                }
+                Ok(format!("{} 个关系：\n{}", relations.len(), lines.join("\n")))
             }
             "send_message" => {
                 let target = arguments["target_agent_id"].as_str().ok_or("缺少 target_agent_id")?;
                 let message = arguments["message"].as_str().ok_or("缺少 message")?;
-                let now = chrono::Utc::now().timestamp_millis();
-                sqlx::query("INSERT INTO settings (key, value) VALUES (?, ?)")
-                    .bind(format!("agent_msg_{}_{}", target, now))
-                    .bind(message)
-                    .execute(&self.pool).await.map_err(|e| e.to_string())?;
-                Ok(format!("Message sent to agent [{}]", &target[..target.len().min(8)]))
+                if my_agent_id.is_empty() {
+                    return Err("无法获取当前 Agent ID".into());
+                }
+                // 通过 SubagentRegistry 发送（带权限检查）
+                let orchestrator = super::super::delegate::get_orchestrator()
+                    .map_err(|e| format!("Orchestrator 未初始化: {}", e))?;
+                let msg = super::super::subagent::AgentMessage {
+                    from: my_agent_id.to_string(),
+                    to: target.to_string(),
+                    content: message.to_string(),
+                    timestamp: chrono::Utc::now().timestamp_millis(),
+                };
+                orchestrator.subagent_registry()
+                    .send_message_checked(&self.pool, msg).await?;
+                // 获取目标 Agent 名称
+                let name: String = sqlx::query_scalar("SELECT name FROM agents WHERE id = ?")
+                    .bind(target).fetch_optional(&self.pool).await.ok().flatten()
+                    .unwrap_or_else(|| target[..target.len().min(8)].to_string());
+                Ok(format!("消息已发送给 **{}**", name))
             }
             "check_mailbox" => {
-                let msgs: Vec<(String, String)> = sqlx::query_as(
-                    "SELECT key, value FROM settings WHERE key LIKE 'agent_msg_%' ORDER BY key DESC LIMIT 10"
-                ).fetch_all(&self.pool).await.unwrap_or_default();
-                if msgs.is_empty() { return Ok("No messages.".into()); }
-                let list: Vec<String> = msgs.iter()
-                    .map(|(_, v)| { let p: String = v.chars().take(100).collect(); format!("- {}", p) })
-                    .collect();
-                Ok(format!("{} messages:\n{}", msgs.len(), list.join("\n")))
+                if my_agent_id.is_empty() {
+                    return Err("无法获取当前 Agent ID".into());
+                }
+                // 从 SubagentRegistry 读取邮箱（非阻塞）
+                let orchestrator = super::super::delegate::get_orchestrator()
+                    .map_err(|e| format!("Orchestrator 未初始化: {}", e))?;
+                // 尝试接收，0 秒超时 = 非阻塞检查
+                let mut messages = Vec::new();
+                for _ in 0..20 {
+                    match orchestrator.subagent_registry()
+                        .receive_message(my_agent_id, 0).await {
+                        Ok(msg) => {
+                            let sender_name: String = sqlx::query_scalar("SELECT name FROM agents WHERE id = ?")
+                                .bind(&msg.from).fetch_optional(&self.pool).await.ok().flatten()
+                                .unwrap_or_else(|| msg.from[..msg.from.len().min(8)].to_string());
+                            messages.push(format!("- **{}**: {}", sender_name, msg.content));
+                        }
+                        Err(_) => break,
+                    }
+                }
+                if messages.is_empty() {
+                    Ok("邮箱为空，没有新消息。".into())
+                } else {
+                    Ok(format!("{} 条新消息：\n{}", messages.len(), messages.join("\n")))
+                }
             }
-            "invite" => {
-                let target = arguments["target_agent_id"].as_str().ok_or("缺少 target_agent_id")?;
-                let task = arguments["task"].as_str().ok_or("缺少 task")?;
-                let now = chrono::Utc::now().timestamp_millis();
-                sqlx::query("INSERT INTO settings (key, value) VALUES (?, ?)")
-                    .bind(format!("collab_{}_{}", target, now))
-                    .bind(serde_json::json!({"task": task, "status": "pending", "created_at": chrono::Utc::now().to_rfc3339()}).to_string())
-                    .execute(&self.pool).await.map_err(|e| e.to_string())?;
-                Ok(format!("Invited agent [{}] for: {}", &target[..target.len().min(8)], task))
-            }
-            _ => Err(format!("Unknown action: {}", action)),
+            _ => Err(format!("未知操作: {}。支持: send_message/check_mailbox/list_agents/list_peers", action)),
         }
     }
 }
@@ -4192,12 +4234,14 @@ impl Tool for YieldTool {
     }
 }
 
-// ─── A2A Ping-Pong 工具 ─────────────────────────────────────
+// ─── A2A 对话工具 ───────────────────────────────────────────
 
-/// Agent-to-Agent 多轮对话工具
+/// Agent-to-Agent 对话工具（v2）
 ///
-/// 两个 Agent 交替对话，像人类聊天一样协作。
-/// Agent A 发起 → Agent B 回复 → Agent A 继续 → ...
+/// 通过完整 agent_loop 与目标 Agent 对话：
+/// - 走 Orchestrator.send_message_stream（使用目标 Agent 的工具/人格/记忆）
+/// - 对话持久化到 DB
+/// - 带权限检查
 pub struct A2aTool {
     pool: sqlx::SqlitePool,
 }
@@ -4211,14 +4255,13 @@ impl Tool for A2aTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "agent_chat".to_string(),
-            description: "与另一个 Agent 进行多轮对话。发送消息并等待回复，支持多轮交替。".to_string(),
+            description: "与另一个 Agent 对话。消息走完整 agent_loop（使用目标 Agent 的工具和人格），对话持久化。需要先建立关系。".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
                     "target_agent_id": { "type": "string", "description": "目标 Agent ID" },
                     "message": { "type": "string", "description": "要发送的消息" },
-                    "max_turns": { "type": "integer", "description": "最大对话轮数（默认 3）" },
-                    "timeout_secs": { "type": "integer", "description": "每轮超时秒数（默认 30）" }
+                    "timeout_secs": { "type": "integer", "description": "超时秒数（默认 60）" }
                 },
                 "required": ["target_agent_id", "message"]
             }),
@@ -4230,74 +4273,78 @@ impl Tool for A2aTool {
     async fn execute(&self, arguments: serde_json::Value) -> Result<String, String> {
         let target_id = arguments["target_agent_id"].as_str().ok_or("缺少 target_agent_id")?;
         let message = arguments["message"].as_str().ok_or("缺少 message")?;
-        let max_turns = arguments["max_turns"].as_u64().unwrap_or(3) as usize;
-        let timeout = arguments["timeout_secs"].as_u64().unwrap_or(30);
+        let timeout = arguments["timeout_secs"].as_u64().unwrap_or(60);
+        let my_agent_id = arguments["_parent_agent_id"].as_str().unwrap_or("");
 
-        // 验证目标 Agent 存在
+        // 权限检查
+        if !my_agent_id.is_empty() {
+            let can = super::super::relations::RelationManager::can_communicate(
+                &self.pool, my_agent_id, target_id
+            ).await?;
+            if !can {
+                return Err(format!(
+                    "与目标 Agent 没有协作关系，无法对话。请先在「关系」页面建立 Delegate 或 Collaborator 关系。"
+                ));
+            }
+        }
+
+        // 验证目标 Agent 存在并获取模型
         let target: Option<(String, String)> = sqlx::query_as(
             "SELECT name, model FROM agents WHERE id = ?"
         ).bind(target_id).fetch_optional(&self.pool).await.map_err(|e| e.to_string())?;
         let (target_name, target_model) = target.ok_or("目标 Agent 不存在")?;
 
-        // 创建 A2A session
-        let _a2a_session = format!("a2a-{}", chrono::Utc::now().timestamp_millis());
-        let mut conversation = Vec::new();
-        let mut current_msg = message.to_string();
-
         // 查找 provider
-        let (_api_type, api_key, base_url) = crate::channels::find_provider(&self.pool, &target_model)
+        let (api_type, api_key, base_url) = crate::channels::find_provider(&self.pool, &target_model)
             .await
             .ok_or("目标 Agent 无可用 Provider")?;
 
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(timeout))
-            .build().map_err(|e| e.to_string())?;
+        // 获取 Orchestrator
+        let orchestrator = super::super::delegate::get_orchestrator()
+            .map_err(|e| format!("Orchestrator 未初始化: {}", e))?;
 
-        // 获取目标 Agent 的 system prompt
-        let target_prompt: Option<String> = sqlx::query_scalar(
-            "SELECT system_prompt FROM agents WHERE id = ?"
-        ).bind(target_id).fetch_optional(&self.pool).await.ok().flatten();
+        // 在目标 Agent 下创建 A2A session
+        let session_title = format!("[a2a] 来自 {}", if my_agent_id.is_empty() { "unknown" } else { &my_agent_id[..my_agent_id.len().min(8)] });
+        let session = crate::memory::conversation::create_session(
+            &self.pool, target_id, &session_title,
+        ).await.map_err(|e| format!("创建 A2A session 失败: {}", e))?;
 
-        for turn in 0..max_turns {
-            conversation.push(format!("Turn {}: You → {}: {}", turn + 1, target_name, current_msg));
-
-            // 调用目标 Agent 的 LLM
-            let url = if base_url.is_empty() {
-                "https://api.openai.com/v1/chat/completions".to_string()
-            } else {
-                format!("{}/chat/completions", base_url.trim_end_matches('/'))
-            };
-
-            let mut msgs = vec![];
-            if let Some(ref sp) = target_prompt {
-                msgs.push(serde_json::json!({"role": "system", "content": sp}));
+        // 收集输出
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let output_handle = tokio::spawn(async move {
+            let mut output = String::new();
+            while let Some(token) = rx.recv().await {
+                output.push_str(&token);
             }
-            msgs.push(serde_json::json!({"role": "user", "content": current_msg}));
+            output
+        });
 
-            let resp = client.post(&url)
-                .header("Authorization", format!("Bearer {}", api_key))
-                .json(&serde_json::json!({
-                    "model": target_model,
-                    "messages": msgs,
-                    "max_tokens": 1024,
-                    "temperature": 0.7,
-                }))
-                .send().await.map_err(|e| format!("A2A turn {} 失败: {}", turn + 1, e))?;
+        let base_url_opt = if base_url.is_empty() { None } else { Some(base_url.as_str()) };
 
-            let data: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
-            let reply = data["choices"][0]["message"]["content"].as_str()
-                .or(data["content"][0]["text"].as_str())
-                .unwrap_or("(no reply)");
-
-            conversation.push(format!("Turn {}: {} → You: {}", turn + 1, target_name, reply));
-
-            // 检查是否需要继续
-            if reply.contains("[END]") || reply.contains("[DONE]") || reply.len() < 10 {
-                break;
+        // 通过完整 agent_loop 调用目标 Agent（使用其 workspace/工具/人格/记忆）
+        let result = match tokio::time::timeout(
+            std::time::Duration::from_secs(timeout),
+            orchestrator.send_message_stream(
+                target_id, &session.id, message,
+                &api_key, &api_type, base_url_opt, tx, None,
+            ),
+        ).await {
+            Ok(Ok(_)) => {
+                let output = output_handle.await.unwrap_or_default();
+                log::info!("A2A 对话完成: {} → {} ({}字符)", my_agent_id, target_name, output.len());
+                Ok(output)
             }
-            current_msg = reply.to_string();
+            Ok(Err(e)) => Err(format!("{} 回复失败: {}", target_name, e)),
+            Err(_) => Err(format!("{} 回复超时（{}秒）", target_name, timeout)),
+        };
+
+        match result {
+            Ok(reply) => Ok(format!(
+                "**{}** 的回复：\n\n{}",
+                target_name,
+                if reply.is_empty() { "(无回复内容)".to_string() } else { reply }
+            )),
+            Err(e) => Err(e),
         }
-
-        Ok(format!("A2A conversation with {} ({} turns):\n\n{}", target_name, conversation.len() / 2, conversation.join("\n\n")))
     }
 }

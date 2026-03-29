@@ -587,7 +587,7 @@ pub async fn run_agent_loop(
                 let mut subagent_result = String::new();
                 loop {
                     let status: Option<(String, Option<String>)> = sqlx::query_as(
-                        "SELECT status, output FROM subagent_runs WHERE id = ?"
+                        "SELECT status, result FROM subagent_runs WHERE id = ?"
                     ).bind(run_id).fetch_optional(deps.pool).await.ok().flatten();
 
                     if let Some((st, output)) = &status {
@@ -746,9 +746,9 @@ async fn execute_builtin_tool(
         _ => {}
     }
 
-    // 为 delegate_task 注入父上下文
+    // 为需要上下文的工具注入父 Agent 信息
     let mut final_args = args.clone();
-    if name == "delegate_task" {
+    if matches!(name, "delegate_task" | "collaborate" | "agent_chat") {
         if let Some(obj) = final_args.as_object_mut() {
             obj.insert("_parent_agent_id".to_string(), serde_json::json!(agent_id));
             obj.insert("_parent_session_id".to_string(), serde_json::json!(session_id));
