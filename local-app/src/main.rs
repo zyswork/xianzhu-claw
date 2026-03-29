@@ -40,6 +40,7 @@ use handlers::skills::*;
 use handlers::plugins::*;
 use handlers::scheduler_cmd::*;
 use handlers::misc::*;
+use handlers::profile::*;
 
 // ─── 从 helpers 导入 main() 使用的函数 ────────────────────────
 use handlers::helpers::{load_providers, save_providers, seed_marketplace_skills};
@@ -625,6 +626,8 @@ async fn main() {
             check_runtime, setup_runtime, health_check, get_token_stats, get_token_daily_stats,
             run_memory_hygiene, get_cache_stats, get_setting, set_setting, get_settings_by_prefix,
             export_memory_snapshot, extract_memories_from_history, cloud_api_proxy,
+            // profile
+            get_user_profile, save_user_profile, save_user_avatar, get_user_avatar,
         ])
         .build(tauri::generate_context!())
         .expect("error building tauri application");

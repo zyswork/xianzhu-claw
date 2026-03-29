@@ -27,6 +27,7 @@ const ChannelsPage = lazy(() => import('./pages/ChannelsPage'))
 const PluginsPage = lazy(() => import('./pages/PluginsPage'))
 const PlazaPage = lazy(() => import('./pages/PlazaPage'))
 const GroupChatPage = lazy(() => import('./pages/GroupChatPage'))
+const LoginPage = lazy(() => import('./pages/LoginPage'))
 
 function PageLoader() {
   const { t } = useI18n()
@@ -62,6 +63,11 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
 }
 
 function ProtectedPage({ children }: { children: React.ReactNode }) {
+  const { isLoggedIn } = useAuthStore()
+  // 未登录时跳转到登录页（仅对曾经登录过又登出的用户生效）
+  if (!isLoggedIn && localStorage.getItem('had_login') === 'true') {
+    return <Navigate to="/login" replace />
+  }
   return (
     <Layout>
       <ErrorBoundary>
@@ -76,13 +82,18 @@ function ProtectedPage({ children }: { children: React.ReactNode }) {
 export default function App() {
   const { isConnected, retryCount } = useBackendConnection()
   const { t } = useI18n()
-  const { hydrate } = useAuthStore()
+  const { hydrate, loadProfile } = useAuthStore()
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null)
 
   // 启动时恢复登录状态
   useEffect(() => {
     hydrate()
   }, [hydrate])
+
+  // 连接后加载个人资料
+  useEffect(() => {
+    if (isConnected) loadProfile()
+  }, [isConnected, loadProfile])
 
   // 连接后检查是否需要首次设置
   useEffect(() => {
@@ -127,6 +138,7 @@ export default function App() {
       <ConfirmDialog />
       <ApprovalDialog />
       <Routes>
+        <Route path="/login" element={<Suspense fallback={<PageLoader />}><LoginPage /></Suspense>} />
         <Route path="/" element={<Navigate to="/agents" replace />} />
         <Route path="/agents" element={<ProtectedPage><AgentListPage /></ProtectedPage>} />
         <Route path="/agents/new" element={<ProtectedPage><AgentCreatePage /></ProtectedPage>} />

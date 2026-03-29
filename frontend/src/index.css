@@ -486,7 +486,10 @@ select option { background: var(--bg-elevated); color: var(--text-primary); }
 
 /* 打字指示器 */
 [data-theme="light"] .typing-indicator {
-  background: #f1f5f9;
+  background: #e2e8f0;
+}
+[data-theme="light"] .typing-indicator .dot {
+  background: #64748b;
 }
 
 /* Mermaid 流程图 */

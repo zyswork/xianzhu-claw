@@ -112,9 +112,12 @@ impl DelegateTaskTool {
     }
 
     /// 执行单个子任务（通过 Orchestrator 走完整 agent_loop）
+    ///
+    /// `target_agent_id`：实际执行任务的 Agent（可以与 parent 不同，实现跨 Agent 协作）
     async fn execute_subtask(
         pool: sqlx::SqlitePool,
         parent_agent_id: String,
+        target_agent_id: String,
         run_id: String,
         goal: String,
         context: String,
@@ -125,7 +128,12 @@ impl DelegateTaskTool {
     ) -> (usize, String, Result<String, String>) {
         let start = std::time::Instant::now();
         let goal_preview: String = goal.chars().take(50).collect();
-        log::info!("子代理 #{}: 开始执行「{}」", task_index + 1, goal_preview);
+        let is_cross_agent = target_agent_id != parent_agent_id;
+        if is_cross_agent {
+            log::info!("子代理 #{}: 跨 Agent 派发「{}」→ Agent {}", task_index + 1, goal_preview, &target_agent_id[..8.min(target_agent_id.len())]);
+        } else {
+            log::info!("子代理 #{}: 开始执行「{}」", task_index + 1, goal_preview);
+        }
 
         // 获取 Orchestrator
         let orchestrator = match get_orchestrator() {
@@ -136,20 +144,54 @@ impl DelegateTaskTool {
             }
         };
 
+        // 跨 Agent 协作：检查通信权限
+        if is_cross_agent {
+            match super::relations::RelationManager::can_communicate(&pool, &parent_agent_id, &target_agent_id).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    let e = format!("Agent {} 与 Agent {} 之间没有协作关系，无法委派任务。请先在「关系」页面建立 Delegate 或 Collaborator 关系。", &parent_agent_id[..8.min(parent_agent_id.len())], &target_agent_id[..8.min(target_agent_id.len())]);
+                    Self::finish_run(&pool, &run_id, "failed", None, Some(&e), 0).await;
+                    return (task_index, goal, Err(e));
+                }
+                Err(e) => {
+                    Self::finish_run(&pool, &run_id, "failed", None, Some(&e), 0).await;
+                    return (task_index, goal, Err(e));
+                }
+            }
+        }
+
+        // 确定模型：显式指定 > 目标 Agent 模型 > 父 Agent 模型 > 兜底
+        let effective_model = if !model.is_empty() && model != "inherit" {
+            model.clone()
+        } else {
+            // 读取目标 Agent 的模型配置
+            match sqlx::query_scalar::<_, String>("SELECT model FROM agents WHERE id = ?")
+                .bind(&target_agent_id)
+                .fetch_optional(&pool)
+                .await {
+                Ok(Some(m)) if !m.is_empty() => m,
+                _ => model.clone(), // 用传入的（父 Agent 的模型）
+            }
+        };
+
         // 查找 provider
-        let (api_type, api_key, base_url) = match crate::channels::find_provider(&pool, &model).await {
+        let (api_type, api_key, base_url) = match crate::channels::find_provider(&pool, &effective_model).await {
             Some(p) => p,
             None => {
-                let e = format!("未找到模型 {} 的 provider", model);
+                let e = format!("未找到模型 {} 的 provider", effective_model);
                 Self::finish_run(&pool, &run_id, "failed", None, Some(&e), 0).await;
                 return (task_index, goal, Err(e));
             }
         };
 
-        // 创建/复用子代理 session
-        let session_title = format!("[subagent] {}", &goal_preview);
+        // 在目标 Agent 下创建子代理 session（跨 Agent 时使用目标 Agent 的 workspace/tools/人格）
+        let session_title = if is_cross_agent {
+            format!("[cross-agent] {}", &goal_preview)
+        } else {
+            format!("[subagent] {}", &goal_preview)
+        };
         let session_id = match crate::memory::conversation::create_session(
-            &pool, &parent_agent_id, &session_title,
+            &pool, &target_agent_id, &session_title,
         ).await {
             Ok(s) => s.id,
             Err(e) => {
@@ -178,11 +220,11 @@ impl DelegateTaskTool {
 
         let base_url_opt = if base_url.is_empty() { None } else { Some(base_url.as_str()) };
 
-        // 带超时调用完整 agent_loop
+        // 带超时调用完整 agent_loop（使用目标 Agent 的 workspace/tools/人格）
         let result = match tokio::time::timeout(
             std::time::Duration::from_secs(timeout),
             orchestrator.send_message_stream(
-                &parent_agent_id, &session_id, &prompt,
+                &target_agent_id, &session_id, &prompt,
                 &api_key, &api_type, base_url_opt, tx, None,
             ),
         ).await {
@@ -250,7 +292,7 @@ impl Tool for DelegateTaskTool {
     fn definition(&self) -> ToolDefinition {
         ToolDefinition {
             name: "delegate_task".to_string(),
-            description: "委托子任务给并行子代理执行。每个子代理走完整工具循环，可使用父 Agent 的全部工具。支持独立模型、可配超时、异步模式。".to_string(),
+            description: "委托子任务给并行子代理执行。可指定目标 Agent（跨 Agent 协作）或在当前 Agent 内派发。每个子代理走完整工具循环。支持独立模型、可配超时、异步模式。".to_string(),
             parameters: serde_json::json!({
                 "type": "object",
                 "properties": {
@@ -262,12 +304,13 @@ impl Tool for DelegateTaskTool {
                             "properties": {
                                 "goal": { "type": "string", "description": "任务目标" },
                                 "context": { "type": "string", "description": "上下文信息（可选）" },
+                                "agent_id": { "type": "string", "description": "目标 Agent ID（可选）。指定后该任务由目标 Agent 执行（跨 Agent 协作），使用目标 Agent 的工具和人格。不填则由当前 Agent 执行。" },
                                 "timeout_secs": { "type": "integer", "description": "单任务超时秒数（可选，默认120）" }
                             },
                             "required": ["goal"]
                         }
                     },
-                    "model": { "type": "string", "description": "子代理使用的模型（可选），不填则用默认" },
+                    "model": { "type": "string", "description": "子代理使用的模型（可选），不填则继承目标 Agent 的模型" },
                     "max_concurrent": { "type": "integer", "description": "最大并发数（可选，默认3，最大6）" },
                     "max_depth": { "type": "integer", "description": "最大嵌套深度（可选，默认3）" },
                     "async_mode": { "type": "boolean", "description": "异步模式（可选）。true 时立即返回，后台执行完成后通过事件通知" }
@@ -361,6 +404,12 @@ impl Tool for DelegateTaskTool {
             let context = task["context"].as_str().unwrap_or("").to_string();
             if goal.is_empty() { continue; }
 
+            // 每个任务可指定不同的目标 Agent（跨 Agent 协作）
+            let target_agent = task["agent_id"].as_str()
+                .filter(|s| !s.is_empty())
+                .unwrap_or(&parent_agent_id)
+                .to_string();
+
             let timeout = task.get("timeout_secs")
                 .and_then(|v| v.as_u64())
                 .unwrap_or(DEFAULT_TIMEOUT_SECS);
@@ -380,7 +429,7 @@ impl Tool for DelegateTaskTool {
             let handle = tokio::spawn(async move {
                 let _permit = sem.acquire().await.unwrap();
                 Self::execute_subtask(
-                    pool, parent, run_id, goal, context, model, None, timeout, i,
+                    pool, parent, target_agent, run_id, goal, context, model, None, timeout, i,
                 ).await
             });
 

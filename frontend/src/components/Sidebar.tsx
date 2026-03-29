@@ -34,7 +34,7 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const location = useLocation()
   const { t } = useI18n()
-  const { user, logout } = useAuthStore()
+  const { user, logout, nickname, avatarUrl } = useAuthStore()
   const { theme, setTheme } = useTheme()
   const { collapsed, setCollapsed } = useSidebarStore()
 
@@ -257,31 +257,47 @@ export default function Sidebar() {
         <div className="sidebar-divider" />
 
         {/* 用户信息 */}
-        {user && !collapsed && (
-          <div className="sidebar-user">
-            <div className="sidebar-user-avatar">
-              {(user.name || user.email)[0].toUpperCase()}
+        {!collapsed && (user || nickname || avatarUrl) && (
+          <div
+            className="sidebar-user"
+            style={{ cursor: 'pointer' }}
+            onClick={() => navigate('/settings?section=profile')}
+          >
+            <div className="sidebar-user-avatar" style={{ overflow: 'hidden' }}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                ((nickname || user?.name || user?.email || 'U')[0].toUpperCase())
+              )}
             </div>
             <div className="sidebar-user-info">
-              {user.name && <div className="sidebar-user-name">{user.name}</div>}
-              <div className="sidebar-user-email">{user.email}</div>
+              <div className="sidebar-user-name">{nickname || user?.name || user?.email || 'User'}</div>
+              {user?.email && <div className="sidebar-user-email">{user.email}</div>}
             </div>
           </div>
         )}
-        {user && collapsed && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '6px 0' }}>
+        {collapsed && (user || nickname || avatarUrl) && (
+          <div
+            style={{ display: 'flex', justifyContent: 'center', padding: '6px 0', cursor: 'pointer' }}
+            onClick={() => navigate('/settings?section=profile')}
+          >
             <div
               className="sidebar-user-avatar sidebar-tooltip"
-              data-tooltip={user.email}
+              data-tooltip={nickname || user?.email || 'User'}
+              style={{ overflow: 'hidden' }}
             >
-              {(user.name || user.email)[0].toUpperCase()}
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              ) : (
+                ((nickname || user?.name || user?.email || 'U')[0].toUpperCase())
+              )}
             </div>
           </div>
         )}
 
         {/* 退出按钮 */}
         {user && !collapsed && (
-          <button className="sidebar-logout-btn" onClick={logout}>
+          <button className="sidebar-logout-btn" onClick={() => { logout(); navigate('/login') }}>
             <IconLogout size={14} />
             {t('sidebar.logout')}
           </button>
@@ -291,7 +307,7 @@ export default function Sidebar() {
             <button
               className="sidebar-logout-btn--icon sidebar-tooltip"
               data-tooltip={t('sidebar.logout')}
-              onClick={logout}
+              onClick={() => { logout(); navigate('/login') }}
             >
               <IconLogout size={14} />
             </button>

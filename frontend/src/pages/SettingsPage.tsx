@@ -8,13 +8,15 @@
  * - 环境变量自动导入提示
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { useLocation } from 'react-router-dom'
 import { useI18n, SUPPORTED_LOCALES, LOCALE_LABELS } from '../i18n'
 import { toast } from '../hooks/useToast'
 import { useTheme, type Theme } from '../hooks/useTheme'
 import type { Locale } from '../i18n'
 import Select from '../components/Select'
+import { useAuthStore } from '../store/authStore'
 
 interface ProviderModel {
   id: string
@@ -271,7 +273,7 @@ const PRESET_PROVIDERS: Omit<Provider, 'apiKey' | 'apiKeyMasked'>[] = [
 ]
 
 /** 分类导航项定义 */
-type SectionId = 'providers' | 'appearance' | 'search' | 'heartbeat' | 'backup' | 'gateway' | 'embedding'
+type SectionId = 'profile' | 'providers' | 'appearance' | 'search' | 'heartbeat' | 'backup' | 'gateway' | 'embedding'
 
 interface NavItem {
   id: SectionId
@@ -281,6 +283,16 @@ interface NavItem {
 
 /** 左侧导航图标（SVG 线条风格） */
 const NAV_ITEMS: NavItem[] = [
+  {
+    id: 'profile',
+    labelKey: 'settings.sectionProfile',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+    ),
+  },
   {
     id: 'providers',
     labelKey: 'settings.title',
@@ -364,6 +376,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function SettingsPage() {
   const { t } = useI18n()
+  const location = useLocation()
   const [activeSection, setActiveSection] = useState<SectionId>('providers')
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
@@ -386,6 +399,16 @@ export default function SettingsPage() {
   }
 
   useEffect(() => { loadProviders() }, [])
+
+  // 从 URL 参数读取 section（支持 ?section=profile 等）
+  useEffect(() => {
+    const params = new URLSearchParams(location.search)
+    const section = params.get('section')
+    const validSections: SectionId[] = ['profile', 'providers', 'appearance', 'search', 'heartbeat', 'backup', 'gateway', 'embedding']
+    if (section && validSections.includes(section as SectionId)) {
+      setActiveSection(section as SectionId)
+    }
+  }, [location.search])
 
   const handleEdit = (p: Provider) => {
     setEditingId(p.id)
@@ -500,6 +523,7 @@ export default function SettingsPage() {
 
   /** 导航项的显示名称（需要 t 函数，所以在组件内定义映射） */
   const navLabels: Record<SectionId, string> = {
+    profile: t('settings.sectionProfile'),
     providers: t('settings.title'),
     appearance: t('settings.sectionTheme') + ' / ' + t('settings.sectionLanguage'),
     search: t('settings.sectionSearch'),
@@ -562,6 +586,14 @@ export default function SettingsPage() {
             border: `1px solid ${message.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
           }}>
             {message.text}
+          </div>
+        )}
+
+        {/* ---- 个人资料 ---- */}
+        {activeSection === 'profile' && (
+          <div style={{ maxWidth: 700 }}>
+            <h1 style={{ marginTop: 0, marginBottom: 16 }}>{t('settings.sectionProfile')}</h1>
+            <ProfileSection />
           </div>
         )}
 
@@ -978,6 +1010,183 @@ export DEEPSEEK_API_KEY="sk-..."`}
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+/** 个人资料设置 */
+function ProfileSection() {
+  const { t } = useI18n()
+  const { setProfile } = useAuthStore()
+  const [nickname, setNickname] = useState('')
+  const [bio, setBio] = useState('')
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [avatarBase64, setAvatarBase64] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 加载个人资料
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const profile = await invoke<{ nickname: string; bio: string }>('get_user_profile')
+        if (profile) {
+          setNickname(profile.nickname || '')
+          setBio(profile.bio || '')
+        }
+      } catch { /* 忽略 */ }
+      try {
+        const avatar = await invoke<string | null>('get_user_avatar')
+        if (avatar) {
+          setAvatarPreview(`data:image/png;base64,${avatar}`)
+        }
+      } catch { /* 忽略 */ }
+    })()
+  }, [])
+
+  // 头像上传处理：读取文件并缩放到 256x256
+  const handleAvatarChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = 256
+        canvas.height = 256
+        const ctx = canvas.getContext('2d')!
+        // 居中裁剪
+        const size = Math.min(img.width, img.height)
+        const sx = (img.width - size) / 2
+        const sy = (img.height - size) / 2
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 256, 256)
+        const dataUrl = canvas.toDataURL('image/png')
+        setAvatarPreview(dataUrl)
+        // 提取纯 base64 部分
+        setAvatarBase64(dataUrl.replace(/^data:image\/\w+;base64,/, ''))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  }, [])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      if (avatarBase64) {
+        await invoke('save_user_avatar', { base64Data: avatarBase64 })
+      }
+      await invoke('save_user_profile', { nickname, bio })
+      // 更新全局状态，让侧边栏等组件立即显示最新资料
+      setProfile({
+        nickname,
+        bio,
+        avatarUrl: avatarPreview || '',
+      })
+      toast.success(t('profile.saved'))
+    } catch (err) {
+      toast.error(t('profile.saveFailed') + ': ' + String(err))
+    }
+    setSaving(false)
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '10px 12px', borderRadius: 8,
+    border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-elevated)',
+    color: 'var(--text-primary)', fontSize: 14, outline: 'none',
+    boxSizing: 'border-box',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block', marginBottom: 6, fontSize: 13,
+    fontWeight: 600, color: 'var(--text-secondary)',
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* 头像 */}
+      <div>
+        <label style={labelStyle}>{t('profile.avatar')}</label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div
+            style={{
+              width: 80, height: 80, borderRadius: '50%', overflow: 'hidden',
+              backgroundColor: 'var(--bg-elevated)', border: '2px solid var(--border-subtle)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 28, color: 'var(--text-muted)',
+            }}
+          >
+            {avatarPreview ? (
+              <img src={avatarPreview} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            )}
+          </div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            style={{
+              padding: '8px 16px', border: '1px solid var(--border-subtle)', borderRadius: 8,
+              backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)',
+              cursor: 'pointer', fontSize: 13,
+            }}
+          >
+            {t('profile.changeAvatar')}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleAvatarChange}
+            style={{ display: 'none' }}
+          />
+        </div>
+      </div>
+
+      {/* 昵称 */}
+      <div>
+        <label style={labelStyle}>{t('profile.nickname')}</label>
+        <input
+          type="text"
+          value={nickname}
+          onChange={(e) => setNickname(e.target.value)}
+          placeholder={t('profile.nicknamePlaceholder')}
+          maxLength={30}
+          style={inputStyle}
+        />
+      </div>
+
+      {/* 个人简介 */}
+      <div>
+        <label style={labelStyle}>{t('profile.bio')}</label>
+        <textarea
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          placeholder={t('profile.bioPlaceholder')}
+          maxLength={200}
+          rows={3}
+          style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+        />
+      </div>
+
+      {/* 保存按钮 */}
+      <div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          style={{
+            padding: '10px 24px', border: 'none', borderRadius: 8,
+            backgroundColor: 'var(--accent)', color: 'white',
+            cursor: saving ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600,
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          {saving ? t('common.saving') : t('common.save')}
+        </button>
+      </div>
     </div>
   )
 }

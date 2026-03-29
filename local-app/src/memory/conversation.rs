@@ -216,7 +216,8 @@ async fn generate_session_title(
     let url = match base_url {
         Some(u) => format!("{}/chat/completions", u.trim_end_matches('/')),
         None => match provider {
-            "anthropic" => "https://api.anthropic.com/v1/messages".to_string(),
+            // 直接 Anthropic API 需要不同格式，跳过自动命名
+            "anthropic" => return Err("Anthropic 直接 API 不支持 OpenAI 格式自动命名".to_string()),
             _ => "https://api.openai.com/v1/chat/completions".to_string(),
         }
     };
@@ -558,17 +559,11 @@ pub async fn save_chat_message(
 
     let tool_name = message["name"].as_str().map(|s| s.to_string());
 
-    // 获取下一个 seq
-    let seq_row = sqlx::query("SELECT COALESCE(MAX(seq), 0) + 1 as next_seq FROM chat_messages WHERE session_id = ?")
-        .bind(session_id)
-        .fetch_one(pool)
-        .await?;
-    let seq: i64 = seq_row.get("next_seq");
-
+    // 使用原子 INSERT 避免 seq 竞态条件
     sqlx::query(
         r#"
         INSERT INTO chat_messages (id, session_id, agent_id, role, content, tool_calls_json, tool_call_id, tool_name, seq, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq),0)+1 FROM chat_messages WHERE session_id = ?), ?)
         "#,
     )
     .bind(&id)
@@ -579,7 +574,7 @@ pub async fn save_chat_message(
     .bind(&tool_calls_json)
     .bind(&tool_call_id)
     .bind(&tool_name)
-    .bind(seq)
+    .bind(session_id)
     .bind(now)
     .execute(pool)
     .await?;

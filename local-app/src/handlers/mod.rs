@@ -14,4 +14,5 @@ pub mod skills;
 pub mod plugins;
 pub mod scheduler_cmd;
 pub mod misc;
+pub mod profile;
 pub mod helpers;

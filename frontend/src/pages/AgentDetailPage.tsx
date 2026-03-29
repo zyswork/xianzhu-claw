@@ -112,6 +112,9 @@ export default function AgentDetailPage() {
 
   useEffect(() => {
     if (!agentId) return
+    setActiveTab('chat')
+    setAgent(null)
+    setLoading(true)
     ;(async () => {
       try {
         const agents = await invoke<Agent[]>('list_agents')
@@ -954,10 +957,13 @@ function AgentMessagesPanel({ agentId }: { agentId: string }) {
         invoke<any[]>('get_agent_mailbox', { agentId }),
         invoke<any[]>('list_agents'),
       ])
-      if (msgs.length > 0) setMessages(prev => [...prev, ...msgs])
+      setMessages(msgs)
       setAgents(agentList.filter((a: any) => a.id !== agentId))
     } catch (e) { console.error('loadMailboxPanel failed:', e) }
   }, [agentId])
+
+  // 切换 agent 时清空消息
+  useEffect(() => { setMessages([]) }, [agentId])
 
   useEffect(() => { load() }, [load])
 

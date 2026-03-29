@@ -683,11 +683,25 @@ function ThinkingBlock({ thinking }: { thinking: string }) {
 
 /** 打字指示器 - 三点跳动 */
 function TypingIndicator() {
+  const [dots, setDots] = useState('')
+  useEffect(() => {
+    const timer = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 400)
+    return () => clearInterval(timer)
+  }, [])
   return (
-    <div className="typing-indicator">
-      <span className="dot" />
-      <span className="dot" />
-      <span className="dot" />
+    <div style={{
+      display: 'inline-flex', alignItems: 'center', gap: 6,
+      padding: '8px 14px', borderRadius: 12,
+      backgroundColor: 'var(--bg-elevated, #f1f5f9)',
+      border: '1px solid var(--border-subtle, #e2e8f0)',
+      fontSize: 13, color: 'var(--text-muted, #64748b)',
+    }}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+        stroke="var(--accent, #10b981)" strokeWidth="2" strokeLinecap="round"
+        style={{ animation: 'spin 1s linear infinite' }}>
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+      </svg>
+      <span style={{ fontWeight: 500, minWidth: 42 }}>思考中{dots}</span>
     </div>
   )
 }
@@ -866,6 +880,18 @@ export default function ChatTab({ agentId }: { agentId: string }) {
   const [displayCount, setDisplayCount] = useState(50)
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
+
+  // 切换 Agent 时重置状态，避免旧 Agent 的对话内容残留
+  const prevAgentIdRef = useRef(agentId)
+  useEffect(() => {
+    if (prevAgentIdRef.current !== agentId) {
+      prevAgentIdRef.current = agentId
+      setActiveSession('')
+      setMessages([])
+      setSessions([])
+      setStreaming(false)
+    }
+  }, [agentId])
   // 对话模式：flash=快速回复(不使用工具), standard=标准, thinking=深度思考
   const [chatMode, setChatMode] = useState<'flash' | 'standard' | 'thinking'>('standard')
   const streamingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -998,7 +1024,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
     // 加载邮箱
     try {
       const msgs = await invoke<any[]>('get_agent_mailbox', { agentId })
-      if (msgs.length > 0) setMailboxMsgs(prev => [...prev, ...msgs])
+      if (msgs.length > 0) setMailboxMsgs(msgs)
     } catch (e) { console.error('loadMailbox failed:', e) }
   }, [agentId])
 
@@ -1013,17 +1039,30 @@ export default function ChatTab({ agentId }: { agentId: string }) {
     return () => clearInterval(timer)
   }, [showAgentPanel, loadAgentPanel])
 
-  // 事件驱动刷新：子代理派发/完成时立即更新面板
+  // 事件驱动：子代理派发/完成时刷新面板 + 完成结果注入对话
   useEffect(() => {
-    if (!showAgentPanel) return
     const unlistenP = listen<any>('agent-event', (e) => {
       const type = e.payload?.type
-      if (type === 'subagent_spawned' || type === 'subagent_complete') {
+      // 刷新子 Agent 面板
+      if (showAgentPanel && (type === 'subagent_spawned' || type === 'subagent_complete')) {
         loadAgentPanel()
+      }
+      // 异步子代理完成：将结果作为 assistant 消息追加到对话中
+      if (type === 'subagent_complete' && e.payload?.parent_agent_id === agentId) {
+        const { success_count, fail_count, summary } = e.payload
+        const status = fail_count > 0
+          ? `${success_count} ${t('common.success') || 'succeeded'}, ${fail_count} ${t('common.failed') || 'failed'}`
+          : `${success_count} ${t('agentDetailSub.tasksComplete') || 'tasks completed'}`
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `**[${t('multiAgent.subagentResult') || 'Subagent Result'}]** ${status}\n\n${summary || ''}`,
+        }])
+        // 同时从 DB 刷新完整消息（subagent 可能写了 DB 消息）
+        loadMessagesRef.current()
       }
     })
     return () => { unlistenP.then(f => f()) }
-  }, [showAgentPanel, loadAgentPanel])
+  }, [showAgentPanel, loadAgentPanel, agentId])
 
   // 发送 Agent 间消息
   const handleSendAgentMsg = async () => {
@@ -1119,6 +1158,8 @@ export default function ChatTab({ agentId }: { agentId: string }) {
   }
   const streamBuf = useRef('')
   const thinkingBuf = useRef('')
+  const streamingSessionRef = useRef('')
+  const sendingRef = useRef(false)
 
   // 序列计数器：防止快速切换会话/session 时旧请求覆盖新数据
   const sessionLoadSeqRef = useRef(0)
@@ -1246,6 +1287,8 @@ export default function ChatTab({ agentId }: { agentId: string }) {
   useEffect(() => {
     // 桌面对话的流式 token（无 sessionId，来自 main.rs 的 send_message）
     const unlisten1 = listen<string>('llm-token', (e) => {
+      // 跨会话过滤：忽略非当前流式会话的 token
+      if (streamingSessionRef.current && streamingSessionRef.current !== activeSessionRef.current) return
       const THINKING_PREFIX = '\x01THINKING\x01'
       if (e.payload.startsWith(THINKING_PREFIX)) {
         // Thinking delta：追加到 thinking buffer
@@ -1269,6 +1312,9 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       }
     })
     const unlisten2 = listen('llm-done', () => {
+      // 跨会话过滤
+      if (streamingSessionRef.current && streamingSessionRef.current !== activeSessionRef.current) return
+      streamingSessionRef.current = ''
       setStreaming(false)
       streamBuf.current = ''
       thinkingBuf.current = ''
@@ -1289,6 +1335,9 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       setTimeout(() => loadSessionsRef.current(), 3000)
     })
     const unlisten3 = listen<string>('llm-error', (e) => {
+      // 跨会话过滤
+      if (streamingSessionRef.current && streamingSessionRef.current !== activeSessionRef.current) return
+      streamingSessionRef.current = ''
       setStreaming(false)
       streamBuf.current = ''
       thinkingBuf.current = ''
@@ -1631,6 +1680,9 @@ export default function ChatTab({ agentId }: { agentId: string }) {
         if (streaming) {
           setStreaming(false)
           streamBuf.current = ''
+          thinkingBuf.current = ''
+          streamingSessionRef.current = ''
+          sendingRef.current = false
           return 'Generation stopped'
         }
         return 'No active generation'
@@ -1748,6 +1800,8 @@ export default function ChatTab({ agentId }: { agentId: string }) {
 
   const handleSend = async () => {
     if ((!input.trim() && pendingImages.length === 0) || streaming || !activeSession) return
+    if (sendingRef.current) return
+    sendingRef.current = true
     const userMsg = input.trim()
     setInput('')
 
@@ -1780,6 +1834,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       : userMsg
     setMessages((prev) => [...prev, { role: 'user', content: displayMsg }])
     setMessages((prev) => [...prev, { role: 'assistant', content: '' }])
+    streamingSessionRef.current = activeSession
     setStreaming(true)
     streamBuf.current = ''
 
@@ -1788,6 +1843,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
         // Flash 模式：使用轻量级 send_chat_only，不带工具/技能/记忆
         await invoke<string>('send_chat_only', {
           agentId,
+          sessionId: activeSession,
           message: fullMessage,
         })
       } else {
@@ -1803,10 +1859,12 @@ export default function ChatTab({ agentId }: { agentId: string }) {
       // invoke 完成意味着 orchestrator 已结束，兜底清除 streaming 状态
       // （llm-done 事件可能因竞态尚未到达）
       setStreaming(false)
+      sendingRef.current = false
       // 从 DB 重新加载结构化消息（替换 streaming 临时状态，避免闪烁）
       loadMessagesRef.current()
     } catch (e) {
       setStreaming(false)
+      sendingRef.current = false
       setMessages((prev) => [...prev, { role: 'system', content: String(e), isError: true }])
     }
   }
@@ -2114,7 +2172,8 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   </button>
                 </div>
               )}
-              {groupMessages(messages.slice(-displayCount)).map((group) => {
+              {/* displayOffset: slice(-displayCount) 偏移，用于还原原始索引 */}
+              {(() => { const displayOffset = Math.max(0, messages.length - displayCount); return groupMessages(messages.slice(-displayCount)).map((group) => {
                 // 连续工具调用合并为一组
                 if (group.type === 'tool-group') {
                   return (
@@ -2130,6 +2189,8 @@ export default function ChatTab({ agentId }: { agentId: string }) {
 
                 const msg = group.messages[0]
                 const i = group.startIdx
+                const oi = i + displayOffset // 原始索引（对应完整 messages 数组）
+                const isLastMsg = oi === messages.length - 1
 
                 // 单个工具调用（保持现有卡片样式）
                 if (msg.role === 'tool') {
@@ -2139,7 +2200,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   const accentColor = meta.success ? 'var(--accent, #34d399)' : 'var(--error, #ef4444)'
                   const statusBg = meta.success ? 'rgba(52,211,153,0.1)' : 'rgba(239,68,68,0.1)'
                   return (
-                    <div key={i} data-msg-idx={i} style={{
+                    <div key={i} data-msg-idx={oi} style={{
                       marginBottom: 6, marginLeft: 38, maxWidth: 560,
                       borderRadius: 10, overflow: 'hidden',
                       border: '1px solid var(--border-subtle)',
@@ -2250,7 +2311,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   const textParts = parts.filter(p => p.type === 'text')
                   if (toolParts.length > 0) {
                     return (
-                      <div key={i} data-msg-idx={i} className="msg-row message-enter" style={{
+                      <div key={i} data-msg-idx={oi} className="msg-row message-enter" style={{
                         marginBottom: 12, display: 'flex', flexDirection: 'row',
                         alignItems: 'flex-start', gap: 8, overflow: 'hidden',
                       }}>
@@ -2320,7 +2381,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                               {renderMd(part.content)}
                             </div>
                           ))}
-                          {streaming && i === messages.length - 1 && <TypingIndicator />}
+                          {streaming && isLastMsg && <TypingIndicator />}
                         </div>
                       </div>
                     )
@@ -2333,7 +2394,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   // Yield 状态
                   if (c.includes('⏸️') || c.includes('YIELD:') || c.includes('⏳ Waiting for subagent')) {
                     return (
-                      <div key={i} data-msg-idx={i} style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+                      <div key={i} data-msg-idx={oi} style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
                         <div style={{
                           padding: '10px 16px', borderRadius: 10, fontSize: 13,
                           backgroundColor: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
@@ -2347,7 +2408,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   // Subagent Result
                   if (c.includes('[Subagent Result')) {
                     return (
-                      <div key={i} data-msg-idx={i} style={{ marginBottom: 12 }}>
+                      <div key={i} data-msg-idx={oi} style={{ marginBottom: 12 }}>
                         <div style={{
                           padding: '10px 14px', borderRadius: 10, fontSize: 13,
                           backgroundColor: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)',
@@ -2366,7 +2427,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                     const header = lines[0] || ''
                     const turns = lines.slice(1)
                     return (
-                      <div key={i} data-msg-idx={i} style={{ marginBottom: 12 }}>
+                      <div key={i} data-msg-idx={oi} style={{ marginBottom: 12 }}>
                         <div style={{
                           padding: '10px 14px', borderRadius: 10, fontSize: 13,
                           backgroundColor: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
@@ -2390,7 +2451,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                   // Auto-compact 通知
                   if (c.includes('Context overflow') || c.includes('auto-compacting') || c.includes('Auto-compacted')) {
                     return (
-                      <div key={i} data-msg-idx={i} style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
+                      <div key={i} data-msg-idx={oi} style={{ marginBottom: 12, display: 'flex', gap: 8 }}>
                         <div style={{
                           padding: '8px 14px', borderRadius: 8, fontSize: 12,
                           backgroundColor: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)',
@@ -2410,13 +2471,13 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                 const needsSettingsLink = isErrorMsg && /设置|Key|供应商|充值|过期/.test(msg.content)
 
                 return (
-                  <div key={i} data-msg-idx={i} style={{
+                  <div key={i} data-msg-idx={oi} style={{
                     marginBottom: 12, display: 'flex',
                     flexDirection: isUser ? 'row-reverse' : 'row',
                     alignItems: 'flex-start', gap: 8,
                     overflow: 'hidden',
-                    ...(chatSearchOpen && chatSearchMatches.includes(i) ? {
-                      boxShadow: chatSearchMatches[chatSearchIdx] === i
+                    ...(chatSearchOpen && chatSearchMatches.includes(oi) ? {
+                      boxShadow: chatSearchMatches[chatSearchIdx] === oi
                         ? '0 0 0 2px var(--accent)' : '0 0 0 1px var(--warning, #f59e0b)',
                       borderRadius: 12,
                     } : {}),
@@ -2448,7 +2509,10 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                     <div className="agent-msg-bubble" style={{ display: 'flex', flexDirection: 'column', maxWidth: 560, minWidth: 0 }}>
                     {/* 推理过程折叠显示（assistant 消息） */}
                     {msg.role === 'assistant' && msg.thinking && <ThinkingBlock thinking={msg.thinking} />}
-                    <div style={{
+                    {/* 等待中：直接渲染 TypingIndicator，不套气泡（避免双层背景导致点不可见） */}
+                    {streaming && isLastMsg && !msg.content && !msg.thinking
+                      ? <TypingIndicator />
+                      : <div style={{
                       padding: '10px 14px', borderRadius: isUser ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
                       backgroundColor: isUser ? 'var(--accent)' : isErrorMsg ? 'rgba(239,68,68,0.06)' : isSystem ? 'var(--success-bg)' : 'var(--bg-elevated)',
                       color: isUser ? '#fff' : isErrorMsg ? '#ef4444' : 'var(--text-primary)',
@@ -2456,10 +2520,9 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                       borderLeft: isErrorMsg ? '3px solid #ef4444' : undefined,
                       fontSize: isSystem ? 13 : 14,
                       lineHeight: 1.6, wordBreak: 'break-word', overflowWrap: 'anywhere',
-                      minHeight: streaming && i === messages.length - 1 && !msg.content ? 40 : undefined,
                     }}>
                       {/* 用户消息编辑模式 */}
-                      {isUser && editingIdx === i ? (
+                      {isUser && editingIdx === oi ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           <textarea
                             value={editingContent}
@@ -2474,7 +2537,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                             onKeyDown={e => {
                               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
                                 e.preventDefault()
-                                if (editingContent.trim()) handleEditMessage(i, editingContent.trim())
+                                if (editingContent.trim()) handleEditMessage(oi, editingContent.trim())
                               }
                               if (e.key === 'Escape') { setEditingIdx(null); setEditingContent('') }
                             }}
@@ -2488,7 +2551,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                               }}
                             >Cancel</button>
                             <button
-                              onClick={() => { if (editingContent.trim()) handleEditMessage(i, editingContent.trim()) }}
+                              onClick={() => { if (editingContent.trim()) handleEditMessage(oi, editingContent.trim()) }}
                               style={{
                                 padding: '3px 10px', fontSize: 12, borderRadius: 4, cursor: 'pointer',
                                 border: 'none', backgroundColor: 'rgba(255,255,255,0.2)', color: '#fff', fontWeight: 600,
@@ -2514,10 +2577,10 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                               onClick={async () => {
                                 if (!activeSession || !agentId || streaming) return
                                 // 找到最后一条用户消息
-                                const lastUserMsg = messages.slice(0, i).reverse().find(m => m.role === 'user')
+                                const lastUserMsg = messages.slice(0, oi).reverse().find(m => m.role === 'user')
                                 if (!lastUserMsg) return
                                 // 移除错误消息，添加空 assistant 占位
-                                setMessages(prev => [...prev.filter((_, idx) => idx !== i), { role: 'assistant', content: '' }])
+                                setMessages(prev => [...prev.filter((_, idx) => idx !== oi), { role: 'assistant', content: '' }])
                                 setStreaming(true)
                                 streamBuf.current = ''
                                 try {
@@ -2540,21 +2603,21 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                       ) : (msg.role === 'assistant' || isSystem) ? (
                         msg.content
                           ? renderMd(typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content))
-                          : streaming && i === messages.length - 1
+                          : streaming && oi === messages.length - 1
                             ? <TypingIndicator />
                             : null
                       ) : (
                         <UserMessageContent content={typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content || '')} searchQuery={chatSearchOpen ? chatSearchQuery : undefined} />
                       )}
-                    </div>
+                    </div>}
                     {/* 操作按钮（消息下方，hover 显示） */}
                     <div className="msg-actions" style={{
                       gap: 4, alignSelf: isUser ? 'flex-end' : 'flex-start',
                     }}>
                       {/* 用户消息：编辑 */}
-                      {isUser && !streaming && editingIdx !== i && (
+                      {isUser && !streaming && editingIdx !== oi && (
                         <button
-                          onClick={() => { setEditingIdx(i); setEditingContent(typeof msg.content === 'string' ? msg.content : '') }}
+                          onClick={() => { setEditingIdx(oi); setEditingContent(typeof msg.content === 'string' ? msg.content : '') }}
                           title="Edit" style={actionBtnStyle}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -2563,18 +2626,18 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                       )}
                       {/* AI 消息：重新生成 + 反馈 */}
                       {!isUser && !isSystem && msg.content && !streaming && (<>
-                        <button onClick={() => handleRegenerate(i)} title="Regenerate" style={actionBtnStyle}>
+                        <button onClick={() => handleRegenerate(oi)} title="Regenerate" style={actionBtnStyle}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
                           </svg>
                         </button>
-                        <button onClick={() => invoke('submit_message_feedback', { sessionId: activeSession, messageSeq: i, feedback: 'up' }).then(() => toast.success('Thanks!')).catch(() => {})}
+                        <button onClick={() => invoke('submit_message_feedback', { sessionId: activeSession, messageSeq: oi, feedback: 'up' }).then(() => toast.success('Thanks!')).catch(() => {})}
                           title="Good" style={actionBtnStyle}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M4 22H2V11h2"/>
                           </svg>
                         </button>
-                        <button onClick={() => invoke('submit_message_feedback', { sessionId: activeSession, messageSeq: i, feedback: 'down' }).then(() => toast.success('Noted')).catch(() => {})}
+                        <button onClick={() => invoke('submit_message_feedback', { sessionId: activeSession, messageSeq: oi, feedback: 'down' }).then(() => toast.success('Noted')).catch(() => {})}
                           title="Bad" style={actionBtnStyle}>
                           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M20 2h2v11h-2"/>
@@ -2595,7 +2658,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                     </div>{/* 关闭消息内容列 */}
                   </div>
                 )
-              })}
+              })})()}
               <div ref={messagesEndRef} />
             </div>
             {/* 功能栏 */}
@@ -2792,11 +2855,11 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                 />
                 <button
                   onClick={handleSend}
-                  disabled={streaming || !input.trim()}
+                  disabled={streaming || (!input.trim() && pendingImages.length === 0)}
                   style={{
                     padding: '10px 20px', backgroundColor: 'var(--accent)', color: 'white',
-                    border: 'none', borderRadius: 6, cursor: streaming || !input.trim() ? 'not-allowed' : 'pointer',
-                    opacity: streaming || !input.trim() ? 0.6 : 1,
+                    border: 'none', borderRadius: 6, cursor: streaming || (!input.trim() && pendingImages.length === 0) ? 'not-allowed' : 'pointer',
+                    opacity: streaming || (!input.trim() && pendingImages.length === 0) ? 0.6 : 1,
                   }}
                 >
                   {streaming ? t('agentDetail.generating') : t('common.send')}

@@ -821,9 +821,6 @@ impl LlmClient {
                         }
                     }
                 }
-                // 调试：保存请求 body 到文件（临时）
-                let _ = std::fs::write("/tmp/anthropic-debug.json", serde_json::to_string_pretty(&body).unwrap_or_default());
-                log::info!("Anthropic 请求 body 已保存到 /tmp/anthropic-debug.json (size={})", body.to_string().len());
                 (url, body)
             }
             _ => return Err("不支持的 LLM 提供商".to_string()),
@@ -930,6 +927,8 @@ impl LlmClient {
             let mut buffer = String::new();
             let mut chunk_debug_count = 0usize;
             let mut current_sse_event: Option<String> = None;
+            // SSE 多行 data 累积缓冲（Responses API 事件 JSON 可能跨行）
+            let mut data_accum = String::new();
 
             let stream_result: Result<(), String> = async {
                 loop {
@@ -953,13 +952,23 @@ impl LlmClient {
 
                         // 追踪 SSE event: 行
                         if line.starts_with("event:") || line.starts_with("event: ") {
-                            let evt = line.splitn(2, ':').nth(1).unwrap_or("").trim().to_string();
-                            // 检测错误事件
-                            if evt == "error" || evt == "response.failed" {
-                                current_sse_event = Some(evt);
-                                continue;
+                            // 在新 event 之前，尝试解析累积的 data
+                            if !data_accum.is_empty() {
+                                Self::try_parse_sse_data(&data_accum, &current_sse_event, &mut result, &mut oa_tool_calls, &mut anth_current_tool, &tx, &mut in_think, &mut think_buffer, &self);
+                                data_accum.clear();
                             }
+                            let evt = line.splitn(2, ':').nth(1).unwrap_or("").trim().to_string();
                             current_sse_event = Some(evt);
+                            continue;
+                        }
+
+                        // 空行 = SSE 事件分隔符，触发 dispatch
+                        if line.is_empty() {
+                            if !data_accum.is_empty() {
+                                Self::try_parse_sse_data(&data_accum, &current_sse_event, &mut result, &mut oa_tool_calls, &mut anth_current_tool, &tx, &mut in_think, &mut think_buffer, &self);
+                                data_accum.clear();
+                            }
+                            current_sse_event = None;
                             continue;
                         }
 
@@ -968,26 +977,33 @@ impl LlmClient {
                         let data = data.trim();
                         if data == "[DONE]" { break; }
 
-                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(data) {
+                        // 累积 data 行（SSE 规范：多个 data: 行用换行连接）
+                        if !data_accum.is_empty() {
+                            data_accum.push('\n');
+                        }
+                        data_accum.push_str(data);
+
+                        // 尝试立即解析（大多数情况是单行完整 JSON）
+                        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&data_accum) {
                             log::debug!("SSE event={:?} data: {}", current_sse_event, json.to_string().chars().take(300).collect::<String>());
-                            // 检测错误事件
                             if let Some(err_msg) = Self::extract_sse_error(&json) {
                                 log::error!("LLM API 返回错误事件: {}", err_msg);
                                 let raw = format!("LLM 服务端错误: {}", err_msg);
                                 return Err(classify_llm_error(&raw));
                             }
-                            // 提取 usage 统计
                             Self::extract_usage(&json, &mut result);
-                            // 处理正常事件
                             self.process_sse_event(&json, &mut result, &mut oa_tool_calls, &mut anth_current_tool, &tx, &mut in_think, &mut think_buffer);
-                        } else {
-                            log::warn!("SSE JSON 解析失败: {:?}", data.chars().take(200).collect::<String>());
+                            data_accum.clear();
+                            current_sse_event = None;
                         }
-                        current_sse_event = None;
+                        // 解析失败 → 继续累积下一行 data（不报错，等空行或下一个 event 触发最终解析）
                     }
                 }
 
-                // 残留缓冲区
+                // 残留累积数据 + 缓冲区
+                if !data_accum.is_empty() {
+                    Self::try_parse_sse_data(&data_accum, &current_sse_event, &mut result, &mut oa_tool_calls, &mut anth_current_tool, &tx, &mut in_think, &mut think_buffer, &self);
+                }
                 for line in buffer.lines() {
                     let line = line.trim();
                     if line.starts_with("event:") || line.starts_with("event: ") { continue; }
@@ -1335,6 +1351,33 @@ impl LlmClient {
     }
 
     /// 处理单个 SSE 事件
+    /// 尝试解析累积的 SSE data（多行 data 合并后重试）
+    fn try_parse_sse_data(
+        data: &str,
+        event: &Option<String>,
+        result: &mut LlmResponse,
+        oa_tool_calls: &mut Vec<OaToolCallAccum>,
+        anth_current_tool: &mut Option<AnthToolAccum>,
+        tx: &mpsc::UnboundedSender<String>,
+        in_think: &mut bool,
+        think_buffer: &mut String,
+        this: &Self,
+    ) {
+        let trimmed = data.trim();
+        if trimmed.is_empty() || trimmed == "[DONE]" { return; }
+        match serde_json::from_str::<serde_json::Value>(trimmed) {
+            Ok(json) => {
+                log::debug!("SSE(accumulated) event={:?} data: {}", event, json.to_string().chars().take(300).collect::<String>());
+                Self::extract_usage(&json, result);
+                this.process_sse_event(&json, result, oa_tool_calls, anth_current_tool, tx, in_think, think_buffer);
+            }
+            Err(_) => {
+                // 非关键事件（如 Responses API 的 response.created/completed），降级为 debug
+                log::debug!("SSE 多行 data 解析跳过 (event={:?}): {}", event, trimmed.chars().take(120).collect::<String>());
+            }
+        }
+    }
+
     fn process_sse_event(
         &self,
         json: &serde_json::Value,

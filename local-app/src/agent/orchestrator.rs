@@ -1047,7 +1047,7 @@ impl Orchestrator {
                     );
                     let client = LlmClient::new(LlmConfig {
                         provider: cfg.provider.clone(), api_key: cfg.api_key.clone(),
-                        model: cfg.model.clone(), base_url: cfg.base_url.clone(),
+                        model: pick_compact_model(&cfg.model), base_url: cfg.base_url.clone(),
                         temperature: Some(0.3), max_tokens: Some(512),
                         thinking_level: None,
                     });
@@ -1217,7 +1217,7 @@ impl Orchestrator {
         // 构建要压缩的对话文本（限制总长度，避免发送太多给 LLM）
         let mut conversation_text = String::new();
         let char_budget = 8000usize; // 最多 8000 字符用于摘要生成
-        for (_, role, content) in to_compact.iter().rev() {
+        for (_, role, content) in to_compact.iter() {
             // 安全截断（避免在多字节 UTF-8 字符中间切断导致 panic）
             let truncated: String = content.chars().take(200).collect();
             let line = format!("{}: {}\n", role, truncated);
