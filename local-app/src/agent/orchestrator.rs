@@ -54,7 +54,7 @@ fn format_token_count(tokens: usize) -> String {
 }
 
 /// 为压缩任务选择轻量模型（省钱+快速）
-fn pick_compact_model(agent_model: &str) -> String {
+pub fn pick_compact_model(agent_model: &str) -> String {
     let m = agent_model.to_lowercase();
     // 如果 agent 已经是轻量模型，直接用
     if m.contains("mini") || m.contains("haiku") || m.contains("flash") || m.contains("turbo") {
@@ -543,7 +543,19 @@ impl Orchestrator {
                     }
                 }
 
-                let budget = SectionBudget::default();
+                // 动态记忆预算：根据用户意图调整 memory section 大小
+                let mut budget = SectionBudget::default();
+                let intent_preview = super::intent_gate::classify(user_message);
+                let memory_budget = if intent_preview.intents.contains(&super::intent_gate::Intent::Question) {
+                    500  // 简单问题不需要太多记忆
+                } else if intent_preview.intents.contains(&super::intent_gate::Intent::Research) {
+                    2_000 // 调研需要项目知识
+                } else if intent_preview.intents.contains(&super::intent_gate::Intent::Dangerous) {
+                    1_000 // 危险操作以安全规则为主
+                } else {
+                    3_000 // 代码修改需要全部上下文
+                };
+                budget.limits.insert("memory".into(), memory_budget);
                 let mut prompt = engine.build_system_prompt_with_budget(&workspace, &budget);
                 // 注入工作区环境信息
                 prompt.push_str(&format!(
@@ -1201,12 +1213,15 @@ impl Orchestrator {
             let aid = agent_id.to_string();
             let sid = session_id.to_string();
             let wp = workspace_path.clone();
+            let learner_llm_config = config.clone();
             tokio::spawn(async move {
-                // 确保 DB schema 有 access_count 列
+                // 确保 DB schema 有 access_count / unused_recall_count 列
                 super::memory_eviction::ensure_schema(&pool).await;
+                let _ = sqlx::query("ALTER TABLE memories ADD COLUMN unused_recall_count INTEGER DEFAULT 0")
+                    .execute(&pool).await;
 
-                // 提取经验
-                let outcome = super::learner::extract_lessons(&pool, &aid, &sid).await;
+                // 用 LLM 提取经验（v2，替代关键词匹配）
+                let outcome = super::learner::extract_lessons_with_llm(&pool, &aid, &sid, &learner_llm_config).await;
                 if !outcome.lessons.is_empty() {
                     log::info!("Learner: 从会话 {} 学到 {} 条经验", &sid[..8], outcome.lessons.len());
                     super::learner::persist_lessons(&pool, &aid, wp.as_deref(), &outcome.lessons).await;
