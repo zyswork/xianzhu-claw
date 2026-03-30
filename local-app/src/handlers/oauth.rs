@@ -66,8 +66,10 @@ fn get_oauth_presets() -> Vec<OAuthPreset> {
             base_url: "https://generativelanguage.googleapis.com/v1beta/openai",
             scopes: "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
             models: vec![
-                ("gemini-2.5-flash", "Gemini 2.5 Flash"),
                 ("gemini-2.5-pro", "Gemini 2.5 Pro"),
+                ("gemini-2.5-flash", "Gemini 2.5 Flash"),
+                ("gemini-2.0-flash", "Gemini 2.0 Flash"),
+                ("gemini-2.0-flash-lite", "Gemini 2.0 Flash Lite"),
             ],
             client_id_owned: String::new(),
             client_secret_owned: String::new(),
@@ -75,14 +77,12 @@ fn get_oauth_presets() -> Vec<OAuthPreset> {
         OAuthPreset {
             name: "OpenAI",
             api_type: "openai",
-            authorize_url: "https://auth.openai.com/authorize",
+            authorize_url: "https://auth.openai.com/oauth/authorize",
             token_url: "https://auth.openai.com/oauth/token",
-            // 从 pi-ai (@mariozechner/pi-ai) 提取的 Codex CLI 真实 Client ID
             client_id: "app_EMoamEEZ73f0CkXaXp7hrann",
             client_secret: "",
             base_url: "",
-            // OpenAI 要求固定端口 1455 和路径 /auth/callback（已在 OpenAI 注册白名单）
-            scopes: "openid offline_access",
+            scopes: "openid profile email offline_access",
             models: vec![
                 ("gpt-4o", "GPT-4o"),
                 ("gpt-4o-mini", "GPT-4o Mini"),
@@ -295,6 +295,10 @@ pub async fn start_oauth_flow(
     if provider.to_lowercase().contains("google") {
         params.push(("access_type", "offline".to_string()));
         params.push(("prompt", "consent".to_string()));
+    }
+    if is_openai {
+        params.push(("id_token_add_organizations", "true".to_string()));
+        params.push(("codex_cli_simplified_flow", "true".to_string()));
     }
 
     let url = format!(
