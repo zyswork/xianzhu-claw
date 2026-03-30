@@ -8,7 +8,7 @@ use super::skill_tool::SkillTool;
 use super::media::MediaProvider; // 导入 trait 使 describe_image 可用
 use super::skills::SkillManager;
 use super::soul::{SoulEngine, SectionBudget};
-use super::tools::{ToolManager, CalculatorTool, DateTimeTool, FileReadTool, FileWriteTool, FileListTool, FileEditTool, DiffEditTool, BashExecTool, CodeSearchTool, WebFetchTool, WebSearchTool, ImageGenerateTool, TtsTool, SttTool, DocParseTool, ApplyPatchTool, HttpRequestTool, SessionTool, FocusTool, ResearchTool, CollaborateTool, YieldTool, A2aTool, MemoryReadTool, MemoryWriteTool, SettingsTool, ProviderTool, AgentSelfConfigTool, SkillManageTool, CronManageTool, PluginManageTool, BrowserTool, Tool};
+use super::tools::{ToolManager, CalculatorTool, DateTimeTool, FileReadTool, FileWriteTool, FileListTool, FileEditTool, DiffEditTool, FileRollbackTool, BashExecTool, CodeSearchTool, WebFetchTool, WebSearchTool, ImageGenerateTool, TtsTool, SttTool, DocParseTool, ApplyPatchTool, HttpRequestTool, SessionTool, FocusTool, ResearchTool, CollaborateTool, YieldTool, A2aTool, MemoryReadTool, MemoryWriteTool, SettingsTool, ProviderTool, AgentSelfConfigTool, SkillManageTool, CronManageTool, PluginManageTool, BrowserTool, Tool};
 use super::tools::{parse_tools_config, is_tool_enabled};
 use super::workspace::AgentWorkspace;
 use super::subagent::SubagentRegistry;
@@ -172,6 +172,7 @@ impl Orchestrator {
         tool_manager.register_tool(Box::new(BashExecTool));
         tool_manager.register_tool(Box::new(FileEditTool));
         tool_manager.register_tool(Box::new(DiffEditTool));
+        tool_manager.register_tool(Box::new(FileRollbackTool));
         tool_manager.register_tool(Box::new(CodeSearchTool));
         tool_manager.register_tool(Box::new(WebFetchTool));
         tool_manager.register_tool(Box::new(WebSearchTool::new(pool.clone())));

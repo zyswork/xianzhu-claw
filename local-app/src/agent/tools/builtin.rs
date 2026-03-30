@@ -328,9 +328,14 @@ impl Tool for FileReadTool {
             return Ok(listing);
         }
 
-        tokio::fs::read_to_string(path)
+        let content = tokio::fs::read_to_string(path)
             .await
-            .map_err(|e| format!("读取文件失败: {}", e))
+            .map_err(|e| format!("读取文件失败: {}", e))?;
+
+        // Harness: 注册文件内容 hash（用于后续编辑时校验）
+        super::super::file_harness::register_read(path, &content);
+
+        Ok(content)
     }
 }
 
@@ -989,6 +994,9 @@ impl Tool for FileWriteTool {
 
         log::info!("写入文件: {} ({} 字节)", path, content.len());
 
+        // Harness: 编辑前备份（如果文件已存在）
+        super::super::file_harness::backup_before_edit(path);
+
         // 自动创建父目录
         let file_path = std::path::Path::new(path);
         if let Some(parent) = file_path.parent() {
@@ -1000,6 +1008,9 @@ impl Tool for FileWriteTool {
         tokio::fs::write(path, content)
             .await
             .map_err(|e| format!("写入文件失败: {}", e))?;
+
+        // Harness: 注册新内容 hash
+        super::super::file_harness::update_hash(path, content);
 
         Ok(format!("文件已写入: {} ({} 字节)", path, content.len()))
     }
@@ -1115,6 +1126,12 @@ impl Tool for FileEditTool {
         let content = tokio::fs::read_to_string(path).await
             .map_err(|e| format!("读取文件失败: {}", e))?;
 
+        // Harness: 校验文件是否被外部修改（自上次 file_read 后）
+        super::super::file_harness::verify_before_edit(path, &content)?;
+
+        // Harness: 编辑前自动备份
+        super::super::file_harness::backup_before_edit(path);
+
         let new_content = if old_text.is_empty() {
             // 插入模式
             let insert_line = arguments.get("insert_line")
@@ -1153,6 +1170,9 @@ impl Tool for FileEditTool {
             log::warn!("file_edit 写后验证: new_text 未出现在文件中（写入可能异常）");
             return Err(format!("写后验证失败：new_text 未出现在文件中。当前文件前 500 字符:\n{}", &verify[..verify.len().min(500)]));
         }
+
+        // Harness: 更新 hash
+        super::super::file_harness::update_hash(path, &new_content);
 
         log::info!("文件已编辑: {}", path);
         Ok(format!("文件已编辑: {} (新大小: {} 字节)", path, new_content.len()))
@@ -1217,6 +1237,62 @@ impl Tool for DiffEditTool {
             .count();
 
         Ok(format!("文件 {} 已更新，变更 {} 行", file_path, lines_changed))
+    }
+}
+
+/// 文件回滚工具 — 从备份恢复文件
+pub struct FileRollbackTool;
+
+#[async_trait]
+impl Tool for FileRollbackTool {
+    fn definition(&self) -> ToolDefinition {
+        ToolDefinition {
+            name: "file_rollback".to_string(),
+            description: "从备份恢复文件。可查看备份列表或将指定备份恢复到原路径。每次 file_edit/file_write 会自动创建备份。".to_string(),
+            parameters: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "description": "操作：list（查看备份列表）或 restore（恢复备份）",
+                        "enum": ["list", "restore"]
+                    },
+                    "backup_path": {
+                        "type": "string",
+                        "description": "备份文件路径（restore 时必填，从 list 结果中获取）"
+                    },
+                    "target_path": {
+                        "type": "string",
+                        "description": "恢复目标路径（restore 时必填）"
+                    }
+                },
+                "required": ["action"]
+            }),
+        }
+    }
+
+    fn safety_level(&self) -> ToolSafetyLevel { ToolSafetyLevel::Guarded }
+
+    async fn execute(&self, arguments: serde_json::Value) -> Result<String, String> {
+        let action = arguments["action"].as_str().unwrap_or("list");
+        match action {
+            "list" => {
+                let backups = super::super::file_harness::list_backups();
+                if backups.is_empty() { return Ok("没有可用的备份。".into()); }
+                let lines: Vec<String> = backups.iter().take(20)
+                    .map(|(path, name, size)| format!("- `{}` ({:.1}KB)\n  路径: {}", name, *size as f64 / 1024.0, path))
+                    .collect();
+                Ok(format!("最近 {} 个备份：\n{}", lines.len(), lines.join("\n")))
+            }
+            "restore" => {
+                let backup = arguments["backup_path"].as_str().ok_or("缺少 backup_path")?;
+                let target = arguments["target_path"].as_str().ok_or("缺少 target_path")?;
+                validate_path_safety(target)?;
+                super::super::file_harness::rollback(backup, target)?;
+                Ok(format!("已恢复: {} → {}", backup, target))
+            }
+            _ => Err(format!("未知操作: {}。支持: list/restore", action)),
+        }
     }
 }
 
