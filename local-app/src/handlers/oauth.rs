@@ -64,7 +64,7 @@ fn get_oauth_presets() -> Vec<OAuthPreset> {
             client_id: "", // 动态填充，见 resolve_google_credentials()
             client_secret: "", // 动态填充
             base_url: "https://generativelanguage.googleapis.com/v1beta/openai",
-            scopes: "https://www.googleapis.com/auth/generative-language.tuning https://www.googleapis.com/auth/generative-language.retriever https://www.googleapis.com/auth/cloud-platform",
+            scopes: "https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile",
             models: vec![
                 ("gemini-2.5-flash", "Gemini 2.5 Flash"),
                 ("gemini-2.5-pro", "Gemini 2.5 Pro"),
@@ -79,8 +79,9 @@ fn get_oauth_presets() -> Vec<OAuthPreset> {
             token_url: "https://auth.openai.com/oauth/token",
             // 从 pi-ai (@mariozechner/pi-ai) 提取的 Codex CLI 真实 Client ID
             client_id: "app_EMoamEEZ73f0CkXaXp7hrann",
-            client_secret: "", // OpenAI 用 PKCE 不需要 secret
+            client_secret: "",
             base_url: "",
+            // OpenAI 要求固定端口 1455 和路径 /auth/callback（已在 OpenAI 注册白名单）
             scopes: "openid offline_access",
             models: vec![
                 ("gpt-4o", "GPT-4o"),
@@ -257,14 +258,20 @@ pub async fn start_oauth_flow(
         flows.retain(|_, v| v.created_at > cutoff);
     }
 
-    // 启动临时 HTTP server 接收回调（随机端口）
-    let listener = std::net::TcpListener::bind("127.0.0.1:0")
-        .map_err(|e| format!("绑定回调端口失败: {}", e))?;
-    let port = listener.local_addr()
-        .map_err(|e| format!("获取端口失败: {}", e))?.port();
-    drop(listener); // 释放端口给 hyper
+    // 确定回调端口和路径（OpenAI 要求固定 1455 + /auth/callback）
+    let is_openai = provider.to_lowercase().contains("openai");
+    let (port, callback_path) = if is_openai {
+        (1455u16, "/auth/callback")
+    } else {
+        // Google 等其他 provider 用随机端口
+        let listener = std::net::TcpListener::bind("127.0.0.1:0")
+            .map_err(|e| format!("绑定回调端口失败: {}", e))?;
+        let p = listener.local_addr().map_err(|e| format!("获取端口失败: {}", e))?.port();
+        drop(listener);
+        (p, "/oauth/callback")
+    };
 
-    let redirect_uri = format!("http://localhost:{}/oauth/callback", port);
+    let redirect_uri = format!("http://localhost:{}{}", port, callback_path);
 
     // 更新 pending flow 的 redirect_uri
     {
@@ -339,7 +346,7 @@ async fn run_oauth_callback_server(
     let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await
         .map_err(|e| format!("绑定回调端口失败: {}", e))?;
 
-    log::info!("OAuth 回调 server 启动: http://localhost:{}/oauth/callback", port);
+    log::info!("OAuth 回调 server 启动: http://localhost:{}", port);
 
     // 等待一个连接（2 分钟超时）
     let accept = tokio::time::timeout(
@@ -611,8 +618,16 @@ pub async fn handle_oauth_callback(
             .ok_or_else(|| "无效或过期的 OAuth state".to_string())?
     };
 
-    let preset = find_preset(&pending.provider)
+    let mut preset = find_preset(&pending.provider)
         .ok_or_else(|| format!("未知的 OAuth 提供商: {}", pending.provider))?;
+
+    // Google: 动态解析 credentials（和 start_oauth_flow 相同）
+    if pending.provider.to_lowercase().contains("google") {
+        if let Some((id, secret)) = resolve_google_credentials() {
+            preset.client_id_owned = id;
+            preset.client_secret_owned = secret;
+        }
+    }
 
     let redirect_uri = pending.redirect_uri;
 
