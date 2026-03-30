@@ -1195,9 +1195,51 @@ impl Orchestrator {
             }
         }
 
-        // 11. 每日 Token 限额检查（已在 send_message_stream 入口 0b 步骤实现）
+        // 11. Learner：从会话中提取经验（异步，fire-and-forget）
+        {
+            let pool = self.pool.clone();
+            let aid = agent_id.to_string();
+            let sid = session_id.to_string();
+            let wp = workspace_path.clone();
+            tokio::spawn(async move {
+                // 确保 DB schema 有 access_count 列
+                super::memory_eviction::ensure_schema(&pool).await;
 
-        // 11. 自我进化：检查是否触发后台 review
+                // 提取经验
+                let outcome = super::learner::extract_lessons(&pool, &aid, &sid).await;
+                if !outcome.lessons.is_empty() {
+                    log::info!("Learner: 从会话 {} 学到 {} 条经验", &sid[..8], outcome.lessons.len());
+                    super::learner::persist_lessons(&pool, &aid, wp.as_deref(), &outcome.lessons).await;
+
+                    // 每 10 次学习后执行一次蒸馏
+                    let learned_count: i64 = sqlx::query_scalar(
+                        "SELECT COUNT(*) FROM memories WHERE agent_id = ? AND memory_type = 'learned'"
+                    ).bind(&aid).fetch_one(&pool).await.unwrap_or(0);
+
+                    if learned_count > 0 && learned_count % 10 == 0 {
+                        let result = super::distillation::distill_rules(&pool, &aid).await;
+                        if !result.rules.is_empty() {
+                            if let Some(ref wp) = wp {
+                                let _ = super::distillation::append_to_standing_orders(wp, &result.rules);
+                            }
+                        }
+                    }
+
+                    // 记忆淘汰
+                    let config = super::memory_eviction::EvictionConfig::default();
+                    let removed = super::memory_eviction::run_eviction(&pool, &aid, &config).await;
+                    if removed > 0 {
+                        log::info!("Learner: 淘汰了 {} 条旧记忆", removed);
+                    }
+                } else if let Some(reason) = outcome.skipped_reason {
+                    log::debug!("Learner: 跳过学习 — {}", reason);
+                }
+            });
+        }
+
+        // 12. 每日 Token 限额检查（已在 send_message_stream 入口 0b 步骤实现）
+
+        // 12. 自我进化：检查是否触发后台 review
         {
             self.evolution_state.on_user_message();
             let should_skill = self.evolution_state.should_review_skills(&self.evolution_config);

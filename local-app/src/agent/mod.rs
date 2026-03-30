@@ -51,6 +51,9 @@ pub mod file_harness;
 pub mod auto_verify;
 pub mod progress;
 pub mod intent_gate;
+pub mod learner;
+pub mod memory_eviction;
+pub mod distillation;
 
 // ── 工具系统 ──
 pub mod tools;
