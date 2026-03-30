@@ -184,10 +184,10 @@ class Database {
     const updated = { ...user, ...updates, updatedAt: new Date() }
     const stmt = sqliteDb.prepare(`
       UPDATE users
-      SET email = ?, name = ?, role = ?, status = ?, updatedAt = ?
+      SET email = ?, name = ?, passwordHash = ?, role = ?, status = ?, updatedAt = ?
       WHERE id = ?
     `)
-    stmt.run(updated.email, updated.name, updated.role, updated.status, updated.updatedAt.toISOString(), id)
+    stmt.run(updated.email, updated.name, updated.passwordHash || null, updated.role, updated.status, updated.updatedAt.toISOString(), id)
     return updated
   }
 

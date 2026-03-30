@@ -314,6 +314,30 @@ export default function Sidebar() {
           </div>
         )}
 
+        {/* 未登录时：显示登录按钮 */}
+        {!user && !collapsed && (
+          <button className="sidebar-logout-btn" style={{ color: 'var(--accent)' }} onClick={() => navigate('/login')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+            </svg>
+            {t('login.loginBtn')}
+          </button>
+        )}
+        {!user && collapsed && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '4px 0' }}>
+            <button
+              className="sidebar-logout-btn--icon sidebar-tooltip"
+              data-tooltip={t('login.loginBtn')}
+              style={{ color: 'var(--accent)' }}
+              onClick={() => navigate('/login')}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/>
+              </svg>
+            </button>
+          </div>
+        )}
+
         {/* 版本号 */}
         <div className={collapsed ? 'sidebar-version sidebar-version--collapsed' : 'sidebar-version'}>
           {collapsed ? 'v0.1' : 'v0.1.0'}

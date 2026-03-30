@@ -56,9 +56,11 @@ export const useAuthStore = create<AuthStore>((set) => ({
   logout: () => {
     localStorage.removeItem('token')
     localStorage.removeItem('user')
-    // 注意：不移除 had_login，让 ProtectedPage 知道用户曾登录过
+    localStorage.setItem('had_login', 'true')
     set({ user: null, token: null, isLoggedIn: false })
     useEnterpriseStore.setState({ enterprise: null })
+    // ProtectedPage 检测到 !isLoggedIn + had_login → 重定向到 /login
+    // LoginPage 检测到 had_login → 显示登录页（不会自动跳走）
   },
   hydrate: () => {
     const token = localStorage.getItem('token')

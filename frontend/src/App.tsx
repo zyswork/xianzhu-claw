@@ -64,8 +64,8 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { err
 
 function ProtectedPage({ children }: { children: React.ReactNode }) {
   const { isLoggedIn } = useAuthStore()
-  // 未登录时跳转到登录页（仅对曾经登录过又登出的用户生效）
-  if (!isLoggedIn && localStorage.getItem('had_login') === 'true') {
+  // 未登录 → 强制跳转登录页
+  if (!isLoggedIn) {
     return <Navigate to="/login" replace />
   }
   return (
