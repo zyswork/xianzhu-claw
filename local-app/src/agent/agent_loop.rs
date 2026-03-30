@@ -60,6 +60,10 @@ pub struct AgentLoopDeps<'a> {
     pub approval_manager: Option<&'a super::approval::ApprovalManager>,
     /// Tauri app handle（用于发送事件到前端）
     pub app_handle: Option<&'a tauri::AppHandle>,
+    /// 执行预算（Harness: 统一管控 LLM/工具/验证次数）
+    pub budget: Option<&'a super::execution_budget::ExecutionBudget>,
+    /// 进度追踪器（Harness: 跨会话恢复）
+    pub progress: Option<&'a std::sync::Mutex<super::progress::ProgressTracker>>,
 }
 
 /// 多轮工具调用循环
@@ -117,6 +121,19 @@ pub async fn run_agent_loop(
             if token.is_cancelled() {
                 log::info!("Agent loop 被用户取消（第 {} 轮）", round + 1);
                 let _ = tx.send("\n\n⚠️ 已取消\n".to_string());
+                break;
+            }
+        }
+        // Harness: 执行预算检查
+        if let Some(budget) = deps.budget {
+            if let Err(e) = budget.try_llm_call() {
+                log::warn!("Agent loop 预算耗尽: {}", e);
+                let _ = tx.send(format!("\n⚠️ {}\n", e));
+                break;
+            }
+            if budget.is_token_exceeded() {
+                log::warn!("Agent loop Token 预算耗尽");
+                let _ = tx.send("\n⚠️ Token 预算已用完\n".to_string());
                 break;
             }
         }
@@ -315,6 +332,11 @@ pub async fn run_agent_loop(
         if let Some(ref usage) = llm_response.usage {
             accumulated_tokens += usage.total_tokens;
             _accumulated_cost += estimate_cost(&config.model, usage.input_tokens, usage.output_tokens);
+            // Harness: 同步到 ExecutionBudget
+            if let Some(budget) = deps.budget {
+                budget.add_tokens(usage.total_tokens);
+                budget.add_cost(estimate_cost(&config.model, usage.input_tokens, usage.output_tokens));
+            }
             log::info!("Token: input={}, output={}, 累积={}/{}", usage.input_tokens, usage.output_tokens, accumulated_tokens, DEFAULT_TOKEN_BUDGET);
 
             // 异步写入 token_usage
@@ -549,6 +571,34 @@ pub async fn run_agent_loop(
                         log::info!("反思注入: {} ({:?})", tc.name, error_class);
                     }
                 }
+
+                // Harness: 进度追踪
+                if let Some(ref progress_mutex) = deps.progress {
+                    if let Ok(mut tracker) = progress_mutex.lock() {
+                        let summary: String = result_text.chars().take(80).collect();
+                        tracker.record(round, &tc.name, success, &summary);
+                    }
+                }
+                // Harness: 工具预算检查
+                if let Some(budget) = deps.budget {
+                    if budget.try_tool_call().is_err() {
+                        log::warn!("工具调用预算耗尽，终止 loop");
+                        let _ = tx.send("\n⚠️ 工具调用次数已达上限\n".to_string());
+                        break;
+                    }
+                }
+                // Harness: 文件写入后轻量语法检查
+                if success && matches!(tc.name.as_str(), "file_write" | "file_edit" | "diff_edit") {
+                    if let Some(path) = tc.arguments.get("path").and_then(|p| p.as_str()) {
+                        if let Some(verify_result) = super::auto_verify::check_file_syntax(path) {
+                            if !verify_result.passed {
+                                let warn = format!("[Syntax Check] {}", verify_result.summary);
+                                messages.push(serde_json::json!({"role": "user", "content": warn}));
+                                log::info!("轻量语法检查失败: {} — {}", path, verify_result.summary);
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -650,6 +700,13 @@ pub async fn run_agent_loop(
     // 缓存
     if tool_defs.is_empty() && !full_content.is_empty() {
         let _ = response_cache.put(&cache_key, &config.model, &full_content).await;
+    }
+
+    // Harness: 标记进度完成
+    if let Some(ref progress_mutex) = deps.progress {
+        if let Ok(mut tracker) = progress_mutex.lock() {
+            tracker.mark_complete();
+        }
     }
 
     Ok(full_content)

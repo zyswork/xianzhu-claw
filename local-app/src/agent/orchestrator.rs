@@ -1057,6 +1057,12 @@ impl Orchestrator {
         } else {
             Box::new(super::dispatcher::NativeDispatcher::new(provider))
         };
+        // Harness: 创建执行预算和进度追踪器
+        let execution_budget = super::execution_budget::ExecutionBudget::from_config(agent.config.as_deref());
+        let progress_tracker = workspace_path.as_ref().map(|wp| {
+            std::sync::Mutex::new(super::progress::ProgressTracker::new(wp))
+        });
+
         let loop_deps = super::agent_loop::AgentLoopDeps {
             pool: &self.pool,
             tool_manager: &self.tool_manager,
@@ -1069,7 +1075,9 @@ impl Orchestrator {
             provider_registry: Some(&self.provider_registry),
             evolution_state: Some(&self.evolution_state),
             approval_manager: Some(&self.approval_manager),
-            app_handle: None, // 由调用方注入（send_message 时传入）
+            app_handle: None,
+            budget: Some(&execution_budget),
+            progress: progress_tracker.as_ref(),
         };
 
         // C4: 跨会话恢复 — 检查 PROGRESS.md 是否有未完成任务
@@ -1147,6 +1155,10 @@ impl Orchestrator {
                 }
             }
         }
+
+        // 9.8 记忆使用反馈循环：检查 Agent 回复是否引用了注入的记忆
+        // TODO: 需要在 MemoryLoader 中记录注入了哪些记忆 ID，此处暂用简化版
+        // 完整版需要 MemoryLoader 返回 (memory_text, injected_ids)
 
         // 自动生成会话标题：如果是第一条消息且标题为默认值
         if let Ok(Some(session)) = memory::conversation::get_session(&self.pool, session_id).await {
@@ -1245,6 +1257,12 @@ impl Orchestrator {
                     let removed = super::memory_eviction::run_eviction(&pool, &aid, &config).await;
                     if removed > 0 {
                         log::info!("Learner: 淘汰了 {} 条旧记忆", removed);
+                    }
+
+                    // 文件记忆一致性验证（每次学习后检查）
+                    let invalidated = super::learner::verify_file_memories(&pool, &aid).await;
+                    if invalidated > 0 {
+                        log::info!("Learner: {} 条文件记忆已失效（文件不存在）", invalidated);
                     }
                 } else if let Some(reason) = outcome.skipped_reason {
                     log::debug!("Learner: 跳过学习 — {}", reason);
