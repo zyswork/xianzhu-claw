@@ -540,6 +540,13 @@ export const en: TranslationMap = {
     getKey: 'Get Key',
     sectionBackup: 'Backup & Restore',
     sectionProfile: 'Profile',
+    oauthAuthorize: 'OAuth Login',
+    oauthReauthorize: 'Re-authorize',
+    oauthAuthorized: 'Authorized',
+    oauthExpires: 'Expires',
+    oauthBrowserOpened: 'Browser opened, please complete authorization...',
+    oauthSuccess: 'Authorization successful!',
+    oauthFailed: 'Authorization failed',
   },
   profile: {
     nickname: 'Nickname',

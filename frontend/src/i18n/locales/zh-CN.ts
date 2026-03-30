@@ -540,6 +540,13 @@ export const zhCN: TranslationMap = {
     getKey: '获取 Key',
     sectionBackup: '备份恢复',
     sectionProfile: '个人资料',
+    oauthAuthorize: 'OAuth 授权',
+    oauthReauthorize: '重新授权',
+    oauthAuthorized: '已授权',
+    oauthExpires: '过期时间',
+    oauthBrowserOpened: '浏览器已打开，请完成授权...',
+    oauthSuccess: '授权成功！',
+    oauthFailed: '授权失败',
   },
   profile: {
     nickname: '昵称',

@@ -41,6 +41,7 @@ use handlers::plugins::*;
 use handlers::scheduler_cmd::*;
 use handlers::misc::*;
 use handlers::profile::*;
+use handlers::oauth::*;
 
 // ─── 从 helpers 导入 main() 使用的函数 ────────────────────────
 use handlers::helpers::{load_providers, save_providers, seed_marketplace_skills};
@@ -628,6 +629,8 @@ async fn main() {
             export_memory_snapshot, extract_memories_from_history, cloud_api_proxy,
             // profile
             get_user_profile, save_user_profile, save_user_avatar, get_user_avatar,
+            // oauth
+            start_oauth_flow, exchange_oauth_code, refresh_oauth_token,
         ])
         .build(tauri::generate_context!())
         .expect("error building tauri application");

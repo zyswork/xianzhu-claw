@@ -358,6 +358,69 @@ async fn handle_request(
             }
         }
 
+        // OAuth 回调端点：GET /oauth/callback?code=...&state=...
+        (Method::GET, "/oauth/callback") => {
+            let query = req.uri().query().unwrap_or("");
+            let params: HashMap<String, String> = url::form_urlencoded::parse(query.as_bytes())
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect();
+
+            let code = params.get("code").cloned().unwrap_or_default();
+            let oauth_state = params.get("state").cloned().unwrap_or_default();
+
+            if code.is_empty() || oauth_state.is_empty() {
+                // 可能是错误回调（用户拒绝授权）
+                let error = params.get("error").cloned().unwrap_or_else(|| "未知错误".to_string());
+                return Ok(hyper::Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "text/html; charset=utf-8")
+                    .body(hyper::Body::from(format!(
+                        r#"<!DOCTYPE html><html><body style="font-family:system-ui;text-align:center;padding:60px">
+                        <h2 style="color:#e74c3c">授权失败</h2>
+                        <p>{}</p>
+                        <p style="color:#888">可以关闭此窗口。</p>
+                        <script>setTimeout(()=>window.close(),3000)</script>
+                        </body></html>"#,
+                        error
+                    )))
+                    .unwrap());
+            }
+
+            match crate::handlers::oauth::handle_oauth_callback(&state.pool, &code, &oauth_state).await {
+                Ok(provider_name) => {
+                    Ok(hyper::Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", "text/html; charset=utf-8")
+                        .body(hyper::Body::from(format!(
+                            r#"<!DOCTYPE html><html><body style="font-family:system-ui;text-align:center;padding:60px">
+                            <h2 style="color:#27ae60">授权成功！</h2>
+                            <p>已连接到 <strong>{}</strong></p>
+                            <p style="color:#888">可以关闭此窗口。</p>
+                            <script>setTimeout(()=>window.close(),3000)</script>
+                            </body></html>"#,
+                            provider_name
+                        )))
+                        .unwrap())
+                }
+                Err(e) => {
+                    log::error!("OAuth 回调处理失败: {}", e);
+                    Ok(hyper::Response::builder()
+                        .status(StatusCode::OK)
+                        .header("Content-Type", "text/html; charset=utf-8")
+                        .body(hyper::Body::from(format!(
+                            r#"<!DOCTYPE html><html><body style="font-family:system-ui;text-align:center;padding:60px">
+                            <h2 style="color:#e74c3c">授权失败</h2>
+                            <p>{}</p>
+                            <p style="color:#888">可以关闭此窗口。</p>
+                            <script>setTimeout(()=>window.close(),3000)</script>
+                            </body></html>"#,
+                            e
+                        )))
+                        .unwrap())
+                }
+            }
+        }
+
         // CORS preflight
         (Method::OPTIONS, _) => {
             Ok(hyper::Response::builder()

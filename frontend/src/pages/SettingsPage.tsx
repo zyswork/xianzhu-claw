@@ -10,6 +10,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/tauri'
+import { listen } from '@tauri-apps/api/event'
 import { useLocation } from 'react-router-dom'
 import { useI18n, SUPPORTED_LOCALES, LOCALE_LABELS } from '../i18n'
 import { toast } from '../hooks/useToast'
@@ -33,6 +34,12 @@ interface Provider {
   models: ProviderModel[]
   enabled: boolean
 }
+
+/** OAuth 供应商模板（特殊处理，不走 API Key 流程） */
+const OAUTH_PROVIDERS = [
+  { id: 'google-oauth', name: 'Google Gemini (OAuth)', apiType: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', isOAuth: true },
+  { id: 'openai-oauth', name: 'OpenAI (OAuth)', apiType: 'openai', baseUrl: '', isOAuth: true },
+] as const
 
 /** 预置供应商模板 */
 const PRESET_PROVIDERS: Omit<Provider, 'apiKey' | 'apiKeyMasked'>[] = [
@@ -400,6 +407,31 @@ export default function SettingsPage() {
 
   useEffect(() => { loadProviders() }, [])
 
+  // 监听 OAuth 完成事件
+  useEffect(() => {
+    const unlistenP = listen<any>('oauth-complete', (e) => {
+      if (e.payload?.success) {
+        toast.success(`${e.payload.provider || 'Provider'} ${t('settings.oauthSuccess')}`)
+        loadProviders() // 刷新供应商列表
+      } else {
+        toast.error(`${t('settings.oauthFailed')}: ${e.payload?.error || '未知错误'}`)
+      }
+    })
+    return () => { unlistenP.then(f => f()) }
+  }, [])
+
+  /** 启动 OAuth 授权流程 */
+  const handleOAuthAdd = async (oauthProviderId: string) => {
+    try {
+      await invoke<{ state: string; authorizeUrl: string }>('start_oauth_flow', { provider: oauthProviderId.replace('-oauth', '') })
+      toast.success(t('settings.oauthBrowserOpened'))
+      // 回调由 gateway 处理，触发 'oauth-complete' 事件
+    } catch (e) {
+      toast.error(`${t('settings.oauthFailed')}: ${String(e)}`)
+    }
+    setShowAddMenu(false)
+  }
+
   // 从 URL 参数读取 section（支持 ?section=profile 等）
   useEffect(() => {
     const params = new URLSearchParams(location.search)
@@ -624,6 +656,24 @@ export default function SettingsPage() {
                     boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 10, minWidth: '220px',
                     padding: '4px 0',
                   }}>
+                    {/* OAuth 供应商（置顶） */}
+                    {OAUTH_PROVIDERS.map((op) => (
+                      <div
+                        key={op.id}
+                        onClick={() => handleOAuthAdd(op.id)}
+                        style={{
+                          padding: '8px 16px', cursor: 'pointer', fontSize: '13px',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-glass)' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                      >
+                        <span>{op.name}</span>
+                        <span style={{ fontSize: '11px', color: 'var(--accent)', fontWeight: 600 }}>OAuth</span>
+                      </div>
+                    ))}
+                    <div style={{ borderTop: '1px solid var(--border-subtle)', margin: '4px 0' }} />
+                    {/* 普通预置供应商 */}
                     {availablePresets.map((preset) => (
                       <div
                         key={preset.id}
@@ -660,15 +710,16 @@ export default function SettingsPage() {
               const isEditing = editingId === p.id
               const hasKey = !!(p.apiKeyMasked && p.apiKeyMasked !== '')
               const isOllama = p.id === 'ollama' || p.baseUrl.includes('localhost')
+              const isOAuthProvider = (p as any).authMethod === 'oauth'
 
               return (
                 <div
                   key={p.id}
                   style={{
                     marginBottom: '12px', padding: '16px',
-                    border: `1px solid ${p.enabled && (hasKey || isOllama) ? '#c3e6cb' : 'var(--border-subtle)'}`,
+                    border: `1px solid ${p.enabled && (hasKey || isOllama || isOAuthProvider) ? '#c3e6cb' : 'var(--border-subtle)'}`,
                     borderRadius: '8px',
-                    backgroundColor: !p.enabled ? 'var(--bg-glass)' : (hasKey || isOllama) ? 'var(--success-bg)' : 'var(--bg-elevated)',
+                    backgroundColor: !p.enabled ? 'var(--bg-glass)' : (hasKey || isOllama || isOAuthProvider) ? 'var(--success-bg)' : 'var(--bg-elevated)',
                     opacity: p.enabled ? 1 : 0.6,
                   }}
                 >
@@ -686,11 +737,16 @@ export default function SettingsPage() {
                       <strong style={{ fontSize: '15px' }}>{p.name}</strong>
                       <span style={{
                         fontSize: '11px', padding: '2px 6px', borderRadius: '3px',
-                        backgroundColor: hasKey || isOllama ? 'var(--success)' : '#ffc107',
-                        color: hasKey || isOllama ? '#fff' : 'var(--text-primary)',
+                        backgroundColor: isOAuthProvider ? '#28a745' : (hasKey || isOllama) ? 'var(--success)' : '#ffc107',
+                        color: isOAuthProvider ? '#fff' : (hasKey || isOllama) ? '#fff' : 'var(--text-primary)',
                       }}>
-                        {isOllama ? t('settings.labelLocal') : hasKey ? t('settings.labelConfigured') : t('settings.labelNoKey')}
+                        {isOAuthProvider ? t('settings.oauthAuthorized') : isOllama ? t('settings.labelLocal') : hasKey ? t('settings.labelConfigured') : t('settings.labelNoKey')}
                       </span>
+                      {isOAuthProvider && (p as any).oauth?.expiresAt && (
+                        <span style={{ fontSize: '10px', color: 'var(--text-muted)', padding: '2px 6px' }}>
+                          {t('settings.oauthExpires')}: {new Date((p as any).oauth.expiresAt * 1000).toLocaleString()}
+                        </span>
+                      )}
                       <span style={{ fontSize: '11px', color: 'var(--text-muted)', padding: '2px 6px', backgroundColor: 'var(--bg-glass)', borderRadius: '3px' }}>
                         {p.apiType}
                       </span>
@@ -698,6 +754,17 @@ export default function SettingsPage() {
                     <div style={{ display: 'flex', gap: '6px' }}>
                       {!isEditing && (
                         <>
+                          {isOAuthProvider && (
+                            <button
+                              onClick={() => handleOAuthAdd(p.id.endsWith('-oauth') ? p.id : p.id + '-oauth')}
+                              style={{
+                                padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
+                                border: '1px solid var(--accent)', borderRadius: '4px', backgroundColor: 'var(--bg-elevated)', color: 'var(--accent)',
+                              }}
+                            >
+                              {t('settings.oauthReauthorize')}
+                            </button>
+                          )}
                           <button
                             onClick={async () => {
                               try {
