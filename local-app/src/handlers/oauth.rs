@@ -93,47 +93,40 @@ fn get_oauth_presets() -> Vec<OAuthPreset> {
     ]
 }
 
-/// 从本地 Gemini CLI 提取 OAuth credentials（和 OpenClaw 相同的方式）
+/// 从 DB settings 或本地 Gemini CLI 获取 Google OAuth credentials
 fn resolve_google_credentials() -> Option<(String, String)> {
-    // 优先从环境变量读取
+    // 优先从环境变量
     if let (Ok(id), Ok(secret)) = (std::env::var("GEMINI_CLI_OAUTH_CLIENT_ID"), std::env::var("GEMINI_CLI_OAUTH_CLIENT_SECRET")) {
         return Some((id, secret));
     }
 
-    // 从本地 Gemini CLI 安装中提取
-    let search_paths = [
-        "/opt/homebrew/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js",
-        "/opt/homebrew/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/code_assist/oauth2.js",
-        "/usr/local/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js",
-    ];
-
-    for path in &search_paths {
-        if let Ok(content) = std::fs::read_to_string(path) {
-            // 提取 client_id 和 client_secret
-            let id = extract_pattern(&content, r"\d+-[a-z0-9]+\.apps\.googleusercontent\.com");
-            let secret = extract_pattern(&content, r"GOCSPX-[A-Za-z0-9_-]+");
-            if let (Some(id), Some(secret)) = (id, secret) {
-                log::info!("OAuth: 从 Gemini CLI 提取到 Google credentials");
+    // 从 settings DB 读取（首次运行时由 seed_oauth_credentials 写入）
+    // 这里用同步文件读取作为 fallback（DB 需要 async，但 preset 构建是 sync）
+    let home = dirs::home_dir()?;
+    let creds_file = home.join(".xianzhu/oauth_credentials.json");
+    if let Ok(content) = std::fs::read_to_string(&creds_file) {
+        if let Ok(creds) = serde_json::from_str::<serde_json::Value>(&content) {
+            let id = creds["google_client_id"].as_str()?.to_string();
+            let secret = creds["google_client_secret"].as_str()?.to_string();
+            if !id.is_empty() && !secret.is_empty() {
                 return Some((id, secret));
             }
         }
     }
 
-    // 也搜索 PATH 中的 gemini 命令
-    if let Ok(output) = std::process::Command::new("which").arg("gemini").output() {
-        let gemini_path = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        if !gemini_path.is_empty() {
-            // 尝试从 gemini 命令的安装目录找
-            if let Some(parent) = std::path::Path::new(&gemini_path).parent() {
-                let guess = parent.parent().unwrap_or(parent)
-                    .join("lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js");
-                if let Ok(content) = std::fs::read_to_string(&guess) {
-                    let id = extract_pattern(&content, r"\d+-[a-z0-9]+\.apps\.googleusercontent\.com");
-                    let secret = extract_pattern(&content, r"GOCSPX-[A-Za-z0-9_-]+");
-                    if let (Some(id), Some(secret)) = (id, secret) {
-                        return Some((id, secret));
-                    }
-                }
+    // Fallback: 从本地 Gemini CLI 提取
+    let search_paths = [
+        "/opt/homebrew/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js",
+        "/usr/local/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js",
+    ];
+    for path in &search_paths {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            let id = extract_pattern(&content, r"\d+-[a-z0-9]+\.apps\.googleusercontent\.com");
+            let secret = extract_pattern(&content, r"GOCSPX-[A-Za-z0-9_-]+");
+            if let (Some(id), Some(secret)) = (id, secret) {
+                // 提取成功后缓存到本地文件
+                let _ = save_credentials_cache(&id, &secret);
+                return Some((id, secret));
             }
         }
     }
@@ -141,8 +134,49 @@ fn resolve_google_credentials() -> Option<(String, String)> {
     None
 }
 
+/// 缓存 credentials 到本地文件（避免每次都扫描 Gemini CLI）
+fn save_credentials_cache(google_id: &str, google_secret: &str) -> Result<(), String> {
+    let home = dirs::home_dir().ok_or("无法获取 home 目录")?;
+    let dir = home.join(".xianzhu");
+    let _ = std::fs::create_dir_all(&dir);
+    let creds = serde_json::json!({
+        "google_client_id": google_id,
+        "google_client_secret": google_secret,
+    });
+    std::fs::write(dir.join("oauth_credentials.json"), serde_json::to_string_pretty(&creds).unwrap_or_default())
+        .map_err(|e| format!("保存 credentials 缓存失败: {}", e))
+}
+
 fn extract_pattern(content: &str, pattern: &str) -> Option<String> {
     regex::Regex::new(pattern).ok()?.find(content).map(|m| m.as_str().to_string())
+}
+
+/// 首次运行时从 Gemini CLI 提取 credentials 并缓存（由 main.rs 调用）
+pub async fn seed_oauth_credentials() {
+    let home = match dirs::home_dir() {
+        Some(h) => h,
+        None => return,
+    };
+    let creds_file = home.join(".xianzhu/oauth_credentials.json");
+    if creds_file.exists() { return; } // 已有缓存
+
+    // 尝试从 Gemini CLI 提取
+    let search_paths = [
+        "/opt/homebrew/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js",
+        "/usr/local/lib/node_modules/@google/gemini-cli/node_modules/@google/gemini-cli-core/dist/src/code_assist/oauth2.js",
+    ];
+    for path in &search_paths {
+        if let Ok(content) = std::fs::read_to_string(path) {
+            let id = extract_pattern(&content, r"\d+-[a-z0-9]+\.apps\.googleusercontent\.com");
+            let secret = extract_pattern(&content, r"GOCSPX-[A-Za-z0-9_-]+");
+            if let (Some(id), Some(secret)) = (id, secret) {
+                let _ = save_credentials_cache(&id, &secret);
+                log::info!("OAuth: 已从 Gemini CLI 提取并缓存 Google credentials");
+                return;
+            }
+        }
+    }
+    log::info!("OAuth: 未找到 Gemini CLI，Google OAuth 需要安装 gemini-cli 或手动配置");
 }
 
 fn find_preset(provider: &str) -> Option<OAuthPreset> {

@@ -500,6 +500,9 @@ async fn main() {
     // 释放内置技能到 marketplace（首次安装或 marketplace 为空时）
     seed_marketplace_skills();
 
+    // 首次运行时从 Gemini CLI 提取 OAuth credentials 并缓存
+    tokio::spawn(async { handlers::oauth::seed_oauth_credentials().await });
+
     // 记录初始化完成时间
     let init_elapsed = app_start_time.elapsed();
     log::info!(
