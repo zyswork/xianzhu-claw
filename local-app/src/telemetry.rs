@@ -179,12 +179,13 @@ async fn report_error_inner(
 /// 在 tokio 后台任务中运行，优雅处理所有错误。
 pub fn start_heartbeat(pool: SqlitePool) {
     tokio::spawn(async move {
-        // 首次等待 60 秒再发第一次心跳（让应用完全初始化）
-        tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+        // 首次等待 10 秒再发第一次心跳
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
 
         loop {
-            if let Err(e) = send_heartbeat(&pool).await {
-                log::debug!("心跳发送失败（忽略）: {}", e);
+            match send_heartbeat(&pool).await {
+                Ok(_) => log::info!("遥测心跳发送成功"),
+                Err(e) => log::warn!("遥测心跳发送失败: {}", e),
             }
             tokio::time::sleep(tokio::time::Duration::from_secs(HEARTBEAT_INTERVAL_SECS)).await;
         }

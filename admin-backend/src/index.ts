@@ -1,4 +1,5 @@
 import express, { Express, Request, Response, NextFunction, ErrorRequestHandler } from 'express'
+import http from 'http'
 import cors from 'cors'
 import compression from 'compression'
 import dotenv from 'dotenv'
@@ -14,6 +15,7 @@ import {
 } from './routes/mod.js'
 import authRouter from './routes/auth.js'
 import telemetryRouter from './routes/telemetry.js'
+import { setupBridgeWebSocket } from './routes/bridge.js'
 import { authMiddleware } from './middleware/auth.js'
 import { isAppError } from './utils/errors.js'
 
@@ -164,7 +166,13 @@ async function main() {
   // 验证环境变量
   validateEnvironment()
 
-  app.listen(port, () => {
+  // 使用 http.createServer 以支持 WebSocket upgrade
+  const server = http.createServer(app)
+
+  // Bridge WebSocket — 桌面端通过 /ws/bridge 连接
+  setupBridgeWebSocket(server)
+
+  server.listen(port, () => {
     const elapsed = Date.now() - startTime
     logMemoryUsage('启动后')
     console.log(`✓ 后端启动完成，耗时: ${elapsed}ms`)

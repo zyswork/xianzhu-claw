@@ -95,7 +95,7 @@ document.getElementById('loginBtn').onclick = async () => {
   const password = document.getElementById('loginPassword').value;
   const errEl = document.getElementById('loginError');
   try {
-    const res = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+    const res = await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, enterpriseId: '001' }) });
     const data = await res.json();
     if (!res.ok) { errEl.textContent = data.error || '登录失败'; errEl.classList.remove('hidden'); return; }
     setToken(data.token); hideLogin(); loadUsers();
@@ -123,7 +123,7 @@ async function loadUsers() {
     ]);
 
     usersData = usersRes || [];
-    if (!Array.isArray(usersData)) usersData = usersRes.data || [];
+    if (!Array.isArray(usersData)) usersData = usersRes.users || usersRes.data || [];
 
     // 按用户分组设备
     devicesMap = {};
