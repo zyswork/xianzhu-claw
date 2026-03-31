@@ -1056,4 +1056,54 @@ mod tests {
         assert_eq!(MemoryCategory::from_str("custom_type"), MemoryCategory::Custom("custom_type".to_string()));
         assert_eq!(MemoryCategory::Core.as_str(), "core");
     }
+
+    #[tokio::test]
+    async fn test_store_with_priority_uses_key_as_id() {
+        let pool = setup_pool().await;
+        let memory = SqliteMemory::new(pool);
+
+        // 当提供 key 时，应使用 key 作为记忆 ID
+        let id = memory
+            .store_with_priority("test-agent", "my-custom-key", "重要记忆", MemoryCategory::Core, MemoryPriority::High)
+            .await
+            .unwrap();
+        assert_eq!(id, "my-custom-key", "store_with_priority 应使用 key 作为 id");
+
+        // 通过 get(key) 能取回
+        let entry = memory.get("test-agent", "my-custom-key").await.unwrap();
+        assert!(entry.is_some());
+        assert!(entry.unwrap().content.contains("重要记忆"));
+
+        // 通过 forget(key) 能删除
+        memory.forget("test-agent", "my-custom-key").await.unwrap();
+        let gone = memory.get("test-agent", "my-custom-key").await.unwrap();
+        assert!(gone.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_store_with_priority_empty_key_generates_uuid() {
+        let pool = setup_pool().await;
+        let memory = SqliteMemory::new(pool);
+
+        // 空 key 时应生成 UUID
+        let id = memory
+            .store_with_priority("test-agent", "", "自动生成 ID", MemoryCategory::Daily, MemoryPriority::Normal)
+            .await
+            .unwrap();
+        assert!(!id.is_empty(), "空 key 时应生成非空 UUID");
+        assert_ne!(id, "", "空 key 时不应使用空字符串作为 id");
+
+        // 验证生成的 ID 是有效的 UUID 格式
+        assert!(uuid::Uuid::parse_str(&id).is_ok(), "生成的 ID 应为有效 UUID");
+    }
+
+    #[tokio::test]
+    async fn test_memory_priority_roundtrip() {
+        assert_eq!(MemoryPriority::from_i32(0), MemoryPriority::Low);
+        assert_eq!(MemoryPriority::from_i32(1), MemoryPriority::Normal);
+        assert_eq!(MemoryPriority::from_i32(2), MemoryPriority::High);
+        assert_eq!(MemoryPriority::from_i32(3), MemoryPriority::Critical);
+        assert_eq!(MemoryPriority::from_i32(99), MemoryPriority::Normal); // 未知值回退为 Normal
+        assert_eq!(MemoryPriority::High.as_i32(), 2);
+    }
 }

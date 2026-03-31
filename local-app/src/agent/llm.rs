@@ -2410,4 +2410,212 @@ mod tests {
     fn test_classify_llm_error_unknown() {
         assert_eq!(classify_llm_error("some unknown error"), "some unknown error");
     }
+
+    // ─── detect_proxy_url 缓存测试 ─────────────────────────────
+    #[test]
+    fn test_detect_proxy_url_returns_consistent_result() {
+        // OnceLock 保证同一进程内返回相同结果
+        let r1 = detect_proxy_url();
+        let r2 = detect_proxy_url();
+        assert_eq!(r1, r2, "detect_proxy_url 应始终返回相同的缓存结果");
+    }
+
+    // ─── should_use_gemini_native 测试 ──────────────────────────
+    #[test]
+    fn test_should_use_gemini_native_ya29_cloudcode() {
+        let config = LlmConfig {
+            provider: "openai".into(),
+            api_key: "ya29.fake-token".into(),
+            model: "gemini-2.5-flash".into(),
+            base_url: Some("https://cloudcode-pa.googleapis.com/v1internal".into()),
+            temperature: None,
+            max_tokens: None,
+            thinking_level: None,
+        };
+        assert!(LlmClient::should_use_gemini_native(&config));
+    }
+
+    #[test]
+    fn test_should_use_gemini_native_ya29_generativelanguage() {
+        let config = LlmConfig {
+            provider: "openai".into(),
+            api_key: "ya29.token".into(),
+            model: "gemini-2.5-pro".into(),
+            base_url: Some("https://generativelanguage.googleapis.com/v1beta".into()),
+            temperature: None,
+            max_tokens: None,
+            thinking_level: None,
+        };
+        assert!(LlmClient::should_use_gemini_native(&config));
+    }
+
+    #[test]
+    fn test_should_use_gemini_native_ya29_openai_url() {
+        // ya29 token 但 URL 不是 Google → 不使用原生
+        let config = LlmConfig {
+            provider: "openai".into(),
+            api_key: "ya29.token".into(),
+            model: "gpt-4".into(),
+            base_url: Some("https://api.openai.com/v1".into()),
+            temperature: None,
+            max_tokens: None,
+            thinking_level: None,
+        };
+        assert!(!LlmClient::should_use_gemini_native(&config));
+    }
+
+    #[test]
+    fn test_should_use_gemini_native_regular_key_cloudcode() {
+        // 普通 key + cloudcode URL → 不使用原生
+        let config = LlmConfig {
+            provider: "openai".into(),
+            api_key: "sk-regular-key".into(),
+            model: "gemini-2.5-flash".into(),
+            base_url: Some("https://cloudcode-pa.googleapis.com/v1internal".into()),
+            temperature: None,
+            max_tokens: None,
+            thinking_level: None,
+        };
+        assert!(!LlmClient::should_use_gemini_native(&config));
+    }
+
+    #[test]
+    fn test_should_use_gemini_native_no_base_url() {
+        let config = LlmConfig {
+            provider: "openai".into(),
+            api_key: "ya29.token".into(),
+            model: "gemini-2.5-flash".into(),
+            base_url: None,
+            temperature: None,
+            max_tokens: None,
+            thinking_level: None,
+        };
+        assert!(!LlmClient::should_use_gemini_native(&config));
+    }
+
+    // ─── convert_messages_to_gemini_contents 测试 ───────────────
+    #[test]
+    fn test_gemini_contents_user_message() {
+        let msgs = vec![serde_json::json!({"role": "user", "content": "你好"})];
+        let contents = LlmClient::convert_messages_to_gemini_contents(&msgs);
+        assert_eq!(contents.len(), 1);
+        assert_eq!(contents[0]["role"], "user");
+        assert_eq!(contents[0]["parts"][0]["text"], "你好");
+    }
+
+    #[test]
+    fn test_gemini_contents_assistant_message() {
+        let msgs = vec![
+            serde_json::json!({"role": "user", "content": "Hi"}),
+            serde_json::json!({"role": "assistant", "content": "Hello!"}),
+        ];
+        let contents = LlmClient::convert_messages_to_gemini_contents(&msgs);
+        assert_eq!(contents.len(), 2);
+        assert_eq!(contents[1]["role"], "model");
+        assert_eq!(contents[1]["parts"][0]["text"], "Hello!");
+    }
+
+    #[test]
+    fn test_gemini_contents_system_skipped() {
+        let msgs = vec![
+            serde_json::json!({"role": "system", "content": "You are helpful"}),
+            serde_json::json!({"role": "user", "content": "Hi"}),
+        ];
+        let contents = LlmClient::convert_messages_to_gemini_contents(&msgs);
+        // system 消息应被跳过
+        assert_eq!(contents.len(), 1);
+        assert_eq!(contents[0]["role"], "user");
+    }
+
+    #[test]
+    fn test_gemini_contents_tool_call() {
+        let msgs = vec![
+            serde_json::json!({"role": "user", "content": "查天气"}),
+            serde_json::json!({
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [{
+                    "id": "call_1",
+                    "function": {
+                        "name": "get_weather",
+                        "arguments": "{\"city\":\"北京\"}"
+                    }
+                }]
+            }),
+        ];
+        let contents = LlmClient::convert_messages_to_gemini_contents(&msgs);
+        assert_eq!(contents.len(), 2);
+        assert_eq!(contents[1]["role"], "model");
+        let fc = &contents[1]["parts"][0]["functionCall"];
+        assert_eq!(fc["name"], "get_weather");
+        assert_eq!(fc["args"]["city"], "北京");
+    }
+
+    #[test]
+    fn test_gemini_contents_tool_result() {
+        let msgs = vec![
+            serde_json::json!({"role": "user", "content": "Hi"}),
+            serde_json::json!({
+                "role": "tool",
+                "name": "get_weather",
+                "content": "{\"temp\":25}"
+            }),
+        ];
+        let contents = LlmClient::convert_messages_to_gemini_contents(&msgs);
+        // tool result 应为 user 角色 + functionResponse
+        let tool_msg = contents.iter().find(|c| c["parts"][0].get("functionResponse").is_some()).unwrap();
+        assert_eq!(tool_msg["role"], "user");
+        assert_eq!(tool_msg["parts"][0]["functionResponse"]["name"], "get_weather");
+    }
+
+    #[test]
+    fn test_gemini_contents_prepends_user_if_first_is_model() {
+        // 如果第一条消息不是 user，应自动插入一条
+        let msgs = vec![
+            serde_json::json!({"role": "assistant", "content": "Hello"}),
+        ];
+        let contents = LlmClient::convert_messages_to_gemini_contents(&msgs);
+        assert_eq!(contents[0]["role"], "user");
+        assert_eq!(contents[1]["role"], "model");
+    }
+
+    // ─── base_url project ID 提取测试 ───────────────────────────
+    #[test]
+    fn test_project_id_extraction_from_base_url() {
+        let raw_base = "https://cloudcode-pa.googleapis.com/v1internal#project=my-proj-123";
+        let (base_url, project_id) = if let Some(idx) = raw_base.find("#project=") {
+            let pid = raw_base[idx + 9..].to_string();
+            let base = &raw_base[..idx];
+            (base.to_string(), Some(pid))
+        } else {
+            (raw_base.to_string(), None)
+        };
+        assert_eq!(base_url, "https://cloudcode-pa.googleapis.com/v1internal");
+        assert_eq!(project_id, Some("my-proj-123".to_string()));
+    }
+
+    #[test]
+    fn test_project_id_extraction_no_fragment() {
+        let raw_base = "https://cloudcode-pa.googleapis.com/v1internal";
+        let (base_url, project_id) = if let Some(idx) = raw_base.find("#project=") {
+            let pid = raw_base[idx + 9..].to_string();
+            let base = &raw_base[..idx];
+            (base.to_string(), Some(pid))
+        } else {
+            (raw_base.to_string(), None)
+        };
+        assert_eq!(base_url, "https://cloudcode-pa.googleapis.com/v1internal");
+        assert!(project_id.is_none());
+    }
+
+    // ─── extract_retry_after 测试 ───────────────────────────────
+    #[test]
+    fn test_extract_retry_after_various_formats() {
+        assert_eq!(extract_retry_after("retry-after: 45"), Some(45));
+        assert_eq!(extract_retry_after("retry_after\":30"), Some(30));
+        assert_eq!(extract_retry_after("no retry info here"), None);
+        // 超出范围的值应被忽略
+        assert_eq!(extract_retry_after("retry-after: 0"), None);
+        assert_eq!(extract_retry_after("retry-after: 7200"), None);
+    }
 }
