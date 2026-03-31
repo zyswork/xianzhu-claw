@@ -50,10 +50,11 @@ const PRESET_PROVIDERS: Omit<Provider, 'apiKey' | 'apiKeyMasked'>[] = [
     baseUrl: 'https://api.openai.com/v1',
     models: [
       { id: 'gpt-5.4', name: 'GPT-5.4' },
+      { id: 'gpt-5.2', name: 'GPT-5.2' },
+      { id: 'gpt-5.1-codex', name: 'GPT-5.1 Codex' },
+      { id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini' },
       { id: 'gpt-4o', name: 'GPT-4o' },
       { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-      { id: 'o3', name: 'o3' },
-      { id: 'o3-mini', name: 'o3 Mini' },
     ],
     enabled: true,
   },
@@ -130,6 +131,7 @@ const PRESET_PROVIDERS: Omit<Provider, 'apiKey' | 'apiKeyMasked'>[] = [
     baseUrl: 'https://api.moonshot.cn/v1',
     models: [
       { id: 'kimi-k2.5', name: 'Kimi K2.5' },
+      { id: 'kimi-k2.5-thinking', name: 'Kimi K2.5 Thinking' },
       { id: 'moonshot-v1-128k', name: 'Moonshot v1 128K' },
       { id: 'moonshot-v1-32k', name: 'Moonshot v1 32K' },
     ],

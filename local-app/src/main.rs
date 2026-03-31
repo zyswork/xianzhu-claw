@@ -80,9 +80,14 @@ async fn main() {
         if log_path.exists() {
             if let Ok(meta) = std::fs::metadata(&log_path) {
                 if meta.len() > 10 * 1024 * 1024 {
-                    let _ = std::fs::write(&log_path, ""); // 截断
+                    // 截断并写入 UTF-8 BOM（Windows 兼容）
+                    let _ = std::fs::write(&log_path, "\u{feff}");
                 }
             }
+        }
+        // 新文件写入 UTF-8 BOM，确保 Windows 记事本/PowerShell 正确识别编码
+        if !log_path.exists() {
+            let _ = std::fs::write(&log_path, "\u{feff}");
         }
         let log_file = std::fs::OpenOptions::new()
             .create(true)

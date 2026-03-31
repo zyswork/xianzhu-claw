@@ -61,18 +61,19 @@ pub fn pick_compact_model(agent_model: &str) -> String {
         return agent_model.to_string();
     }
     // 根据 provider 系列选择对应的最新轻量模型
-    if m.contains("gpt-5") { return "gpt-5.4-mini".to_string(); }
+    if m.contains("gpt-5") { return "gpt-5.1-codex-mini".to_string(); }
     if m.contains("gpt-4") { return "gpt-4o-mini".to_string(); }
     if m.contains("gpt") || m.contains("openai") { return "gpt-4o-mini".to_string(); }
     if m.contains("claude-opus-4") || m.contains("claude-sonnet-4") { return "claude-haiku-4-5-20251001".to_string(); }
     if m.contains("claude") { return "claude-haiku-4-5-20251001".to_string(); }
     if m.contains("deepseek") { return "deepseek-chat".to_string(); }
     if m.contains("qwen") { return "qwen-turbo".to_string(); }
-    if m.contains("gemini") { return "gemini-2.5-flash".to_string(); }
+    if m.contains("gemini") { return "gemini-3-flash-preview".to_string(); }
     if m.contains("grok") { return "grok-3-mini".to_string(); }
-    if m.contains("moonshot") || m.contains("kimi") { return "moonshot-v1-8k".to_string(); }
-    if m.contains("glm") { return "glm-4-flash".to_string(); }
-    if m.contains("minimax") { return "abab6.5-chat".to_string(); }
+    if m.contains("kimi") { return "kimi-k2.5".to_string(); }
+    if m.contains("moonshot") { return "moonshot-v1-8k".to_string(); }
+    if m.contains("glm") { return "glm-4.7-flash".to_string(); }
+    if m.contains("minimax") { return "MiniMax-M2.5".to_string(); }
     // 默认用 agent 自己的模型
     agent_model.to_string()
 }

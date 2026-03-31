@@ -152,13 +152,14 @@ pub fn find_provider_for_model(
         }
     }
 
-    // 第一轮：按模型名精确匹配
+    // 第一轮：按模型名匹配（大小写不敏感，兼容 MiniMax 等混合大小写模型）
+    let model_id_lower = model_id.to_lowercase();
     for p in providers {
         if p["enabled"].as_bool() != Some(true) { continue; }
         let provider_id = p["id"].as_str().unwrap_or("unknown");
         if let Some(models) = p["models"].as_array() {
             for m in models {
-                if m["id"].as_str() == Some(model_id) {
+                if m["id"].as_str().map(|s| s.to_lowercase()) == Some(model_id_lower.clone()) {
                     let raw_key = p["apiKey"].as_str().unwrap_or("").to_string();
                     if !raw_key.is_empty() {
                         let api_type = p["apiType"].as_str().unwrap_or("openai").to_string();

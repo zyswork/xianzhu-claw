@@ -631,17 +631,28 @@ static CACHED_PROXY_URL: OnceLock<Option<String>> = OnceLock::new();
 /// 检测可用的代理 URL（环境变量 > 本地端口探测），结果缓存
 pub fn detect_proxy_url() -> Option<String> {
     CACHED_PROXY_URL.get_or_init(|| {
-        // 优先使用环境变量
+        // 优先使用环境变量（所有平台）
         if let Ok(proxy_url) = std::env::var("HTTPS_PROXY")
             .or_else(|_| std::env::var("https_proxy"))
             .or_else(|_| std::env::var("ALL_PROXY"))
+            .or_else(|_| std::env::var("all_proxy"))
+            .or_else(|_| std::env::var("HTTP_PROXY"))
+            .or_else(|_| std::env::var("http_proxy"))
         {
+            log::info!("代理检测: 环境变量 {}", proxy_url);
             return Some(proxy_url);
         }
-        // macOS 系统代理（非环境变量设置）— 探测常见端口
-        for port in &[7890, 7891, 1080] {
-            if std::net::TcpStream::connect(format!("127.0.0.1:{}", port)).is_ok() {
-                return Some(format!("http://127.0.0.1:{}", port));
+        // 仅 macOS 做端口探测（ClashX/V2Ray 常见端口）
+        // Windows/Linux 通常通过环境变量或系统代理设置，端口探测容易误检
+        if cfg!(target_os = "macos") {
+            for port in &[7890, 7891, 1080] {
+                if std::net::TcpStream::connect_timeout(
+                    &format!("127.0.0.1:{}", port).parse().unwrap(),
+                    std::time::Duration::from_millis(500),
+                ).is_ok() {
+                    log::info!("代理检测: macOS 本地端口 {}", port);
+                    return Some(format!("http://127.0.0.1:{}", port));
+                }
             }
         }
         None
