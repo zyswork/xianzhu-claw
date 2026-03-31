@@ -1,6 +1,7 @@
 ---
 name: gog
 description: Google Workspace CLI for Gmail, Calendar, Drive, Contacts, Sheets, and Docs.
+trigger_keywords: [search, google, 搜索, 查询, web search]
 homepage: https://gogcli.sh
 metadata:
   {

@@ -1,6 +1,7 @@
 ---
 name: peekaboo
 description: Capture and automate macOS UI with the Peekaboo CLI.
+trigger_keywords: [screenshot, screen, 截图, 屏幕, capture]
 homepage: https://peekaboo.boo
 metadata:
   {

@@ -1,6 +1,7 @@
 ---
 name: ordercli
 description: Foodora-only CLI for checking past orders and active order status (Deliveroo WIP).
+trigger_keywords: [order, 订单, purchase, 购买, shop]
 homepage: https://ordercli.sh
 metadata:
   {

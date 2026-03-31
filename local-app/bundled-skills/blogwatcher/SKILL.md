@@ -1,6 +1,7 @@
 ---
 name: blogwatcher
 description: Monitor blogs and RSS/Atom feeds for updates using the blogwatcher CLI.
+trigger_keywords: [blog, rss, feed, 博客, 订阅, 文章]
 homepage: https://github.com/Hyaxia/blogwatcher
 metadata:
   {

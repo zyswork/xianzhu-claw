@@ -1,6 +1,7 @@
 ---
 name: spotify-player
 description: Terminal Spotify playback/search via spogo (preferred) or spotify_player.
+trigger_keywords: [spotify, music, playlist, 音乐, 歌单, 播放]
 homepage: https://www.spotify.com
 metadata:
   {

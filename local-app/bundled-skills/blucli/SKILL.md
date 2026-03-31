@@ -1,6 +1,7 @@
 ---
 name: blucli
 description: BluOS CLI (blu) for discovery, playback, grouping, and volume.
+trigger_keywords: [bluetooth, 蓝牙, device, 设备]
 homepage: https://blucli.sh
 metadata:
   {

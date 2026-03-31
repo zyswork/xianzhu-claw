@@ -210,12 +210,58 @@ impl SkillManager {
                 path.clone()
             };
 
-            if let Some(manifest) = Self::parse_manifest(&skill_md_path) {
+            if let Some(mut manifest) = Self::parse_manifest(&skill_md_path) {
                 // 获取目录名（文件系统名，非 SKILL.md 中的显示名）
                 let dir_name = path.file_name()
                     .and_then(|n| n.to_str())
                     .unwrap_or(&manifest.name)
                     .to_string();
+
+                // 验证工具执行器脚本是否存在，移除引用缺失脚本的工具
+                let skill_dir = skill_md_path.parent().unwrap_or(skills_dir);
+                let original_tool_count = manifest.tools.len();
+                manifest.tools.retain(|tool| {
+                    match &tool.executor {
+                        SkillToolExecutor::Script { path: script_path, .. } => {
+                            let full_path = skill_dir.join(script_path);
+                            if !full_path.exists() {
+                                log::warn!(
+                                    "技能 {} 工具 {} 引用的脚本不存在: {:?}，已禁用该工具",
+                                    manifest.name, tool.name, full_path
+                                );
+                                false
+                            } else {
+                                true
+                            }
+                        }
+                        SkillToolExecutor::Command { args_template, .. } => {
+                            // 检查 args_template 第一个参数是否为本地脚本文件
+                            if let Some(first_arg) = args_template.first() {
+                                let looks_like_script = first_arg.ends_with(".sh")
+                                    || first_arg.ends_with(".py")
+                                    || first_arg.ends_with(".js");
+                                if looks_like_script {
+                                    let full_path = skill_dir.join(first_arg);
+                                    if !full_path.exists() {
+                                        log::warn!(
+                                            "技能 {} 工具 {} 引用的脚本不存在: {:?}，已禁用该工具",
+                                            manifest.name, tool.name, full_path
+                                        );
+                                        return false;
+                                    }
+                                }
+                            }
+                            true
+                        }
+                    }
+                });
+                if manifest.tools.len() < original_tool_count {
+                    log::warn!(
+                        "技能 {} 已移除 {} 个引用缺失脚本的工具",
+                        manifest.name, original_tool_count - manifest.tools.len()
+                    );
+                }
+
                 log::info!("发现技能: {} (dir={}) - {} (工具: {})", manifest.name, dir_name, manifest.description, manifest.tools.len());
                 let mut idx = manifest.to_index();
                 idx.dir_name = dir_name;
@@ -263,10 +309,15 @@ impl SkillManager {
     }
 
     /// 加载完整技能内容（去除 frontmatter）
+    /// 支持两种路径：skill-name/SKILL.md（目录）或 skill-name.md（单文件）
     pub fn load_full(&self, name: &str) -> Option<String> {
         let skill = self.index.iter().find(|s| s.name == name)?;
-        let path = self.skills_dir.join(format!("{}.md", skill.name));
-        let content = fs::read_to_string(&path).ok()?;
+        // 优先尝试目录格式（使用 dir_name 以匹配文件系统实际名称）
+        let dir_path = self.skills_dir.join(&skill.dir_name).join("SKILL.md");
+        let file_path = self.skills_dir.join(format!("{}.md", skill.name));
+        let content = fs::read_to_string(&dir_path)
+            .or_else(|_| fs::read_to_string(&file_path))
+            .ok()?;
         Self::strip_frontmatter(&content)
     }
 

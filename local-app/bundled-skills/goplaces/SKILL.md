@@ -1,6 +1,7 @@
 ---
 name: goplaces
 description: Query Google Places API (New) via the goplaces CLI for text search, place details, resolve, and reviews. Use for human-friendly place lookup or JSON output for scripts.
+trigger_keywords: [places, location, 地点, 位置, map, 地图]
 homepage: https://github.com/steipete/goplaces
 metadata:
   {

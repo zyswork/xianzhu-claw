@@ -1,6 +1,7 @@
 ---
 name: sonoscli
 description: Control Sonos speakers (discover/status/play/volume/group).
+trigger_keywords: [sonos, speaker, music, 音箱, 播放]
 homepage: https://sonoscli.sh
 metadata:
   {

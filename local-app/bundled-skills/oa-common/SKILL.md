@@ -1,3 +1,10 @@
+---
+name: oa-common
+description: "用友 YonBIP OA 公共脚本层，提供认证、HTTP、用户搜索和日期工具"
+trigger_keywords: []
+metadata: {"openclaw": {"emoji": "🏢"}}
+---
+
 # OA 公共层
 
 用友 YonBIP 的公共能力，被 oa-task 和 oa-schedule 等业务脚本共享。

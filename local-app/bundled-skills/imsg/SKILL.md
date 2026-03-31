@@ -1,6 +1,7 @@
 ---
 name: imsg
 description: iMessage/SMS CLI for listing chats, history, and sending messages via Messages.app.
+trigger_keywords: [imessage, sms, 短信, message, 消息]
 homepage: https://imsg.to
 metadata:
   {

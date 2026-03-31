@@ -1,6 +1,7 @@
 ---
 name: oracle
 description: Best practices for using the oracle CLI (prompt + file bundling, engines, sessions, and file attachment patterns).
+trigger_keywords: [oracle, database, sql, 数据库, 查询]
 homepage: https://askoracle.dev
 metadata:
   {

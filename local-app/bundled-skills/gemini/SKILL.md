@@ -1,6 +1,7 @@
 ---
 name: gemini
 description: Gemini CLI for one-shot Q&A, summaries, and generation.
+trigger_keywords: [gemini, google, 谷歌, ai model]
 homepage: https://ai.google.dev/
 metadata:
   {

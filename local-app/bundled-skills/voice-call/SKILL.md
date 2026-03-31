@@ -1,6 +1,7 @@
 ---
 name: voice-call
 description: Start voice calls via the OpenClaw voice-call plugin.
+trigger_keywords: [voice, call, 语音通话, 电话, ring]
 metadata:
   {
     "openclaw":

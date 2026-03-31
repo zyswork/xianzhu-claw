@@ -1,6 +1,7 @@
 ---
 name: trello
 description: Manage Trello boards, lists, and cards via the Trello REST API.
+trigger_keywords: [trello, board, card, 看板, 卡片, 任务]
 homepage: https://developer.atlassian.com/cloud/trello/rest/
 metadata:
   {

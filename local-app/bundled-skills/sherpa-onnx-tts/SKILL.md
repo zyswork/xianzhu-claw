@@ -1,6 +1,7 @@
 ---
 name: sherpa-onnx-tts
 description: Local text-to-speech via sherpa-onnx (offline, no cloud)
+trigger_keywords: [tts, speech, 语音合成, 朗读, text to speech]
 metadata:
   {
     "openclaw":

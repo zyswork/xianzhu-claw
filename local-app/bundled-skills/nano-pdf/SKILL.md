@@ -1,6 +1,7 @@
 ---
 name: nano-pdf
 description: Edit PDFs with natural-language instructions using the nano-pdf CLI.
+trigger_keywords: [pdf, document, 文档, 阅读, read pdf]
 homepage: https://pypi.org/project/nano-pdf/
 metadata:
   {

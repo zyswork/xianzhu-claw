@@ -1,6 +1,7 @@
 ---
 name: sag
 description: ElevenLabs text-to-speech with mac-style say UX.
+trigger_keywords: [search, agent, 搜索, 智能搜索]
 homepage: https://sag.sh
 metadata:
   {

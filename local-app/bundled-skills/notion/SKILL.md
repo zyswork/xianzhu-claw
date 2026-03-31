@@ -1,6 +1,7 @@
 ---
 name: notion
 description: Notion API for creating and managing pages, databases, and blocks.
+trigger_keywords: [notion, database, page, 笔记, 知识库, wiki]
 homepage: https://developers.notion.com
 metadata:
   {

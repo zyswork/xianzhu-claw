@@ -1,6 +1,7 @@
 ---
 name: obsidian
 description: Work with Obsidian vaults (plain Markdown notes) and automate via obsidian-cli.
+trigger_keywords: [obsidian, vault, 笔记, markdown, knowledge]
 homepage: https://help.obsidian.md
 metadata:
   {

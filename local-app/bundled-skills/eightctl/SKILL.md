@@ -1,6 +1,7 @@
 ---
 name: eightctl
 description: Control Eight Sleep pods (status, temperature, alarms, schedules).
+trigger_keywords: [8x8, phone, call, 电话, 通话]
 homepage: https://eightctl.sh
 metadata:
   {

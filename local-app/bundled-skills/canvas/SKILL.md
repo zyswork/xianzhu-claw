@@ -1,3 +1,10 @@
+---
+name: canvas
+description: "Present and control HTML content on connected nodes via canvas host and node bridge"
+trigger_keywords: [canvas, 画布, 展示, 演示, dashboard, present]
+metadata: {"openclaw": {"emoji": "🖼️"}}
+---
+
 # Canvas Skill
 
 Display HTML content on connected OpenClaw nodes (Mac app, iOS, Android).

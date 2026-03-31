@@ -1,6 +1,7 @@
 ---
 name: bear-notes
 description: Create, search, and manage Bear notes via grizzly CLI.
+trigger_keywords: [bear, 笔记, notes, markdown, 写作]
 homepage: https://bear.app
 metadata:
   {

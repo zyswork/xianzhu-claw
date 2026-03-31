@@ -1,6 +1,7 @@
 ---
 name: summarize
 description: Summarize or extract text/transcripts from URLs, podcasts, and local files (great fallback for “transcribe this YouTube/video”).
+trigger_keywords: [summarize, summary, 总结, 摘要, 概要]
 homepage: https://summarize.sh
 metadata:
   {

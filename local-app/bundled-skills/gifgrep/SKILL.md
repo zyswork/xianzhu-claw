@@ -1,6 +1,7 @@
 ---
 name: gifgrep
 description: Search GIF providers with CLI/TUI, download results, and extract stills/sheets.
+trigger_keywords: [gif, 动图, meme, 表情包]
 homepage: https://gifgrep.com
 metadata:
   {
