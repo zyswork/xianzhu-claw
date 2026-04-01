@@ -1041,6 +1041,9 @@ impl Orchestrator {
             }
         }
 
+        // 5.5 tool_call 清洗 — 在 ContextGuard 之前清洗 ID/配对
+        super::tool_call_sanitizer::sanitize_messages_for_llm(&mut messages, provider);
+
         // 6. 上下文预算守卫（ContextGuard）— 唯一的预算强制点
         //
         // 统一管理所有上下文裁剪。5 步策略链：

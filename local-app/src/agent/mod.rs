@@ -43,6 +43,7 @@ pub mod dispatcher;
 pub mod llm;
 pub mod orchestrator;
 pub mod soul;
+pub mod tool_call_sanitizer;
 pub mod self_evolution;
 pub mod delegate;
 pub mod token_counter;

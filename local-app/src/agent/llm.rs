@@ -1356,6 +1356,30 @@ impl LlmClient {
             }
         }
 
+        // 检测合并的 JSON arguments（两个 tool_call 的 args 合并到一个中）
+        // 例如：{"url":"..."}{"path":"..."} — 拆分为独立的 tool_calls
+        {
+            let mut extra_tool_calls: Vec<OaToolCallAccum> = Vec::new();
+            for tc in oa_tool_calls.iter_mut() {
+                let parts = super::tool_call_sanitizer::split_merged_json(&tc.arguments);
+                if parts.len() > 1 {
+                    log::warn!(
+                        "检测到合并的 JSON arguments（{} 个对象），拆分 tool_call id='{}'",
+                        parts.len(), tc.id
+                    );
+                    tc.arguments = parts[0].clone();
+                    for (j, part) in parts.iter().enumerate().skip(1) {
+                        extra_tool_calls.push(OaToolCallAccum {
+                            id: format!("{}_split_{}", tc.id, j),
+                            name: tc.name.clone(),
+                            arguments: part.clone(),
+                        });
+                    }
+                }
+            }
+            oa_tool_calls.extend(extra_tool_calls);
+        }
+
         // 转换累积的 tool calls
         // 对缺少 name 的 tool call，尝试从 arguments 推断工具名
         // 对缺少 id 的 tool call，自动生成 ID
@@ -1831,6 +1855,10 @@ impl LlmClient {
                     if !id.is_empty() {
                         oa_tool_calls[idx].id = id.to_string();
                     }
+                }
+                // 如果 ID 仍为空（某些 provider 不发 id），自动生成
+                if oa_tool_calls[idx].id.is_empty() {
+                    oa_tool_calls[idx].id = format!("call_{}", idx);
                 }
                 // name: 标准路径 tc.function.name，备选 tc.name, tc.function_call.name
                 if let Some(name) = tc["function"]["name"].as_str()

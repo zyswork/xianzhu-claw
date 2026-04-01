@@ -784,8 +784,9 @@ mod tests {
             tool_result("orphan", "search", "data"),
         ];
         repair_tool_pairing(&mut msgs);
-        assert_eq!(msgs[1]["role"].as_str(), Some("user"));
-        assert!(msgs[1]["content"].as_str().unwrap().contains("[Tool `search`"));
+        // 孤儿 tool_result（无对应 assistant tool_call）应被移除
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0]["role"].as_str(), Some("user"));
     }
 
     #[test]

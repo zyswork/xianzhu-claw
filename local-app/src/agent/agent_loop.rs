@@ -223,8 +223,8 @@ pub async fn run_agent_loop(
             });
         }
 
-        // 发送前最终安全网：确保所有 tool_call 有 response（防止 400 Bad Request）
-        ensure_tool_call_responses(&mut messages);
+        // 发送前最终安全网：清洗 tool_call ID/Name + 配对修复 + 去重（防止 400 Bad Request）
+        super::tool_call_sanitizer::sanitize_messages_for_llm(&mut messages, &config.provider);
 
         let llm_start = std::time::Instant::now();
         // 通过 provider_registry 或 fallback 到传统 LlmClient
@@ -506,6 +506,7 @@ pub async fn run_agent_loop(
                     deps.event_broadcaster.emit(super::observer::AgentEvent::ToolDone { tool_name: tc_name.clone(), success, duration_ms: duration_ms as u64 });
                 }
                 let scrubbed = scrub_credentials(&result_text);
+                let scrubbed = super::tool_call_sanitizer::truncate_tool_result(&scrubbed);
                 messages.push(dispatcher.format_tool_result(&tc_id, &tc_name, &scrubbed));
             }
         } else {
@@ -560,6 +561,7 @@ pub async fn run_agent_loop(
                 }
 
                 let scrubbed = scrub_credentials(&result_text);
+                let scrubbed = super::tool_call_sanitizer::truncate_tool_result(&scrubbed);
                 messages.push(dispatcher.format_tool_result(&tc.id, &tc.name, &scrubbed));
 
                 // 遥测：工具执行失败时上报
