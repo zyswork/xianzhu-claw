@@ -843,7 +843,8 @@ impl Orchestrator {
                 log::debug!("会话消息缓存命中: session_id={}", session_id);
                 msgs
             } else {
-                let msgs = memory::conversation::load_chat_messages(&self.pool, session_id, 20).await.unwrap_or_default();
+                // 加载更多历史（100条），让 ContextGuard 根据 token 预算裁剪
+                let msgs = memory::conversation::load_chat_messages(&self.pool, session_id, 100).await.unwrap_or_default();
                 // 写入缓存
                 if let Ok(mut cache) = self.session_msg_cache.lock() {
                     cache.put(session_id.to_string(), (msgs.clone(), std::time::Instant::now()));
@@ -852,8 +853,7 @@ impl Orchestrator {
             }
         };
 
-        // 如果 session 有摘要（compact 后），注入到 system prompt
-        // 同时获取压缩边界，只把边界之后的消息发给 LLM
+        // 获取压缩边界和会话摘要
         let compact_boundary: i64 = {
             let key = format!("compact_boundary_{}", session_id);
             sqlx::query_scalar::<_, String>("SELECT value FROM settings WHERE key = ?")
@@ -863,17 +863,11 @@ impl Orchestrator {
                 .unwrap_or(0)
         };
 
-        if let Ok(Some(session)) = memory::conversation::get_session(&self.pool, session_id).await {
-            if let Some(ref summary) = session.summary {
-                if !summary.is_empty() {
-                    system_prompt = format!(
-                        "{}\n\n---\n\n# Previous conversation summary\n\n{}\n\n---\n\nThe above is a summary of earlier conversation. Continue naturally from the recent messages below.",
-                        system_prompt, summary
-                    );
-                    log::info!("compact: 已注入摘要到 system prompt（{}字符），boundary_seq={}", summary.len(), compact_boundary);
-                }
-            }
-        }
+        let session_summary = if let Ok(Some(session)) = memory::conversation::get_session(&self.pool, session_id).await {
+            session.summary.filter(|s| !s.is_empty())
+        } else {
+            None
+        };
 
         let mut messages: Vec<serde_json::Value> = Vec::new();
         log::info!("Provider: '{}', 添加 system message: {}", provider, provider == "openai");
@@ -882,19 +876,20 @@ impl Orchestrator {
             messages.push(serde_json::json!({"role": "system", "content": &system_prompt}));
         }
 
-        // 如果有压缩边界，只加载边界之后的消息发给 LLM（用户 UI 仍看到全部历史）
+        // 参照 OpenClaw：摘要作为消息注入对话流（不是系统提示）
+        // 这样 LLM 能看到"之前聊了什么 → 现在的消息"的衔接
+        if let Some(ref summary) = session_summary {
+            messages.push(serde_json::json!({
+                "role": "assistant",
+                "content": format!("[对话摘要] 以下是之前对话的要点：\n\n{}\n\n---\n请基于以上背景继续对话。", summary)
+            }));
+            log::info!("compact: 摘要注入为 assistant 消息（{}字符），boundary_seq={}", summary.len(), compact_boundary);
+        }
+
         if compact_boundary > 0 {
-            // 过滤掉已被摘要覆盖的旧消息
-            let _filtered: Vec<serde_json::Value> = structured_history.into_iter()
-                .filter(|_msg| {
-                    // structured_history 没有 seq 字段，用位置近似判断
-                    // 保留全部（因为 load_chat_messages 已经有 limit）
-                    true
-                })
-                .collect();
-            // 重新从 DB 加载 boundary 之后的消息
+            // 有压缩边界：加载边界之后的所有消息（上限 100 条，让 ContextGuard 裁剪）
             let recent_msgs: Vec<(String, String)> = sqlx::query_as(
-                "SELECT role, COALESCE(content, '') FROM chat_messages WHERE session_id = ? AND seq > ? ORDER BY seq ASC LIMIT 50"
+                "SELECT role, COALESCE(content, '') FROM chat_messages WHERE session_id = ? AND seq > ? ORDER BY seq ASC LIMIT 100"
             ).bind(session_id).bind(compact_boundary)
                 .fetch_all(&self.pool).await.unwrap_or_default();
 
@@ -906,11 +901,9 @@ impl Orchestrator {
             // 无压缩：使用完整结构化历史
             log::info!("加载 {} 条结构化历史消息", structured_history.len());
             messages.extend(structured_history);
-            // 修复历史消息中可能断裂的 tool_call/tool_result 配对
-            super::context_guard::repair_tool_pairing(&mut messages);
         } else {
-            // Fallback: 旧的纯文本历史
-            let history = memory::conversation::get_history(&self.pool, agent_id, session_id, 20).await.unwrap_or_default();
+            // Fallback: 旧的纯文本历史（加载更多条，让 ContextGuard 处理裁剪）
+            let history = memory::conversation::get_history(&self.pool, agent_id, session_id, 50).await.unwrap_or_default();
             for (user_msg, agent_resp) in history.into_iter().rev() {
                 messages.push(serde_json::json!({"role": "user", "content": user_msg}));
                 if !agent_resp.is_empty() {
