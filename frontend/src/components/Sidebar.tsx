@@ -365,7 +365,7 @@ export default function Sidebar() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
                 {t('sidebar.about') || '关于'} XianZhuClaw
               </span>
-              <span style={{ fontSize: 11, opacity: 0.6 }}>v0.2.0</span>
+              <span style={{ fontSize: 11, opacity: 0.6 }}>v1.0.0</span>
             </>
           )}
         </button>
@@ -431,7 +431,7 @@ function AboutDialog({ onClose }: { onClose: () => void }) {
         <p style={{ margin: '0 0 4px', fontSize: 13, color: 'var(--text-muted)' }}>
           {t('about.tagline') || 'AI 原生桌面助手，多智能体协作'}
         </p>
-        <p style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>v0.2.0</p>
+        <p style={{ margin: '0 0 16px', fontSize: 14, fontWeight: 600, color: 'var(--accent)' }}>v1.0.0</p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
           <button onClick={handleCheckUpdate} disabled={checking || updating} style={{

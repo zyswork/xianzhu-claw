@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 type Platform = 'macos' | 'windows' | 'linux';
 
 const BASE = 'https://zys-openclaw.com/downloads';
-const VER = '0.1.0';
+const VER = '1.0.0';
 
 const downloadUrls: Record<Platform, string> = {
   macos: `${BASE}/XianZhu_${VER}_aarch64.dmg`,
@@ -136,7 +136,7 @@ export default function Download() {
           transition={{ duration: 0.6, delay: 0.4 }}
           className="text-white/20 text-sm mt-8"
         >
-          v0.1.0 Preview &middot;{' '}
+          v1.0.0 &middot;{' '}
           <a
             href="https://github.com/zyswork/xianzhu-claw/releases"
             target="_blank"
@@ -146,6 +146,22 @@ export default function Download() {
             查看所有版本
           </a>
         </motion.p>
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.5 }}
+          className="mt-6 text-center max-w-lg mx-auto px-6 py-4 rounded-xl border border-amber-500/10 bg-amber-500/[0.03]"
+        >
+          <p className="text-amber-400/70 text-xs font-medium mb-1">macOS 用户注意</p>
+          <p className="text-white/30 text-xs">
+            首次打开如提示「无法验证开发者」，请在终端执行：
+            <code className="ml-1 px-1.5 py-0.5 bg-white/[0.05] rounded text-amber-400/60 text-[11px]">
+              sudo xattr -cr /Applications/XianZhuClaw.app
+            </code>
+          </p>
+        </motion.div>
       </div>
     </section>
   );

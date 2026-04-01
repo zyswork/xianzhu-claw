@@ -156,7 +156,10 @@ export default function Guide() {
                 </ul>
               </Step>
               <Step number={2} title="macOS 安全提示">
-                <p>首次打开时如果提示「无法验证开发者」，前往系统设置 &gt; 隐私与安全性 &gt; 点击「仍要打开」。</p>
+                <p>由于应用暂未签名，macOS 首次打开会提示「无法验证开发者」或「已损坏」。请按以下步骤解决：</p>
+                <p className="mt-2"><strong className="text-white/60">方法一（推荐）：</strong>打开终端，执行以下命令：</p>
+                <CodeBlock code={`sudo xattr -cr /Applications/XianZhuClaw.app`} />
+                <p className="mt-2"><strong className="text-white/60">方法二：</strong>前往「系统设置 &gt; 隐私与安全性」，找到被阻止的应用，点击「仍要打开」。</p>
               </Step>
               <Step number={3} title="Linux 安装">
                 <CodeBlock code={`# Debian / Ubuntu
@@ -175,8 +178,8 @@ chmod +x XianZhu-0.1.0.AppImage
                 <p>进入「设置 &gt; 供应商管理」，点击「添加供应商」，选择你使用的 AI 服务商。</p>
                 <p className="mt-2">支持的供应商包括：OpenAI、Anthropic (Claude)、Google (Gemini)、Moonshot (Kimi)、DeepSeek 等。</p>
               </Step>
-              <Step number={2} title="配置 API Key（或 OAuth 免费授权）">
-                <p>输入对应供应商的 API Key。对于 <strong>Google Gemini</strong>，支持 OAuth 免费授权 — 无需 API Key，直接用 Google 账号登录即可免费使用 Gemini 2.5/3.1 系列模型。</p>
+              <Step number={2} title="配置 API Key">
+                <p>输入对应供应商的 API Key。支持 OpenAI、Anthropic、Google Gemini、Moonshot、DeepSeek 等。</p>
                 <p className="mt-2">Key 会加密存储在本地数据库中，不上传任何服务器。</p>
                 <CodeBlock code={`# API Key 存储位置
 # macOS: ~/Library/Application Support/com.xianzhu.app/xianzhu.db

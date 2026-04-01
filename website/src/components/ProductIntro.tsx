@@ -21,7 +21,7 @@ function Overview() {
           </p>
           <p className="text-base text-white/40 leading-relaxed max-w-2xl mx-auto">
             完全开源（MIT License），永久免费。原生支持通义千问、智谱GLM、Kimi、MiniMax、DeepSeek 等国产模型，
-            中文优先体验，Google Gemini 免费 OAuth 接入。无需在不同工具间切换，也无需将数据上传到第三方云服务。
+            中文优先体验无需在不同工具间切换，也无需将数据上传到第三方云服务。
           </p>
         </motion.div>
       </div>
@@ -267,7 +267,7 @@ function Comparison() {
                 ['国产模型', '10+ 供应商', '有限支持'],
                 ['中文体验', '原生中文', '英文为主'],
                 ['本地数据', '完全本地', '云端同步'],
-                ['Gemini', '免费 OAuth 接入', '需 API Key'],
+                ['Gemini', 'OAuth 支持', '需 API Key'],
               ].map(([label, xz, oc], i) => (
                 <tr key={i} className="hover:bg-white/[0.02] transition-colors">
                   <td className="px-6 py-3 text-white/50 font-medium">{label}</td>

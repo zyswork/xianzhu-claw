@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-0.2.0-blue" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-brightgreen" alt="Platform" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License" />
   <img src="https://github.com/zyswork/xianzhu-claw/actions/workflows/build.yml/badge.svg" alt="Build" />
