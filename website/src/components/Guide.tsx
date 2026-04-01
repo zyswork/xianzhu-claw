@@ -130,7 +130,7 @@ export default function Guide() {
           <h1 className="text-4xl md:text-6xl font-bold mb-4">
             使用<span className="gradient-text">手册</span>
           </h1>
-          <p className="text-white/40 text-lg">从安装到精通，快速上手衔烛</p>
+          <p className="text-white/40 text-lg">从安装到精通，快速上手衔烛Claw</p>
         </motion.div>
 
         <div className="flex gap-12">
@@ -140,7 +140,7 @@ export default function Guide() {
           <div className="flex-1 min-w-0">
             {/* 安装 */}
             <Section id="install" title="安装">
-              <p>衔烛支持 macOS、Windows 和 Linux 三大平台。</p>
+              <p>衔烛Claw 支持 macOS、Windows 和 Linux 三大平台。</p>
               <Step number={1} title="下载安装包">
                 <p>
                   前往{' '}
@@ -190,7 +190,7 @@ chmod +x XianZhu-0.1.0.AppImage
 
             {/* 创建 Agent */}
             <Section id="create-agent" title="创建 Agent">
-              <p>Agent 是衔烛的核心概念。每个 Agent 有自己的模型、人格和技能配置。</p>
+              <p>Agent 是衔烛Claw 的核心概念。每个 Agent 有自己的模型、人格和技能配置。</p>
               <Step number={1} title="新建 Agent">
                 <p>点击侧栏的「+」按钮，填写 Agent 名称、描述。</p>
               </Step>
@@ -233,7 +233,7 @@ chmod +x XianZhu-0.1.0.AppImage
 
             {/* 多 Agent 协作 */}
             <Section id="multi-agent" title="多 Agent 协作">
-              <p>衔烛支持多个 Agent 之间的协作，实现复杂任务的分工处理。</p>
+              <p>衔烛Claw 支持多个 Agent 之间的协作，实现复杂任务的分工处理。</p>
               <Step number={1} title="创建关系">
                 <p>在 Agent 设置中，添加「可委派对象」，建立 Agent 之间的协作关系。</p>
               </Step>
@@ -252,7 +252,7 @@ chmod +x XianZhu-0.1.0.AppImage
 
             {/* 记忆管理 */}
             <Section id="memory" title="记忆管理">
-              <p>衔烛的三层记忆系统让 AI 真正理解你。</p>
+              <p>衔烛Claw 的三层记忆系统让 AI 真正理解你。</p>
               <Step number={1} title="记忆类型">
                 <ul className="list-disc list-inside space-y-1">
                   <li><strong className="text-white/60">工作记忆</strong>：当前对话的上下文，对话结束后清除</li>
@@ -281,7 +281,7 @@ chmod +x XianZhu-0.1.0.AppImage
               </Step>
               <Step number={2} title="配置 Telegram 示例">
                 <CodeBlock code={`# 1. 在 Telegram 中找到 @BotFather，创建 Bot 获取 Token
-# 2. 在衔烛「频道管理」中添加 Telegram 频道
+# 2. 在衔烛Claw「频道管理」中添加 Telegram 频道
 # 3. 填入 Bot Token
 # 4. 选择关联的 Agent
 # 5. 保存并启用`} />
@@ -295,20 +295,20 @@ chmod +x XianZhu-0.1.0.AppImage
             <Section id="faq" title="常见问题">
               <div className="space-y-6">
                 <div className="glass-card p-5">
-                  <h4 className="text-white font-semibold mb-2">Q: 衔烛是免费的吗？</h4>
-                  <p>衔烛本身是免费开源的（MIT License）。但你需要自备 AI 供应商的 API Key，这些 API 的费用由供应商收取。</p>
+                  <h4 className="text-white font-semibold mb-2">Q: 衔烛Claw是免费的吗？</h4>
+                  <p>衔烛Claw 本身是免费开源的（MIT License）。但你需要自备 AI 供应商的 API Key，这些 API 的费用由供应商收取。</p>
                 </div>
                 <div className="glass-card p-5">
                   <h4 className="text-white font-semibold mb-2">Q: 数据存在哪里？</h4>
-                  <p>所有数据存储在你的本地设备上，具体位置取决于操作系统。衔烛不会将任何对话数据上传到第三方服务器。</p>
+                  <p>所有数据存储在你的本地设备上，具体位置取决于操作系统。衔烛Claw 不会将任何对话数据上传到第三方服务器。</p>
                 </div>
                 <div className="glass-card p-5">
                   <h4 className="text-white font-semibold mb-2">Q: 支持哪些模型？</h4>
                   <p>支持所有兼容 OpenAI API 格式的模型，包括 GPT-4o、Claude、Gemini、Kimi、DeepSeek、Qwen 等。</p>
                 </div>
                 <div className="glass-card p-5">
-                  <h4 className="text-white font-semibold mb-2">Q: 如何更新衔烛？</h4>
-                  <p>衔烛支持自动更新检查。也可以前往 GitHub Releases 手动下载最新版本。</p>
+                  <h4 className="text-white font-semibold mb-2">Q: 如何更新衔烛Claw？</h4>
+                  <p>衔烛Claw 支持自动更新检查。也可以前往 GitHub Releases 手动下载最新版本。</p>
                 </div>
                 <div className="glass-card p-5">
                   <h4 className="text-white font-semibold mb-2">Q: 遇到问题怎么办？</h4>

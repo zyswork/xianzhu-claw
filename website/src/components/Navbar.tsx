@@ -46,7 +46,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <a href="/" className="flex items-center gap-2 text-white font-bold text-lg tracking-wide">
-            <span className="gradient-text text-xl font-black">衔烛</span>
+            <span className="gradient-text text-xl font-black">衔烛Claw</span>
             <span className="text-white/40 text-sm font-normal hidden sm:inline">XianZhuClaw</span>
           </a>
 

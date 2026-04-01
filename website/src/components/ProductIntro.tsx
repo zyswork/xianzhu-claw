@@ -13,10 +13,10 @@ function Overview() {
           transition={{ duration: 0.6 }}
         >
           <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            <span className="gradient-text">衔烛</span>是什么
+            <span className="gradient-text">衔烛Claw</span>是什么
           </h1>
           <p className="text-lg md:text-xl text-white/60 leading-relaxed max-w-3xl mx-auto mb-8">
-            衔烛（XianZhu）是一款开源免费的 AI 原生桌面助手，OpenClaw 的开源替代品。基于 Tauri 构建，支持多供应商大模型（含丰富国产模型）、
+            衔烛Claw（XianZhuClaw）是一款开源免费的 AI 原生桌面助手，OpenClaw 的开源替代品。基于 Tauri 构建，支持多供应商大模型（含丰富国产模型）、
             多智能体协作、持久化记忆和云端技能市场。它运行在你的本地设备上，数据完全由你掌控。
           </p>
           <p className="text-base text-white/40 leading-relaxed max-w-2xl mx-auto">
@@ -91,7 +91,7 @@ function CoreAdvantages() {
           <h2 className="text-3xl md:text-5xl font-bold mb-4">
             核心<span className="gradient-text">优势</span>
           </h2>
-          <p className="text-white/40 text-lg">为什么选择衔烛</p>
+          <p className="text-white/40 text-lg">为什么选择衔烛Claw</p>
         </motion.div>
 
         <div ref={ref} className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -241,10 +241,10 @@ function Comparison() {
           <h2 className="text-3xl md:text-5xl font-bold mb-4">
             对比<span className="gradient-text">优势</span>
           </h2>
-          <p className="text-white/40 text-lg">衔烛 vs 竞品</p>
+          <p className="text-white/40 text-lg">衔烛Claw vs 竞品</p>
         </motion.div>
 
-        {/* 衔烛 vs OpenClaw 详细对比表格 */}
+        {/* 衔烛Claw vs OpenClaw 详细对比表格 */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -290,7 +290,7 @@ function Comparison() {
               className="glass-card p-6"
             >
               <h3 className="text-lg font-semibold text-white mb-1">
-                衔烛 <span className="text-white/30">vs</span>{' '}
+                衔烛Claw <span className="text-white/30">vs</span>{' '}
                 <span className="text-amber-400">{comp.vs}</span>
               </h3>
               <div className="divider-gradient my-4" />

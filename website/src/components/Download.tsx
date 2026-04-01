@@ -79,7 +79,7 @@ export default function Download() {
           transition={{ duration: 0.6 }}
         >
           <h2 className="text-3xl md:text-5xl font-bold mb-4">
-            开始使用<span className="gradient-text">衔烛</span>
+            开始使用<span className="gradient-text">衔烛Claw</span>
           </h2>
           <p className="text-white/40 text-lg mb-12">
             永久免费，开源 MIT 许可，立即体验 AI 原生桌面助手

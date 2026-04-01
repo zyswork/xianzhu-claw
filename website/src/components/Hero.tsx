@@ -91,7 +91,7 @@ function ProductMockup() {
           <div className="w-3 h-3 rounded-full bg-[#febc2e]" />
           <div className="w-3 h-3 rounded-full bg-[#28c840]" />
           <span className="ml-3 text-xs text-white/30 font-medium tracking-wide">
-            XianZhu
+            XianZhuClaw
           </span>
         </div>
         {/* 内容区 */}
@@ -187,7 +187,7 @@ export default function Hero() {
           transition={{ duration: 0.6, delay: 0.1 }}
           className="text-6xl md:text-8xl font-black tracking-tight mb-6"
         >
-          <span className="gradient-text">衔烛</span>
+          <span className="gradient-text">衔烛Claw</span>
         </motion.h1>
 
         {/* 副标题 */}

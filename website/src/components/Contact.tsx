@@ -92,7 +92,7 @@ function ContactForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const subject = encodeURIComponent(`[衔烛反馈] 来自 ${name}`);
+    const subject = encodeURIComponent(`[衔烛Claw 反馈] 来自 ${name}`);
     const body = encodeURIComponent(`姓名: ${name}\n邮箱: ${email}\n\n${message}`);
     window.location.href = `mailto:zys_work@outlook.com?subject=${subject}&body=${body}`;
   };
@@ -187,7 +187,7 @@ function SocialLinks() {
     >
       <h3 className="text-lg font-semibold text-white mb-4">加入社区</h3>
       <p className="text-white/40 text-sm mb-6">
-        加入衔烛的开源社区，获取最新动态、提交功能建议、参与开发。
+        加入衔烛Claw 的开源社区，获取最新动态、提交功能建议、参与开发。
       </p>
       <div className="flex flex-wrap gap-3">
         {links.map((link) => (
