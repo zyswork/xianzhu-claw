@@ -389,7 +389,7 @@ function SessionItem({ s, activeSession, onSelect, onDelete, onExport, renamingS
       {renamingSession === s.id ? (
         <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)}
           onBlur={() => onFinishRename(renameValue)}
-          onKeyDown={(e) => { if (e.key === 'Enter') onFinishRename(renameValue); if (e.key === 'Escape') onCancelRename() }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) onFinishRename(renameValue); if (e.key === 'Escape') onCancelRename() }}
           style={{ flex: 1, padding: '2px 4px', border: '1px solid var(--accent)', borderRadius: 3, fontSize: 13, outline: 'none' }}
         />
       ) : (
@@ -3103,7 +3103,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                 style={{ width: '100%', marginBottom: 4 }} />
               <div style={{ display: 'flex', gap: 4 }}>
                 <input value={agentMsgContent} onChange={e => setAgentMsgContent(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleSendAgentMsg() }}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSendAgentMsg() }}
                   placeholder={t('multiAgent.msgPlaceholder')}
                   style={{ flex: 1, padding: '6px 8px', borderRadius: 4, border: '1px solid var(--border-subtle)', fontSize: 12 }}
                 />
@@ -3125,7 +3125,7 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                 style={{ width: '100%', marginBottom: 4 }} />
               <div style={{ display: 'flex', gap: 4 }}>
                 <input value={a2aTopic} onChange={e => setA2aTopic(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleA2aChat() }}
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleA2aChat() }}
                   placeholder={t('multiAgent.topicPlaceholder')}
                   style={{ flex: 1, padding: '6px 8px', borderRadius: 4, border: '1px solid var(--border-subtle)', fontSize: 12 }}
                 />

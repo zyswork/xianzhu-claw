@@ -148,7 +148,7 @@ export default function LoginPage() {
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary, #aaa)', marginBottom: 6 }}>{t('login.emailLabel')}</label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSendCode() }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSendCode() }}
               placeholder={t('login.emailPlaceholder')} autoFocus style={inputStyle} />
           </div>
           <button onClick={handleSendCode} disabled={loading} style={{ ...btnStyle, marginBottom: 8 }}>
@@ -166,7 +166,7 @@ export default function LoginPage() {
           </div>
           <div style={{ marginBottom: 16 }}>
             <input type="text" value={code} onChange={e => setCode(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleVerifyCode() }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleVerifyCode() }}
               placeholder={t('login.codePlaceholder')} autoFocus maxLength={6}
               style={{ ...inputStyle, letterSpacing: 8, textAlign: 'center', fontSize: 20 }} />
           </div>
@@ -193,7 +193,7 @@ export default function LoginPage() {
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary, #aaa)', marginBottom: 6 }}>{t('login.passwordLabel')}</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handlePasswordLogin() }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handlePasswordLogin() }}
               placeholder={t('login.passwordPlaceholder')} style={inputStyle} />
           </div>
           <button onClick={handlePasswordLogin} disabled={loading} style={{ ...btnStyle, marginBottom: 8 }}>
@@ -216,7 +216,7 @@ export default function LoginPage() {
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'block', fontSize: 12, color: 'var(--text-secondary, #aaa)', marginBottom: 6 }}>{t('login.passwordLabel')}</label>
             <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleSetPassword() }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleSetPassword() }}
               placeholder={t('login.newPasswordPlaceholder')} style={inputStyle} />
           </div>
           <button onClick={handleSetPassword} disabled={loading} style={{ ...btnStyle, marginBottom: 8 }}>

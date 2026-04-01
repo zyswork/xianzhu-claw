@@ -1101,7 +1101,7 @@ function AgentMessagesPanel({ agentId }: { agentId: string }) {
           style={{ width: 140 }} />
         <input
           value={content} onChange={e => setContent(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSend()}
+          onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && handleSend()}
           placeholder={t('agentDetailSub.messagesPlaceholder')}
           style={{ flex: 1, padding: '6px 10px', borderRadius: 6, border: '1px solid var(--border-subtle)', fontSize: 13 }}
         />

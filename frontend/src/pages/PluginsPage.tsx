@@ -465,7 +465,7 @@ export default function PluginsPage() {
               type="password"
               value={configKeyInput}
               onChange={e => setConfigKeyInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && saveApiKey()}
+              onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && saveApiKey()}
               placeholder={configModal.envVar}
               autoFocus
               style={{

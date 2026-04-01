@@ -1342,7 +1342,7 @@ function ChangePasswordSection() {
         <div>
           <label style={labelStyle}>{t('profile.confirmPassword')}</label>
           <input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleChange() }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) handleChange() }}
             placeholder={t('profile.confirmPwPlaceholder')} style={inputStyle} />
         </div>
         {msg && (
@@ -1546,7 +1546,7 @@ function SearchSettings() {
                     if (v && v !== apiKeys[opt.keyName!]) saveApiKey(opt.keyName!, v)
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                       const v = (e.target as HTMLInputElement).value.trim()
                       if (v) saveApiKey(opt.keyName!, v)
                     }

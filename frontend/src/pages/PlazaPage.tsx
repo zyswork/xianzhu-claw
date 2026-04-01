@@ -328,7 +328,7 @@ export default function PlazaPage() {
                     ))}
                     <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
                       <input value={newComment} onChange={e => setNewComment(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleComment(post.id)}
+                        onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && handleComment(post.id)}
                         placeholder={t('plaza.commentPlaceholder')}
                         style={{ flex: 1, padding: '5px 10px', borderRadius: 6, border: '1px solid var(--border-subtle)', fontSize: 12 }}
                       />
