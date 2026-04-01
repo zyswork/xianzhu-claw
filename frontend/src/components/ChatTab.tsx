@@ -891,6 +891,8 @@ export default function ChatTab({ agentId }: { agentId: string }) {
   const [displayCount, setDisplayCount] = useState(50)
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
+  // 中文输入法组合状态跟踪（nativeEvent.isComposing 在 Tauri WebView 中不可靠）
+  const composingRef = useRef(false)
   // HUD 实时状态
   const [hud, setHud] = useState({ round: 0, tokens: 0, cost: 0, lastTool: '', lastToolOk: true })
 
@@ -2927,7 +2929,9 @@ export default function ChatTab({ agentId }: { agentId: string }) {
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); handleSend() } }}
+                  onCompositionStart={() => { composingRef.current = true }}
+                  onCompositionEnd={() => { composingRef.current = false }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !composingRef.current && !e.nativeEvent.isComposing) { e.preventDefault(); handleSend() } }}
                   onPaste={handlePaste}
                   placeholder={t('agentDetail.inputHint')}
                   disabled={streaming}
